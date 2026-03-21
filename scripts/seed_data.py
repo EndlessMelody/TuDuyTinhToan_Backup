@@ -24,3 +24,4 @@ def generate_mock_locations(n=10):
 if __name__ == "__main__":
     locs = generate_mock_locations(5)
     print(json.dumps(locs, indent=2))
+x1
