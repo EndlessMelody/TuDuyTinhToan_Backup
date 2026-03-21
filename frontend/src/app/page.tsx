@@ -1,383 +1,1124 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Column, Row, Heading, Text, Button, IconButton, Input, Avatar } from '@/components/OnceUI';
-import { Compass, Hand, MapPin, Users, Mic, Bell, MessageSquare, Plus, CloudRain, Car, Sparkles, Check, X } from 'lucide-react';
+import { Compass, Hand, MapPin, Users, Mic, Bell, MessageSquare, Plus, CloudRain, Flame, ChevronLeft, ChevronRight, Maximize2, X, PanelLeftClose, PanelLeftOpen, Play, Eye, Sun, Moon, Coffee, Wine, UtensilsCrossed, Sparkles, Navigation, Heart, MessageCircle, Bookmark, MoreHorizontal, Star, SlidersHorizontal } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts';
+import MapWidget from '@/components/Map';
+
+const radarData = [
+  { subject: 'Street Food', A: 120, fullMark: 150 },
+  { subject: 'Spicy', A: 98, fullMark: 150 },
+  { subject: 'Sweet', A: 86, fullMark: 150 },
+  { subject: 'Luxury', A: 30, fullMark: 150 },
+  { subject: 'Quiet', A: 65, fullMark: 150 },
+  { subject: 'Group', A: 110, fullMark: 150 },
+];
+
+function getDynamicContext() {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 11) {
+    return { title: 'Morning Energy Boost', icon: <Sun size={20} color="#FBBF24" />, accent: '#FBBF24', tags: ['Breakfast', 'Coffee', 'Juice Bar', 'Bakery'] };
+  } else if (hour >= 11 && hour < 15) {
+    return { title: 'Lunch Power-Up', icon: <UtensilsCrossed size={20} color="#F97316" />, accent: '#F97316', tags: ['Rice', 'Noodles', 'Quick Bites', 'Healthy'] };
+  } else if (hour >= 15 && hour < 19) {
+    return { title: 'Afternoon Chill & Snacks', icon: <Coffee size={20} color="#A78BFA" />, accent: '#A78BFA', tags: ['Cafe', 'Dessert', 'Boba', 'Chill Spots'] };
+  } else if (hour >= 19 && hour < 22) {
+    return { title: 'Dinner & Unwind', icon: <Wine size={20} color="#F472B6" />, accent: '#F472B6', tags: ['BBQ', 'Hotpot', 'Fine Dining', 'Rooftop'] };
+  } else {
+    return { title: 'Late Night Cravings', icon: <Moon size={20} color="#60A5FA" />, accent: '#60A5FA', tags: ['Street Food', '24h Spots', 'Ramen', 'Midnight Snacks'] };
+  }
+}
 
 export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isCreateRoomOpen, setIsCreateRoomOpen] = useState(false);
 
-  // Simulate network fetch
+  const groupToursRef = useRef<HTMLDivElement>(null);
+  const eatItAgainRef = useRef<HTMLDivElement>(null);
+
+  const scrollList = (ref: React.RefObject<HTMLDivElement | null>, direction: 'left' | 'right') => {
+    if (ref.current) {
+      ref.current.scrollBy({ left: direction === 'left' ? -350 : 350, behavior: 'smooth' });
+    }
+  };
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1500);
+    const timer = setTimeout(() => setIsLoading(false), 1500);
     return () => clearTimeout(timer);
   }, []);
 
+  const sidebarWidth = isSidebarOpen ? 260 : 80;
+
   return (
-    <Row fillWidth fillHeight background="page" style={{ height: '100vh', overflow: 'hidden' }}>
-      
-      {/* 1. Left Panel: Navigation Sidebar */}
-      <Column 
+    <Row fillWidth fillHeight style={{ height: '100vh', overflow: 'hidden', backgroundColor: '#0A0A0A' }}>
+
+      {/* ═══════════ 1. LEFT SIDEBAR ═══════════ */}
+      <Column
         className="no-scrollbar"
-        fillHeight 
-        padding="l" 
-        gap="32" 
-        style={{ 
-          width: '280px', // slightly wider to fit widget
-          borderRight: '1px solid var(--neutral-alpha-weak, rgba(255,255,255,0.1))',
-          backgroundColor: '#121212',
+        fillHeight
+        style={{
+          width: `${sidebarWidth}px`,
+          minWidth: `${sidebarWidth}px`,
+          padding: isSidebarOpen ? '24px 20px' : '24px 12px',
+          borderRight: '1px solid rgba(255,255,255,0.08)',
+          backgroundColor: '#111111',
           flexShrink: 0,
-          overflowY: 'auto'
+          overflowX: 'hidden',
+          overflowY: 'auto',
+          transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+          gap: '28px',
         }}
       >
-        <Heading variant="heading-strong-l" style={{ color: '#ED1B24', fontSize: '1.75rem', fontWeight: '900', letterSpacing: '-0.5px' }}>
-          TasteMap.
-        </Heading>
+        {/* Logo + Toggle */}
+        <Row fillWidth style={{
+          justifyContent: isSidebarOpen ? 'space-between' : 'center',
+          alignItems: 'center',
+          minHeight: '36px',
+        }}>
+          {isSidebarOpen && (
+            <Heading variant="heading-strong-l" style={{ color: '#ED1B24', fontWeight: 900, letterSpacing: '-0.5px', whiteSpace: 'nowrap' }}>
+              TasteMap.
+            </Heading>
+          )}
+          <IconButton
+            icon={isSidebarOpen ? <PanelLeftClose size={18} color="rgba(255,255,255,0.7)" /> : <PanelLeftOpen size={18} color="rgba(255,255,255,0.7)" />}
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            style={{
+              backgroundColor: 'rgba(255,255,255,0.08)',
+              borderRadius: '10px',
+              width: '36px',
+              height: '36px',
+              cursor: 'pointer',
+              border: '1px solid rgba(255,255,255,0.06)',
+              transition: 'background-color 0.2s',
+            }}
+          />
+        </Row>
 
-        <Column gap="4" fillWidth>
-          <Text variant="body-default-s" style={{ color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px', paddingLeft: '8px', fontSize: '0.75rem' }}>Menu</Text>
-          <SidebarItem icon={<Compass size={20} />} label="Discover" active />
-          <SidebarItem icon={<Hand size={20} />} label="Food Tour Builder" />
-          <SidebarItem icon={<MapPin size={20} />} label="Local Hot Routes" />
+        {/* Menu Section */}
+        <Column style={{ gap: '4px', width: '100%' }}>
+          {isSidebarOpen && (
+            <Text variant="body-default-xs" style={{ color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '8px', paddingLeft: '12px' }}>Menu</Text>
+          )}
+          <SidebarItem icon={<Compass size={20} />} label="Discover" active collapsed={!isSidebarOpen} />
+          <SidebarItem icon={<Hand size={20} />} label="Food Tour Builder" collapsed={!isSidebarOpen} />
+          <SidebarItem icon={<MapPin size={20} />} label="Local Hot Routes" collapsed={!isSidebarOpen} />
         </Column>
 
-        <Column gap="4" fillWidth>
-          <Text variant="body-default-s" style={{ color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px', paddingLeft: '8px', fontSize: '0.75rem' }}>Social</Text>
-          <SidebarItem icon={<Users size={20} />} label="Foodies" />
-          <SidebarItem icon={<Mic size={20} />} label="Group Rooms" />
+        {/* Social Section */}
+        <Column style={{ gap: '4px', width: '100%' }}>
+          {isSidebarOpen && (
+            <Text variant="body-default-xs" style={{ color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '8px', paddingLeft: '12px' }}>Social</Text>
+          )}
+          <SidebarItem icon={<Users size={20} />} label="Foodies" collapsed={!isSidebarOpen} />
+          <SidebarItem icon={<Mic size={20} />} label="Group Rooms" collapsed={!isSidebarOpen} />
         </Column>
 
+        {/* Spacer */}
         <div style={{ flex: 1 }} />
 
         {/* Gamification Card */}
-        <Column background="surface" padding="m" radius="m" gap="16" style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
-          <Column align="center" gap="8">
-             <Avatar src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=64&h=64&fit=crop" size="l" />
-             <Heading variant="heading-strong-s" style={{ color: 'white' }}>Taste Explorer</Heading>
-             <Text variant="body-default-xs" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.8rem' }}>Level 12 • 4/8 reviews</Text>
+        {isSidebarOpen ? (
+          <Column style={{
+            backgroundColor: 'rgba(255,255,255,0.03)',
+            borderRadius: '16px',
+            border: '1px solid rgba(255,255,255,0.08)',
+            padding: '16px',
+            gap: '12px',
+            flexShrink: 0,
+            overflow: 'hidden',
+          }}>
+            <Row style={{ alignItems: 'center', gap: '12px' }}>
+              <Avatar src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=64&h=64&fit=crop" size="m" />
+              <Column>
+                <Heading variant="heading-strong-s" style={{ color: 'white' }}>Taste Explorer</Heading>
+                <Text variant="body-default-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>Level 12 • Vector Map</Text>
+              </Column>
+            </Row>
+            <div style={{ width: '100%', height: '150px', marginTop: '-4px', marginBottom: '-4px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart cx="50%" cy="50%" outerRadius="60%" data={radarData}>
+                  <PolarGrid stroke="rgba(255,255,255,0.08)" />
+                  <PolarAngleAxis dataKey="subject" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }} />
+                  <Radar name="Taste" dataKey="A" stroke="#ED1B24" fill="#ED1B24" fillOpacity={0.35} />
+                </RadarChart>
+              </ResponsiveContainer>
+            </div>
+            <Button size="s" variant="secondary" fillWidth>Challenge Data</Button>
           </Column>
-          <Button size="s" variant="secondary" fillWidth style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: 'white' }}>View Challenges</Button>
-        </Column>
+        ) : (
+          <Column style={{ alignItems: 'center', width: '100%', paddingBottom: '8px' }}>
+            <Avatar src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=64&h=64&fit=crop" size="m" style={{ border: '2px solid #ED1B24', cursor: 'pointer' }} />
+          </Column>
+        )}
       </Column>
 
-      {/* 2. Center Panel: Main Content Area */}
-      <Column 
+      {/* ═══════════ 2. CENTER PANEL ═══════════ */}
+      <Column
         className="no-scrollbar"
-        fillHeight 
-        fillWidth 
-        gap="40" 
-        style={{ flex: 1, overflowY: 'auto', position: 'relative' }}
+        fillHeight
+        style={{ flex: 1, minWidth: 0, overflowY: 'auto', position: 'relative' }}
       >
-        {/* Sticky Top Header with Glassmorphism */}
-        <Row fillWidth justify="between" align="center" style={{ 
-          position: 'sticky', 
-          top: 0, 
-          zIndex: 50, 
-          backdropFilter: 'blur(24px)', 
+        {/* Sticky Header */}
+        <Row fillWidth style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 50,
+          backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
-          backgroundColor: 'rgba(18, 18, 18, 0.75)', 
-          padding: '24px 48px',
-          borderBottom: '1px solid rgba(255,255,255,0.05)'
+          backgroundColor: 'rgba(10, 10, 10, 0.8)',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          padding: '16px 40px',
+          justifyContent: 'space-between',
+          alignItems: 'center',
         }}>
-          <Row gap="16" align="center">
-            <Row align="center" gap="8" style={{ backgroundColor: 'rgba(255,255,255,0.15)', padding: '10px 20px', borderRadius: '999px', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer', transition: 'all 0.2s' }}>
-              <MapPin size={20} color="#ED1B24" />
-              <Text style={{ color: 'white', fontWeight: 'bold', fontSize: '0.9rem' }}>Dĩ An, Bình Dương</Text>
-              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', marginLeft: '4px' }}>▼</span>
+          <Row style={{ gap: '16px', alignItems: 'center' }}>
+            <Row style={{
+              backgroundColor: 'rgba(255,255,255,0.08)',
+              padding: '8px 18px',
+              borderRadius: '999px',
+              border: '1px solid rgba(255,255,255,0.1)',
+              cursor: 'pointer',
+              gap: '8px',
+              alignItems: 'center',
+              transition: 'background-color 0.2s',
+            }}>
+              <MapPin size={18} color="#ED1B24" />
+              <Text style={{ color: 'white', fontWeight: 600, fontSize: '0.85rem' }}>Dĩ An, Bình Dương</Text>
+              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', marginLeft: '2px' }}>▼</span>
             </Row>
-            <div style={{ width: '320px' }}>
-              <Input placeholder="Search locations, tours, foodies..." style={{ borderRadius: '999px', padding: '12px 24px', backgroundColor: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)', color: 'white' }} />
+            <div style={{ width: '420px' }}>
+              <Input placeholder="Search locations, tours, foodies..." style={{ borderRadius: '999px', padding: '10px 20px' }} />
             </div>
           </Row>
-          <Row gap="24" align="center">
-            <IconButton icon={<Bell size={24} color="white" />} style={{ backgroundColor: 'transparent' }} />
-            <IconButton icon={<MessageSquare size={24} color="white" />} style={{ backgroundColor: 'transparent' }} />
-            <Row align="center" gap="12" style={{ marginLeft: '8px' }}>
+          <Row style={{ gap: '8px', alignItems: 'center' }}>
+            <IconButton icon={<Bell size={20} color="rgba(255,255,255,0.6)" />} variant="tertiary" style={{ borderRadius: '10px' }} />
+            <IconButton icon={<MessageSquare size={20} color="rgba(255,255,255,0.6)" />} variant="tertiary" style={{ borderRadius: '10px' }} />
+            <Row style={{ alignItems: 'center', gap: '10px', marginLeft: '12px' }}>
               <Avatar src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=64&h=64&fit=crop" size="m" />
               <Column>
-                <Heading variant="heading-strong-xs" style={{ color: 'white', fontSize: '0.9rem' }}>Ramona F.</Heading>
-                <Text variant="body-default-xs" style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem' }}>Level 12</Text>
+                <Text style={{ color: 'white', fontWeight: 600, fontSize: '0.85rem' }}>Ramona F.</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem' }}>Level 12</Text>
               </Column>
             </Row>
           </Row>
         </Row>
 
-        <Column fillWidth padding="xl" gap="40" style={{ paddingTop: '0px', paddingLeft: '48px', paddingRight: '48px' }}>
-          
-          {/* Hero Banner Upgrade with Context Tags & Animations */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-          >
-            <Column 
-              fillWidth 
-              justify="center"
-              padding="l"
-              style={{ 
-                minHeight: '360px', 
-                borderRadius: '24px', 
-                backgroundImage: 'url(https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1200&h=600&fit=crop)', 
-                backgroundSize: 'cover', 
+        {/* Main Content */}
+        <Column fillWidth style={{ gap: '40px', padding: '32px 40px 48px 40px' }}>
+
+          {/* ═══ 1. HERO BENTO: Map + Banner ═══ */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: "easeOut" }}>
+            <Row fillWidth style={{ gap: '20px', height: '320px' }}>
+              {/* Map Box */}
+              <Column style={{
+                width: '320px',
+                minWidth: '320px',
+                height: '320px',
+                borderRadius: '20px',
+                overflow: 'hidden',
+                position: 'relative',
+                border: '1px solid rgba(255,255,255,0.06)',
+                flexShrink: 0,
+              }}>
+                <MapWidget />
+              </Column>
+
+              {/* Hero Banner */}
+              <Column style={{
+                flex: 1,
+                minWidth: 0,
+                height: '320px',
+                borderRadius: '20px',
+                backgroundImage: 'url(https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1600&h=600&fit=crop)',
+                backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 position: 'relative',
                 overflow: 'hidden',
-                boxShadow: '0 24px 48px rgba(0,0,0,0.4)'
-              }}
-            >
-              {/* Gradient Overlay left-to-right */ }
-              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(to right, rgba(0,0,0,0.95) 10%, rgba(0,0,0,0.1) 80%)' }} />
-              
-              <Column gap="12" style={{ position: 'relative', zIndex: 1, maxWidth: '600px', marginLeft: '32px' }}>
-                
-                <Row gap="8" align="center" style={{ flexWrap: 'wrap', marginBottom: '4px' }}>
-                  <div style={{ padding: '6px 12px', backgroundColor: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(10px)', borderRadius: '6px', color: 'white', fontSize: '0.75rem', fontWeight: 'bold' }}>100XP / spot</div>
-                  
-                  {/* Real-time Data Tags */}
-                  <Row align="center" gap="6" style={{ padding: '6px 12px', backgroundColor: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)', borderRadius: '6px', color: 'white' }}>
-                    <CloudRain size={14} color="#60A5FA" />
-                    <Text style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#60A5FA' }}>Light Rain • 1.2km</Text>
+              }}>
+                {/* Gradient overlay */}
+                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(10,10,10,0.95) 0%, rgba(10,10,10,0.5) 55%, transparent 100%)' }} />
+
+                <Column style={{ position: 'relative', zIndex: 10, justifyContent: 'center', padding: '36px 40px', height: '100%', gap: '16px' }}>
+                  {/* Tags */}
+                  <Row style={{ gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span style={{ padding: '5px 12px', backgroundColor: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)', borderRadius: '6px', color: 'white', fontSize: '0.7rem', fontWeight: 700 }}>100XP / spot</span>
+                    <Row style={{ padding: '5px 12px', backgroundColor: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px', gap: '5px', alignItems: 'center' }}>
+                      <Flame size={12} color="#F59E0B" />
+                      <Text style={{ fontSize: '0.7rem', fontWeight: 700, color: '#F59E0B' }}>Trending in Dĩ An</Text>
+                    </Row>
+                    <Row style={{ padding: '5px 12px', backgroundColor: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', gap: '5px', alignItems: 'center' }}>
+                      <CloudRain size={12} color="#60A5FA" />
+                      <Text style={{ fontSize: '0.7rem', fontWeight: 700, color: '#60A5FA' }}>Light Rain • 1.2km</Text>
+                    </Row>
                   </Row>
-                  
-                  <Row align="center" gap="6" style={{ padding: '6px 12px', backgroundColor: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)', borderRadius: '6px', color: 'white' }}>
-                    <Car size={14} color="#34D399" />
-                    <Text style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#34D399' }}>Smooth Traffic</Text>
+
+                  {/* Title */}
+                  <Heading variant="display-strong-m" style={{ color: 'white', lineHeight: 1.1 }}>
+                    Weekend Street<br/>Food Tour
+                  </Heading>
+
+                  {/* Avatars */}
+                  <Row style={{ gap: '0px', alignItems: 'center' }}>
+                    <Avatar src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=32&h=32&fit=crop" size="s" style={{ border: '2px solid rgba(10,10,10,0.9)' }} />
+                    <Avatar src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=32&h=32&fit=crop" size="s" style={{ marginLeft: '-10px', border: '2px solid rgba(10,10,10,0.9)' }} />
+                    <Avatar src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=32&h=32&fit=crop" size="s" style={{ marginLeft: '-10px', border: '2px solid rgba(10,10,10,0.9)' }} />
+                    <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem', marginLeft: '10px' }}>+5 friends tracking</Text>
                   </Row>
-                </Row>
 
-                <Heading variant="display-strong-m" style={{ color: 'white', fontSize: '3.5rem', lineHeight: 1.1 }}>
-                  Weekend<br/>Street Food Tour
-                </Heading>
-
-                <Row gap="8" align="center">
-                  <Avatar src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=32&h=32&fit=crop" size="s" style={{ border: '2px solid rgba(0,0,0,0.8)' }} />
-                  <Avatar src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=32&h=32&fit=crop" size="s" style={{ marginLeft: '-16px', border: '2px solid rgba(0,0,0,0.8)' }} />
-                  <Avatar src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=32&h=32&fit=crop" size="s" style={{ marginLeft: '-16px', border: '2px solid rgba(0,0,0,0.8)' }} />
-                  <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.85rem', marginLeft: '8px' }}>+5 friends tracking</Text>
-                </Row>
-
-                <Row gap="16" align="center" style={{ marginTop: '12px' }}>
-                  <Button size="l" style={{ backgroundColor: '#ED1B24', padding: '16px 40px', fontSize: '1.1rem' }}>Start Tour</Button>
-                  <IconButton icon={<Plus size={24} color="white" />} style={{ backgroundColor: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(10px)', width: '52px', height: '52px', borderRadius: '50%' }} />
-                </Row>
+                  {/* CTA */}
+                  <Row style={{ gap: '12px', alignItems: 'center', marginTop: '4px' }}>
+                    <Button size="l" style={{ backgroundColor: '#ED1B24', borderRadius: '14px' }}>Start Tour</Button>
+                    <IconButton icon={<Maximize2 size={20} color="white" />} style={{
+                      backgroundColor: 'rgba(255,255,255,0.12)',
+                      backdropFilter: 'blur(10px)',
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '14px',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                    }} />
+                  </Row>
+                </Column>
               </Column>
-            </Column>
+            </Row>
           </motion.div>
 
-          {/* Group Tours with Loading State */}
-          <Column gap="16" fillWidth>
-            <Row align="center" justify="between" fillWidth>
-               <Heading variant="heading-strong-m" style={{ color: 'white', fontSize: '1.25rem' }}>Group Tours</Heading>
-               <div style={{ width: '40px', height: '8px', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '4px' }}>
-                  <div style={{ width: '16px', height: '8px', backgroundColor: 'white', borderRadius: '4px' }} />
-               </div>
+          {/* ═══ 2. TRENDING REELS ═══ */}
+          <Column fillWidth style={{ gap: '16px' }}>
+            <Row fillWidth style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
+              <Row style={{ alignItems: 'center', gap: '10px' }}>
+                <Flame size={20} color="#ED1B24" />
+                <Heading variant="heading-strong-m" style={{ color: 'white' }}>Trending Reels</Heading>
+              </Row>
+              <Text style={{ color: '#ED1B24', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.2s' }}>View all</Text>
             </Row>
-            
-            <Row className="no-scrollbar" gap="24" fillWidth style={{ overflowX: 'auto', paddingBottom: '16px', scrollbarWidth: 'none' }}>
-              <AnimatePresence mode="wait">
-                {isLoading ? (
-                  <>
-                    <SkeletonGroupCard key="sk1" />
-                    <SkeletonGroupCard key="sk2" />
-                    <SkeletonGroupCard key="sk3" />
-                  </>
-                ) : (
-                  <>
-                    <GroupCard title="Spicy Noodle Challenge" desc="District 1 mapping" img="https://images.unsplash.com/photo-1552611052-33e04de081de?w=200&h=200&fit=crop" delay={0.1} />
-                    <GroupCard title="Coffee Lovers" desc="Hidden cafes tour" img="https://images.unsplash.com/photo-1497935586351-b67a49e012bf?w=200&h=200&fit=crop" delay={0.2} />
-                    <GroupCard title="Midnight Seafood" desc="Coastal group run" img="https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=200&h=200&fit=crop" delay={0.3} />
-                    <GroupCard title="Vegan Discoveries" desc="Healthy spots only" img="https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=200&h=200&fit=crop" delay={0.4} />
-                  </>
-                )}
-              </AnimatePresence>
+            <Row className="no-scrollbar" fillWidth style={{ gap: '16px', overflowX: 'auto', paddingBottom: '4px', scrollBehavior: 'smooth' }}>
+              <ReelCard
+                title="Crispy Pork Belly ASMR 🔥"
+                user="@foodie_ramona"
+                views="1.2M"
+                avatar="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=64&h=64&fit=crop"
+                img="https://images.unsplash.com/photo-1544025162-d76694265947?w=400&h=700&fit=crop"
+                delay={0}
+              />
+              <ReelCard
+                title="Hidden Ramen Spot in District 1"
+                user="@noodle_king"
+                views="890K"
+                avatar="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=64&h=64&fit=crop"
+                img="https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&h=700&fit=crop"
+                delay={0.05}
+              />
+              <ReelCard
+                title="Vietnamese Coffee Art ☕"
+                user="@cafe_hunter"
+                views="2.1M"
+                avatar="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=64&h=64&fit=crop"
+                img="https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400&h=700&fit=crop"
+                delay={0.1}
+              />
+              <ReelCard
+                title="Street Bánh Mì at 3AM 🌙"
+                user="@midnight_bites"
+                views="567K"
+                avatar="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=64&h=64&fit=crop"
+                img="https://images.unsplash.com/photo-1600454021915-de1c1cb0e91f?w=400&h=700&fit=crop"
+                delay={0.15}
+              />
+              <ReelCard
+                title="Dragon Fruit Smoothie Bowl"
+                user="@healthy_vibes"
+                views="340K"
+                avatar="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=64&h=64&fit=crop"
+                img="https://images.unsplash.com/photo-1590301157890-4810ed352733?w=400&h=700&fit=crop"
+                delay={0.2}
+              />
+              <ReelCard
+                title="Seafood Hot Pot Mukbang 🦐"
+                user="@ocean_eats"
+                views="1.8M"
+                avatar="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=64&h=64&fit=crop"
+                img="https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400&h=700&fit=crop"
+                delay={0.25}
+              />
             </Row>
           </Column>
 
-          {/* Eat It Again with Loading State */}
-          <Column gap="16" fillWidth>
-            <Heading variant="heading-strong-m" style={{ color: 'white', fontSize: '1.25rem' }}>Eat It Again</Heading>
-            <Row className="no-scrollbar" gap="24" fillWidth style={{ overflowX: 'auto', paddingBottom: '16px', scrollbarWidth: 'none' }}>
-              <AnimatePresence mode="wait">
-                {isLoading ? (
-                  <>
-                    <SkeletonThumbnailCard key="skt1" />
-                    <SkeletonThumbnailCard key="skt2" />
-                    <SkeletonThumbnailCard key="skt3" />
-                  </>
-                ) : (
-                  <>
-                    <ThumbnailCard title="Banh Mi Pho 古" xp="10XP" img="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=300&h=150&fit=crop" tags="Vietnamese • Street Food" delay={0.1} />
-                    <ThumbnailCard title="Neon Diner" xp="15XP" img="https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=300&h=150&fit=crop" tags="American • Retro" delay={0.2} />
-                    <ThumbnailCard title="Matcha Room" xp="30XP" img="https://images.unsplash.com/photo-1582787895088-2ff176b668d2?w=300&h=150&fit=crop" tags="Japanese • Cafe" delay={0.3} />
-                    <ThumbnailCard title="Sky Bar" xp="10XP" img="https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=300&h=150&fit=crop" tags="Cocktails • View" delay={0.4} />
-                  </>
-                )}
-              </AnimatePresence>
+          {/* ═══ 3. DYNAMIC CONTEXTUAL SUGGESTIONS ═══ */}
+          {(() => {
+            const ctx = getDynamicContext();
+            return (
+              <Column fillWidth style={{ gap: '16px' }}>
+                <Row fillWidth style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                  <Row style={{ alignItems: 'center', gap: '10px' }}>
+                    {ctx.icon}
+                    <Heading variant="heading-strong-m" style={{ color: 'white' }}>{ctx.title}</Heading>
+                    <Row style={{ gap: '6px', marginLeft: '8px' }}>
+                      {ctx.tags.map((tag) => (
+                        <span key={tag} style={{
+                          padding: '3px 10px',
+                          backgroundColor: `${ctx.accent}15`,
+                          border: `1px solid ${ctx.accent}30`,
+                          borderRadius: '6px',
+                          fontSize: '0.7rem',
+                          fontWeight: 600,
+                          color: ctx.accent,
+                        }}>{tag}</span>
+                      ))}
+                    </Row>
+                  </Row>
+                  <Row style={{ alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                    <Sparkles size={14} color={ctx.accent} />
+                    <Text style={{ color: ctx.accent, fontSize: '0.85rem', fontWeight: 600 }}>AI Picks</Text>
+                  </Row>
+                </Row>
+                <Row className="no-scrollbar" fillWidth style={{ gap: '16px', overflowX: 'auto', paddingBottom: '4px', scrollBehavior: 'smooth' }}>
+                  <ContextCard
+                    title="Phở Bò 36 Lý Quốc Sư"
+                    subtitle="Open until 2AM • 0.8km away"
+                    match={94}
+                    accent={ctx.accent}
+                    img="https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400&h=250&fit=crop"
+                    delay={0}
+                  />
+                  <ContextCard
+                    title="Bánh Tráng Trộn Cô Ba"
+                    subtitle="Trending tonight • 1.2km away"
+                    match={87}
+                    accent={ctx.accent}
+                    img="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=250&fit=crop"
+                    delay={0.05}
+                  />
+                  <ContextCard
+                    title="Cơm Tấm Sườn Bì Chả"
+                    subtitle="Crowded now • 0.5km away"
+                    match={91}
+                    accent={ctx.accent}
+                    img="https://images.unsplash.com/photo-1512058564366-18510be2db19?w=400&h=250&fit=crop"
+                    delay={0.1}
+                  />
+                  <ContextCard
+                    title="Kem Bơ Thanh Long"
+                    subtitle="Just opened • 2.1km away"
+                    match={78}
+                    accent={ctx.accent}
+                    img="https://images.unsplash.com/photo-1590301157890-4810ed352733?w=400&h=250&fit=crop"
+                    delay={0.15}
+                  />
+                  <ContextCard
+                    title="Bún Riêu Cua Đồng"
+                    subtitle="Top rated • 1.5km away"
+                    match={85}
+                    accent={ctx.accent}
+                    img="https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&h=250&fit=crop"
+                    delay={0.2}
+                  />
+                </Row>
+              </Column>
+            );
+          })()}
+
+          {/* ══ Live Group Lobbies ══ */}
+          <Column fillWidth style={{ gap: '20px' }}>
+            <Row fillWidth style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+              <Row style={{ alignItems: 'center', gap: '10px' }}>
+                <Users size={20} color="#00D1B2" />
+                <Heading variant="heading-strong-m" style={{ color: 'white' }}>Live Group Lobbies</Heading>
+                <span style={{ padding: '2px 8px', backgroundColor: 'rgba(0,209,178,0.15)', border: '1px solid rgba(0,209,178,0.3)', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 700, color: '#00D1B2' }}>4 Active</span>
+              </Row>
+              <Row style={{ gap: '8px' }}>
+                <IconButton icon={<ChevronLeft size={18} color="rgba(255,255,255,0.6)" />} onClick={() => scrollList(groupToursRef, 'left')} style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '10px', width: '32px', height: '32px', cursor: 'pointer' }} />
+                <IconButton icon={<ChevronRight size={18} color="rgba(255,255,255,0.6)" />} onClick={() => scrollList(groupToursRef, 'right')} style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '10px', width: '32px', height: '32px', cursor: 'pointer' }} />
+              </Row>
+            </Row>
+            <Row ref={groupToursRef} className="no-scrollbar" fillWidth style={{ overflowX: 'auto', gap: '16px', paddingBottom: '8px', scrollBehavior: 'smooth' }}>
+              <LobbyCard
+                title="Spicy Noodle Challenge"
+                desc="District 1 Mapping"
+                img="https://images.unsplash.com/photo-1552611052-33e04de081de?w=600&h=320&fit=crop"
+                status="Waiting for 1..."
+                members={3}
+                delay={0.05}
+              />
+              <LobbyCard
+                title="Coffee Lovers"
+                desc="Hidden cafes tour"
+                img="https://images.unsplash.com/photo-1497935586351-b67a49e012bf?w=600&h=320&fit=crop"
+                status="Starting soon"
+                members={5}
+                delay={0.1}
+              />
+              <LobbyCard
+                title="Midnight Seafood"
+                desc="Coastal group run"
+                img="https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=600&h=320&fit=crop"
+                status="2 spots left"
+                members={4}
+                delay={0.15}
+              />
+              <LobbyCard
+                title="Vegan Discoveries"
+                desc="Healthy spots only"
+                img="https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&h=320&fit=crop"
+                status="Just started"
+                members={6}
+                delay={0.2}
+              />
             </Row>
           </Column>
 
+          {/* ══ The Taste Vault ══ */}
+          <Column fillWidth style={{ gap: '20px' }}>
+            <Row fillWidth style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+              <Row style={{ alignItems: 'center', gap: '10px' }}>
+                <Bookmark size={20} color="#FBBF24" />
+                <Heading variant="heading-strong-m" style={{ color: 'white' }}>The Taste Vault</Heading>
+              </Row>
+              <Row style={{ gap: '8px' }}>
+                <IconButton icon={<ChevronLeft size={18} color="rgba(255,255,255,0.6)" />} onClick={() => scrollList(eatItAgainRef, 'left')} style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '10px', width: '32px', height: '32px', cursor: 'pointer' }} />
+                <IconButton icon={<ChevronRight size={18} color="rgba(255,255,255,0.6)" />} onClick={() => scrollList(eatItAgainRef, 'right')} style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '10px', width: '32px', height: '32px', cursor: 'pointer' }} />
+              </Row>
+            </Row>
+            <Row ref={eatItAgainRef} className="no-scrollbar" fillWidth style={{ overflowX: 'auto', gap: '16px', paddingBottom: '8px', scrollBehavior: 'smooth' }}>
+              <VaultCard title="Banh Mi Pho 古" xp="10XP" img="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=520&h=360&fit=crop" tags="Vietnamese • Street Food" rating={4.8} delay={0.05} />
+              <VaultCard title="Neon Diner" xp="15XP" img="https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=520&h=360&fit=crop" tags="American • Retro" rating={4.2} delay={0.1} />
+              <VaultCard title="Matcha Room" xp="30XP" img="https://images.unsplash.com/photo-1582787895088-2ff176b668d2?w=520&h=360&fit=crop" tags="Japanese • Cafe" rating={4.6} delay={0.15} />
+              <VaultCard title="Sky Bar" xp="10XP" img="https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=520&h=360&fit=crop" tags="Cocktails • View" rating={4.4} delay={0.2} />
+              <VaultCard title="Phở Sáng" xp="20XP" img="https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=520&h=360&fit=crop" tags="Vietnamese • Breakfast" rating={4.9} delay={0.25} />
+            </Row>
+          </Column>
+
+          {/* ═══════════ FOODIE FEED (Horizontal Carousel) ═══════════ */}
+          <Column fillWidth style={{ gap: '20px' }}>
+            {/* Feed Header */}
+            <Row fillWidth style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+              <Row style={{ alignItems: 'center', gap: '10px' }}>
+                <MessageCircle size={20} color="#ED1B24" />
+                <Heading variant="heading-strong-m" style={{ color: 'white' }}>Foodie Feed</Heading>
+              </Row>
+              <Row style={{ gap: '8px', alignItems: 'center' }}>
+                <IconButton icon={<SlidersHorizontal size={18} color="rgba(255,255,255,0.5)" />} style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '10px', width: '32px', height: '32px' }} />
+                <Button size="s" variant="secondary" style={{ borderRadius: '10px' }}>Local: Dĩ An</Button>
+              </Row>
+            </Row>
+
+            {/* Horizontal Feed Cards */}
+            <Row className="no-scrollbar" fillWidth style={{ overflowX: 'auto', gap: '16px', paddingBottom: '8px', scrollBehavior: 'smooth' }}>
+              <PostCard
+                name="Minh T."
+                avatar="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=128&h=128&fit=crop"
+                time="2h"
+                location="Dĩ An"
+                spotName="Bún Bò O Trắng"
+                rating={4.8}
+                review="Tìm được quán bún bò chân ái mới ở Dĩ An! Nước dùng thanh, siêu nhiều thịt. Mọi người nên thử nhé. 🍜🔥"
+                img="https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=680&h=480&fit=crop"
+                tags={['Street Food', 'Spicy']}
+                likes={42}
+                comments={8}
+                delay={0}
+              />
+              <PostCard
+                name="Lê Hương"
+                avatar="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=128&h=128&fit=crop"
+                time="5h"
+                location="Thủ Đức"
+                spotName="Cafe Rooftop Sunset"
+                rating={4.5}
+                review="View đẹp, cà phê ổn, giá hơi cao nhưng đáng để trải nghiệm vào chiều cuối tuần. Chỗ ngồi ngoài trời mát lắm! ☕🌅"
+                img="https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=680&h=480&fit=crop"
+                tags={['Cafe', 'Rooftop']}
+                likes={128}
+                comments={24}
+                delay={0.05}
+              />
+              <PostCard
+                name="Phúc Nguyễn"
+                avatar="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=128&h=128&fit=crop"
+                time="8h"
+                location="Dĩ An"
+                spotName="Hủ Tiếu Nam Vang Chú Sáu"
+                rating={4.9}
+                review="Hủ tiếu khô ở đây xịn nhất vùng, nước lèo thơm béo, hoành thánh giòn tan. Quán đông nhưng phục vụ nhanh. Sẽ quay lại! 🤤"
+                img="https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=680&h=480&fit=crop"
+                tags={['Noodles', 'Budget']}
+                likes={89}
+                comments={15}
+                delay={0.1}
+              />
+              <PostCard
+                name="Thanh Vũ"
+                avatar="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=128&h=128&fit=crop"
+                time="12h"
+                location="Bình Dương"
+                spotName="BBQ Garden Night"
+                rating={4.3}
+                review="Thịt nướng ướp khói thơm phức, bia đá lạnh. Không gian ngoài trời thoáng mát, nhạc acoustic live nữa. 🍖🍻"
+                img="https://images.unsplash.com/photo-1544025162-d76694265947?w=680&h=480&fit=crop"
+                tags={['BBQ', 'Night Life']}
+                likes={67}
+                comments={11}
+                delay={0.15}
+              />
+            </Row>
+          </Column>
         </Column>
       </Column>
 
-      {/* 3. Right Panel: Activity Sidebar */}
-      <Column 
-        fillHeight 
-        padding="l" 
-        gap="32" 
-        align="center"
-        style={{ 
-          width: '100px', 
-          borderLeft: '1px solid var(--neutral-alpha-weak, rgba(255,255,255,0.1))',
-          backgroundColor: '#121212',
-          flexShrink: 0,
-          paddingTop: '48px',
-          paddingRight: '12px'
-        }}
-      >
-        <IconButton 
-          icon={<Plus size={24} color="#ED1B24" />} 
-          style={{ backgroundColor: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '50%', width: '48px', height: '48px', cursor: 'pointer', transition: 'all 0.2s ease', WebkitTapHighlightColor: 'transparent' }} 
+      {/* ═══════════ 3. RIGHT SIDEBAR ═══════════ */}
+      <Column fillHeight style={{
+        width: '80px',
+        minWidth: '80px',
+        flexShrink: 0,
+        borderLeft: '1px solid rgba(255,255,255,0.08)',
+        backgroundColor: '#111111',
+        alignItems: 'center',
+        paddingTop: '24px',
+        gap: '24px',
+      }}>
+        <IconButton
+          icon={<Plus size={20} color="#ED1B24" />}
+          onClick={() => setIsCreateRoomOpen(true)}
+          style={{
+            backgroundColor: 'transparent',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: '50%',
+            width: '44px',
+            height: '44px',
+            cursor: 'pointer',
+            transition: 'border-color 0.2s',
+          }}
         />
-        
-        <Column gap="24" align="center" style={{ marginTop: '32px', width: '100%', alignItems: 'center' }}>
+        <Column style={{ gap: '20px', alignItems: 'center', marginTop: '16px' }}>
           <AvatarWithStatus src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=64&h=64&fit=crop" status="online" />
           <AvatarWithStatus src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=64&h=64&fit=crop" status="offline" />
           <AvatarWithStatus src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=64&h=64&fit=crop" status="online" />
           <AvatarWithStatus src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=64&h=64&fit=crop" status="busy" />
           <AvatarWithStatus src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=64&h=64&fit=crop" status="online" />
         </Column>
-
       </Column>
 
+      {/* ═══════════ MODAL ═══════════ */}
+      <AnimatePresence>
+        {isCreateRoomOpen && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(16px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }}
+              style={{ width: '100%', maxWidth: '420px', backgroundColor: '#161616', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.08)', padding: '32px' }}
+            >
+              <Row fillWidth style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <Heading variant="heading-strong-l" style={{ color: 'white' }}>Start Group Room</Heading>
+                <IconButton icon={<X size={18} color="rgba(255,255,255,0.6)" />} onClick={() => setIsCreateRoomOpen(false)} variant="tertiary" style={{ cursor: 'pointer' }} />
+              </Row>
+              <Column style={{ gap: '24px' }}>
+                <Column style={{ gap: '8px' }}>
+                  <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' }}>Room Name</Text>
+                  <Input placeholder="e.g. Saturday Midnight Snacks" style={{ borderRadius: '12px', padding: '14px 16px' }} />
+                </Column>
+                <Column style={{ gap: '8px' }}>
+                  <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' }}>Invite Foodies</Text>
+                  <Row style={{ gap: '16px', flexWrap: 'wrap' }}>
+                    <Column style={{ alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                      <Avatar src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=64&h=64&fit=crop" size="m" />
+                      <Text style={{ color: 'white', fontSize: '0.7rem' }}>Ramona</Text>
+                    </Column>
+                    <Column style={{ alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                      <Avatar src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=64&h=64&fit=crop" size="m" />
+                      <Text style={{ color: 'white', fontSize: '0.7rem' }}>Jane</Text>
+                    </Column>
+                    <Column style={{ alignItems: 'center', gap: '6px', cursor: 'pointer', opacity: 0.4 }}>
+                      <Avatar src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=64&h=64&fit=crop" size="m" />
+                      <Text style={{ color: 'white', fontSize: '0.7rem' }}>Mike</Text>
+                    </Column>
+                  </Row>
+                </Column>
+                <Button size="l" onClick={() => setIsCreateRoomOpen(false)} style={{ marginTop: '8px', borderRadius: '12px' }}>Initialize Minimax Engine</Button>
+              </Column>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </Row>
   );
 }
 
-// ------ Styled Components & Helpers ------ //
+// ═══════════ SUB-COMPONENTS ═══════════ //
 
-function SidebarItem({ icon, label, active = false }: { icon: React.ReactNode, label: string, active?: boolean }) {
+function SidebarItem({ icon, label, active = false, collapsed = false }: { icon: React.ReactNode; label: string; active?: boolean; collapsed?: boolean }) {
   return (
-    <Row gap="16" align="center" fillWidth style={{ 
-      padding: '12px 16px', 
-      borderRadius: '8px', 
-      backgroundColor: active ? 'rgba(255,255,255,0.05)' : 'transparent',
+    <Row style={{
+      padding: collapsed ? '10px 0' : '10px 12px',
+      borderRadius: '10px',
+      backgroundColor: active ? 'rgba(255,255,255,0.06)' : 'transparent',
       cursor: 'pointer',
-      borderLeft: active ? '4px solid #ED1B24' : '4px solid transparent',
-      color: active ? 'white' : 'rgba(255,255,255,0.6)',
-      transition: 'all 0.2s ease',
+      borderLeft: active ? '3px solid #ED1B24' : '3px solid transparent',
+      color: active ? 'white' : 'rgba(255,255,255,0.5)',
+      transition: 'all 0.25s ease',
+      alignItems: 'center',
+      justifyContent: collapsed ? 'center' : 'flex-start',
+      gap: collapsed ? '0px' : '14px',
+      overflow: 'hidden',
+      minHeight: '42px',
     }}>
-      <div style={{ color: 'inherit', display: 'flex', alignItems: 'center' }}>{icon}</div>
-      <Text style={{ color: 'inherit', fontWeight: active ? '600' : '500', fontSize: '0.95rem' }}>{label}</Text>
+      <div style={{ color: 'inherit', display: 'flex', alignItems: 'center', flexShrink: 0 }}>{icon}</div>
+      {!collapsed && (
+        <Text style={{ color: 'inherit', fontWeight: active ? 600 : 400, fontSize: '0.9rem', whiteSpace: 'nowrap' }}>{label}</Text>
+      )}
     </Row>
   );
 }
 
-// Micro-animation applied using framer-motion's motion.div wrapping the standard Column setup
-function GroupCard({ title, desc, img, delay }: { title: string, desc: string, img: string, delay: number }) {
+// ═════════ LOBBY CARD ═════════ //
+
+const lobbyAvatars = [
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=64&h=64&fit=crop',
+  'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=64&h=64&fit=crop',
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=64&h=64&fit=crop',
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=64&h=64&fit=crop',
+  'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=64&h=64&fit=crop',
+  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=64&h=64&fit=crop',
+];
+
+function LobbyCard({ title, desc, img, status, members, delay }: { title: string; desc: string; img: string; status: string; members: number; delay: number }) {
   return (
-    <motion.div 
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.4, delay }}
-      whileHover={{ scale: 1.05, border: '1px solid rgba(237,27,36,0.5)', boxShadow: '0 8px 32px rgba(237,27,36,0.15)' }} // Hover scale micro-animation
-      style={{ borderRadius: '16px' }}
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4, delay }}
+      whileHover={{ scale: 1.03, boxShadow: '0 8px 32px rgba(0,209,178,0.15)' }}
+      style={{ borderRadius: '16px', flexShrink: 0 }}
     >
-      <Column padding="m" gap="12" style={{ backgroundColor: '#1A1A1A', borderRadius: '16px', minWidth: '240px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.05)', height: '100%' }}>
-         <Row justify="between" align="center" fillWidth>
-           <Avatar src={img} size="m" style={{ borderRadius: '12px' }} />
-           <Row>
-             <Avatar src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=32&h=32&fit=crop" size="s" style={{ border: '2px solid #1a1a1a', zIndex: 3 }} />
-             <Avatar src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=32&h=32&fit=crop" size="s" style={{ border: '2px solid #1a1a1a', zIndex: 2, marginLeft: '-12px' }} />
-             <Avatar src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=32&h=32&fit=crop" size="s" style={{ border: '2px solid #1a1a1a', zIndex: 1, marginLeft: '-12px' }} />
-           </Row>
-         </Row>
-         <Column>
-           <Heading variant="heading-strong-xs" style={{ color: 'white', fontSize: '1rem', marginTop: '8px' }}>{title}</Heading>
-           <Text variant="body-default-xs" style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem' }}>{desc}</Text>
-         </Column>
+      <Column style={{
+        minWidth: '300px', height: '165px', borderRadius: '16px',
+        position: 'relative', overflow: 'hidden', cursor: 'pointer',
+        padding: '20px',
+        justifyContent: 'space-between',
+      }}>
+        {/* Background image + heavy dark overlay for glassmorphism */}
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${img})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(2px) brightness(0.3)' }} />
+        <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(12px)' }} />
+        <div style={{ position: 'absolute', inset: 0, border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', pointerEvents: 'none' }} />
+
+        {/* Top Row — Status */}
+        <Row style={{ position: 'relative', zIndex: 2, justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+          <Row style={{ alignItems: 'center', gap: '8px' }}>
+            <motion.div
+              animate={{ scale: [1, 1.4, 1], opacity: [1, 0.6, 1] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+              style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#00D1B2' }}
+            />
+            <Text style={{ color: '#00D1B2', fontSize: '0.75rem', fontWeight: 700 }}>{status}</Text>
+          </Row>
+          <Users size={16} color="rgba(255,255,255,0.35)" />
+        </Row>
+
+        {/* Middle — Content */}
+        <Column style={{ position: 'relative', zIndex: 2, gap: '2px' }}>
+          <Text style={{ color: 'white', fontWeight: 700, fontSize: '1.05rem' }}>{title}</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.8rem' }}>{desc}</Text>
+        </Column>
+
+        {/* Bottom — Avatars + Join */}
+        <Row style={{ position: 'relative', zIndex: 2, justifyContent: 'space-between', alignItems: 'flex-end', width: '100%' }}>
+          <Row style={{ alignItems: 'center' }}>
+            {lobbyAvatars.slice(0, members).map((src, i) => (
+              <Avatar key={i} src={src} size="s" style={{ border: '2px solid rgba(20,20,20,0.9)', marginLeft: i > 0 ? '-8px' : '0', zIndex: members - i }} />
+            ))}
+          </Row>
+          <Button size="s" style={{ backgroundColor: '#00D1B2', color: '#000', fontWeight: 700, borderRadius: '10px', padding: '6px 18px', fontSize: '0.8rem', border: 'none' }}>Join</Button>
+        </Row>
       </Column>
     </motion.div>
   );
 }
 
-function ThumbnailCard({ title, xp, img, tags, delay }: { title: string, xp: string, img: string, tags: string, delay: number }) {
+// ═════════ VAULT CARD ═════════ //
+
+function VaultCard({ title, xp, img, tags, rating, delay }: { title: string; xp: string; img: string; tags: string; rating: number; delay: number }) {
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.4, delay }}
-      whileHover={{ scale: 1.05, zIndex: 10, boxShadow: '0 12px 32px rgba(237,27,36,0.3)' }}
-      style={{ borderRadius: '16px' }}
+      initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4, delay }}
+      whileHover={{ scale: 1.04, boxShadow: '0 12px 40px rgba(251,191,36,0.15)' }}
+      style={{ borderRadius: '16px', flexShrink: 0 }}
     >
-      <Column justify="end" style={{ 
-        minWidth: '320px', 
-        height: '180px', 
-        borderRadius: '16px', 
-        backgroundImage: `url(${img})`, 
-        backgroundSize: 'cover', 
-        backgroundPosition: 'center',
-        position: 'relative',
-        cursor: 'pointer',
-        overflow: 'hidden'
+      <Column style={{
+        minWidth: '260px', height: '180px', borderRadius: '16px',
+        position: 'relative', cursor: 'pointer', overflow: 'hidden',
       }}>
-        {/* Bottom up gradient overlay */}
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0) 65%)' }} />
-        
-        <div style={{ position: 'absolute', top: '12px', left: '12px', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', padding: '4px 12px', borderRadius: '6px', color: 'white', fontSize: '0.75rem', fontWeight: 'bold' }}>
-          {xp}
-        </div>
+        {/* Full-cover image */}
+        <img src={img} alt={title} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
 
-        <Column padding="m" gap="4" style={{ position: 'relative', zIndex: 1, paddingBottom: '16px' }}>
-           <Heading variant="heading-strong-s" style={{ color: 'white', fontSize: '1.1rem' }}>{title}</Heading>
-           <Text variant="body-default-xs" style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem' }}>{tags}</Text>
+        {/* Heavy gradient for text readability */}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.4) 50%, transparent 100%)' }} />
+
+        {/* XP badge — top left */}
+        <Row style={{
+          position: 'absolute', top: '12px', left: '12px', zIndex: 3,
+          backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)',
+          padding: '4px 10px', borderRadius: '8px', gap: '4px', alignItems: 'center',
+          border: '1px solid rgba(251,191,36,0.3)',
+        }}>
+          <Sparkles size={10} color="#FBBF24" />
+          <Text style={{ fontSize: '0.7rem', fontWeight: 700, color: '#FBBF24' }}>{xp}</Text>
+        </Row>
+
+        {/* Rating badge — top right */}
+        <Row style={{
+          position: 'absolute', top: '12px', right: '12px', zIndex: 3,
+          backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)',
+          padding: '4px 8px', borderRadius: '8px', gap: '3px', alignItems: 'center',
+        }}>
+          <Star size={11} color="#FBBF24" fill="#FBBF24" />
+          <Text style={{ fontSize: '0.7rem', fontWeight: 700, color: '#FBBF24' }}>{rating}</Text>
+        </Row>
+
+        {/* Bottom content */}
+        <Column style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', zIndex: 2, padding: '16px', gap: '3px' }}>
+          <Text style={{ color: 'white', fontWeight: 700, fontSize: '0.95rem' }}>{title}</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.75rem' }}>{tags}</Text>
         </Column>
       </Column>
     </motion.div>
   );
 }
 
-function AvatarWithStatus({ src, status }: { src: string, status: 'online' | 'offline' | 'busy' }) {
+function AvatarWithStatus({ src, status }: { src: string; status: 'online' | 'offline' | 'busy' }) {
   const color = status === 'online' ? '#00D1B2' : status === 'busy' ? '#ED1B24' : 'rgba(255,255,255,0.2)';
   return (
     <div style={{ position: 'relative' }}>
       <Avatar src={src} size="m" />
-      <div style={{ 
-        position: 'absolute', 
-        bottom: 2, 
-        right: -2, 
-        width: '12px', 
-        height: '12px', 
-        backgroundColor: color, 
-        borderRadius: '50%',
-        border: '2px solid #121212'
-      }} />
+      <div style={{ position: 'absolute', bottom: 1, right: -1, width: '11px', height: '11px', backgroundColor: color, borderRadius: '50%', border: '2px solid #111111' }} />
     </div>
   );
 }
 
-// ------ Skeletons ------ //
+// ═══════════ SKELETONS ═══════════ //
 
 function SkeletonGroupCard() {
   return (
-    <motion.div 
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '16px', minWidth: '240px', height: '140px', position: 'relative', overflow: 'hidden' }}
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: '16px', minWidth: '240px', height: '130px', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
+      <div style={{ width: '100%', height: '100%', background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
+    </motion.div>
+  );
+}
+
+function ContextCard({ title, subtitle, match, accent, img, delay }: { title: string; subtitle: string; match: number; accent: string; img: string; delay: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay }}
+      whileHover={{ scale: 1.03, boxShadow: `0 8px 32px ${accent}25` }}
+      style={{ borderRadius: '16px', flexShrink: 0 }}
     >
-      <div style={{ width: '100%', height: '100%', animation: 'pulse 1.5s infinite', background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0) 100%)', backgroundSize: '200% 100%' }} />
+      <Column style={{
+        width: '260px',
+        minWidth: '260px',
+        borderRadius: '16px',
+        backgroundColor: '#161616',
+        border: '1px solid rgba(255,255,255,0.06)',
+        overflow: 'hidden',
+        cursor: 'pointer',
+      }}>
+        {/* Thumbnail */}
+        <div style={{
+          width: '100%',
+          height: '140px',
+          backgroundImage: `url(${img})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          position: 'relative',
+        }}>
+          {/* Match badge */}
+          <Row style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(8px)',
+            padding: '4px 10px',
+            borderRadius: '8px',
+            gap: '4px',
+            alignItems: 'center',
+            border: `1px solid ${accent}40`,
+          }}>
+            <Sparkles size={11} color={accent} />
+            <Text style={{ fontSize: '0.7rem', fontWeight: 700, color: accent }}>{match}% match</Text>
+          </Row>
+          {/* Distance badge */}
+          <Row style={{
+            position: 'absolute',
+            bottom: '10px',
+            left: '10px',
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(8px)',
+            padding: '3px 8px',
+            borderRadius: '6px',
+            gap: '4px',
+            alignItems: 'center',
+          }}>
+            <Navigation size={10} color="rgba(255,255,255,0.6)" />
+            <Text style={{ fontSize: '0.65rem', fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>Dĩ An</Text>
+          </Row>
+        </div>
+        {/* Info */}
+        <Column style={{ padding: '14px 16px', gap: '4px' }}>
+          <Text style={{ color: 'white', fontWeight: 700, fontSize: '0.9rem' }}>{title}</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.75rem' }}>{subtitle}</Text>
+        </Column>
+      </Column>
     </motion.div>
   );
 }
 
 function SkeletonThumbnailCard() {
   return (
-    <motion.div 
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '16px', minWidth: '320px', height: '180px', position: 'relative', overflow: 'hidden' }}
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: '16px', minWidth: '300px', height: '180px', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
+      <div style={{ width: '100%', height: '100%', background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
+    </motion.div>
+  );
+}
+
+// ═════════ POST CARD (Compact Horizontal) ═════════ //
+
+function PostCard({ name, avatar, time, location, spotName, rating, review, img, tags, likes, comments, delay }: {
+  name: string; avatar: string; time: string; location: string; spotName: string;
+  rating: number; review: string; img: string; tags: string[]; likes: number; comments: number; delay: number;
+}) {
+  const [isExpanded, setIsExpanded] = React.useState(false);
+  const [isLiked, setIsLiked] = React.useState(false);
+  const [isSaved, setIsSaved] = React.useState(false);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.4, delay }}
+      whileHover={{ scale: 1.02, boxShadow: '0 8px 32px rgba(237,27,36,0.1)' }}
+      style={{ borderRadius: '16px', flexShrink: 0 }}
     >
-      <div style={{ width: '100%', height: '100%', animation: 'pulse 1.5s infinite', background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0) 100%)', backgroundSize: '200% 100%' }} />
+      <Column style={{
+        minWidth: '340px',
+        maxWidth: '340px',
+        backgroundColor: '#161616',
+        borderRadius: '16px',
+        border: '1px solid rgba(255,255,255,0.06)',
+        overflow: 'hidden',
+        cursor: 'pointer',
+      }}>
+        {/* Top Half — Image with overlays */}
+        <Column style={{ height: '200px', width: '100%', position: 'relative' }}>
+          <img src={img} alt={spotName} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          {/* Vignette */}
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, transparent 40%, rgba(0,0,0,0.6) 100%)' }} />
+
+          {/* User info overlay — top left */}
+          <Row style={{
+            position: 'absolute', top: '12px', left: '12px', zIndex: 3,
+            backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)',
+            padding: '5px 10px', borderRadius: '10px', gap: '8px', alignItems: 'center',
+            border: '1px solid rgba(255,255,255,0.1)',
+          }}>
+            <Avatar src={avatar} size="s" />
+            <Column>
+              <Text style={{ color: 'white', fontWeight: 700, fontSize: '0.75rem' }}>{name}</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.6rem' }}>{time} • {location}</Text>
+            </Column>
+          </Row>
+
+          {/* Rating — top right */}
+          <Row style={{
+            position: 'absolute', top: '12px', right: '12px', zIndex: 3,
+            backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+            padding: '4px 8px', borderRadius: '8px', gap: '3px', alignItems: 'center',
+            border: '1px solid rgba(255,255,255,0.1)',
+          }}>
+            <Star size={11} color="#FBBF24" fill="#FBBF24" />
+            <Text style={{ fontSize: '0.7rem', fontWeight: 700, color: '#FBBF24' }}>{rating}</Text>
+          </Row>
+        </Column>
+
+        {/* Bottom Half — Content */}
+        <Column style={{ padding: '16px', gap: '12px' }}>
+          {/* Location */}
+          <Row style={{ alignItems: 'center', gap: '6px' }}>
+            <MapPin size={14} color="rgba(255,255,255,0.4)" />
+            <Text style={{ color: 'white', fontWeight: 700, fontSize: '0.85rem' }}>{spotName}</Text>
+          </Row>
+
+          {/* Truncated Review */}
+          <Text style={{
+            color: 'rgba(255,255,255,0.75)',
+            fontSize: '0.8rem',
+            lineHeight: 1.5,
+            ...(isExpanded ? {} : {
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical' as const,
+              overflow: 'hidden',
+            }),
+          }}>{review}</Text>
+
+          {/* Xem thêm Toggle */}
+          <Text
+            onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
+            style={{ color: '#ED1B24', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', marginTop: '-4px' }}
+          >{isExpanded ? 'Ẩn bớt' : 'Xem thêm'}</Text>
+
+          {/* Tags */}
+          <Row style={{ gap: '6px', flexWrap: 'wrap' }}>
+            {tags.map((tag) => (
+              <span key={tag} style={{
+                padding: '3px 8px',
+                backgroundColor: 'rgba(237,27,36,0.08)',
+                border: '1px solid rgba(237,27,36,0.15)',
+                borderRadius: '6px',
+                fontSize: '0.65rem',
+                fontWeight: 600,
+                color: '#ED1B24',
+              }}>{tag}</span>
+            ))}
+          </Row>
+
+          {/* Divider */}
+          <div style={{ width: '100%', height: '1px', backgroundColor: 'rgba(255,255,255,0.06)' }} />
+
+          {/* Action Bar */}
+          <Row style={{ justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            <Row style={{ alignItems: 'center', gap: '4px' }}>
+              <Row
+                onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsLiked(!isLiked); }}
+                style={{
+                  alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '8px', cursor: 'pointer',
+                  backgroundColor: isLiked ? 'rgba(237,27,36,0.1)' : 'transparent',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <Heart size={14} color={isLiked ? '#ED1B24' : 'rgba(255,255,255,0.45)'} fill={isLiked ? '#ED1B24' : 'none'} />
+                <Text style={{ fontSize: '0.7rem', fontWeight: 600, color: isLiked ? '#ED1B24' : 'rgba(255,255,255,0.45)' }}>{isLiked ? likes + 1 : likes}</Text>
+              </Row>
+              <Row style={{ alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '8px' }}>
+                <MessageCircle size={14} color="rgba(255,255,255,0.45)" />
+                <Text style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)' }}>{comments}</Text>
+              </Row>
+            </Row>
+            <Row
+              onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsSaved(!isSaved); }}
+              style={{
+                alignItems: 'center', padding: '4px 8px', borderRadius: '8px', cursor: 'pointer',
+                backgroundColor: isSaved ? 'rgba(96,165,250,0.1)' : 'transparent',
+                transition: 'all 0.2s',
+              }}
+            >
+              <Bookmark size={14} color={isSaved ? '#60A5FA' : 'rgba(255,255,255,0.45)'} fill={isSaved ? '#60A5FA' : 'none'} />
+            </Row>
+          </Row>
+        </Column>
+      </Column>
+    </motion.div>
+  );
+}
+
+
+
+function ReelCard({ title, user, views, avatar, img, delay }: { title: string; user: string; views: string; avatar: string; img: string; delay: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.4, delay }}
+      whileHover={{ scale: 1.04, boxShadow: '0 12px 40px rgba(237,27,36,0.2)' }}
+      style={{ borderRadius: '16px', flexShrink: 0 }}
+    >
+      <Column style={{
+        width: '180px',
+        minWidth: '180px',
+        height: '320px',
+        borderRadius: '16px',
+        backgroundImage: `url(${img})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        position: 'relative',
+        overflow: 'hidden',
+        cursor: 'pointer',
+      }}>
+        {/* Dark vignette overlay */}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.1) 40%, rgba(0,0,0,0.3) 100%)' }} />
+
+        {/* Views badge — top right */}
+        <Row style={{
+          position: 'absolute',
+          top: '10px',
+          right: '10px',
+          zIndex: 10,
+          backgroundColor: 'rgba(0,0,0,0.6)',
+          backdropFilter: 'blur(8px)',
+          padding: '4px 8px',
+          borderRadius: '6px',
+          gap: '4px',
+          alignItems: 'center',
+        }}>
+          <Eye size={10} color="rgba(255,255,255,0.7)" />
+          <Text style={{ fontSize: '0.65rem', fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>{views}</Text>
+        </Row>
+
+        {/* Center play button */}
+        <Column style={{
+          position: 'absolute',
+          inset: 0,
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 5,
+        }}>
+          <div style={{
+            width: '44px',
+            height: '44px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(255,255,255,0.15)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'background-color 0.2s',
+          }}>
+            <Play size={18} color="white" fill="white" />
+          </div>
+        </Column>
+
+        {/* Bottom content */}
+        <Column style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          width: '100%',
+          zIndex: 10,
+          padding: '14px',
+          gap: '8px',
+        }}>
+          <Text style={{
+            color: 'white',
+            fontWeight: 700,
+            fontSize: '0.8rem',
+            lineHeight: 1.3,
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}>{title}</Text>
+          <Row style={{ alignItems: 'center', gap: '6px' }}>
+            <Avatar src={avatar} size="xs" />
+            <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.7rem', fontWeight: 500 }}>{user}</Text>
+          </Row>
+        </Column>
+      </Column>
     </motion.div>
   );
 }
