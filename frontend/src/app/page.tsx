@@ -2,10 +2,46 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Column, Row, Heading, Text, Button, IconButton, Input, Avatar } from '@/components/OnceUI';
-import { Compass, Hand, MapPin, Users, Mic, Bell, MessageSquare, Plus, CloudRain, Flame, ChevronLeft, ChevronRight, Maximize2, X, PanelLeftClose, PanelLeftOpen, Play, Eye, Sun, Moon, Coffee, Wine, UtensilsCrossed, Sparkles, Navigation, Heart, MessageCircle, Bookmark, MoreHorizontal, Star, SlidersHorizontal } from 'lucide-react';
+import { Compass, Hand, MapPin, Users, Mic, Bell, MessageSquare, Plus, CloudRain, Flame, ChevronLeft, ChevronRight, Maximize2, X, PanelLeftClose, PanelLeftOpen, Play, Eye, Sun, Moon, Coffee, Wine, UtensilsCrossed, Sparkles, Navigation, Heart, MessageCircle, Bookmark, MoreHorizontal, Star, SlidersHorizontal, Beer } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts';
+import { toast } from 'sonner';
 import MapWidget from '@/components/Map';
+import PostModal, { PostData } from '@/components/PostModal';
+import ReelModal, { ReelData } from '@/components/ReelModal';
+import LobbyModal, { LobbyData } from '@/components/LobbyModal';
+
+// Mock Data Arrays
+const MOCK_REELS: ReelData[] = [
+  { title: "Crispy Pork Belly ASMR 🔥", user: "@foodie_ramona", views: "1.2M", userAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=64&h=64&fit=crop", img: "https://images.unsplash.com/photo-1544025162-d76694265947?w=400&h=700&fit=crop" },
+  { title: "Hidden Ramen Spot in District 1", user: "@noodle_king", views: "890K", userAvatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=64&h=64&fit=crop", img: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&h=700&fit=crop" },
+  { title: "Vietnamese Coffee Art ☕", user: "@cafe_hunter", views: "2.1M", userAvatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=64&h=64&fit=crop", img: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400&h=700&fit=crop" },
+  { title: "Street Bánh Mì at 3AM 🌙", user: "@midnight_bites", views: "567K", userAvatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=64&h=64&fit=crop", img: "https://images.unsplash.com/photo-1600454021915-de1c1cb0e91f?w=400&h=700&fit=crop" },
+  { title: "Dragon Fruit Smoothie Bowl", user: "@healthy_vibes", views: "340K", userAvatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=64&h=64&fit=crop", img: "https://images.unsplash.com/photo-1590301157890-4810ed352733?w=400&h=700&fit=crop" },
+  { title: "Seafood Hot Pot Mukbang 🦐", user: "@ocean_eats", views: "1.8M", userAvatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=64&h=64&fit=crop", img: "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400&h=700&fit=crop" },
+];
+
+const MOCK_LOBBIES: LobbyData[] = [
+  { name: "Spicy Noodle Challenge", route: "District 1 Mapping", time: "Tonight at 8 PM", spots: 4, bg: "https://images.unsplash.com/photo-1552611052-33e04de081de?w=600&h=320&fit=crop", accent: "#ED1B24", members: [
+    { name: "Ramona", avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=64&h=64&fit=crop", ready: true },
+    { name: "Khoa", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=64&h=64&fit=crop", ready: true },
+    { name: "Linh", avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=64&h=64&fit=crop", ready: false },
+  ]},
+  { name: "Coffee Lovers", route: "Hidden cafes tour", time: "Tomorrow at 9 AM", spots: 6, bg: "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?w=600&h=320&fit=crop", accent: "#F59E0B", members: [
+    { name: "Tran", avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=64&h=64&fit=crop", ready: true },
+    { name: "Vy", avatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=64&h=64&fit=crop", ready: true },
+    { name: "Minh", avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=64&h=64&fit=crop", ready: false },
+    { name: "Bao", avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=64&h=64&fit=crop", ready: false },
+    { name: "Duc", avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=64&h=64&fit=crop", ready: false },
+  ]},
+];
+
+const MOCK_POSTS: PostData[] = [
+  { name: "Minh T.", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=128&h=128&fit=crop", time: "2h", location: "Dĩ An", spotName: "Bún Bò O Trắng", rating: 4.8, review: "Tìm được quán bún bò chân ái mới ở Dĩ An! Nước dùng thanh, siêu nhiều thịt. Mọi người nên thử nhé. 🍜🔥", img: "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=680&h=480&fit=crop", tags: ['Street Food', 'Spicy'], likes: 42, comments: 8 },
+  { name: "Lê Hương", avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=128&h=128&fit=crop", time: "5h", location: "Thủ Đức", spotName: "Cafe Rooftop Sunset", rating: 4.5, review: "View đẹp, cà phê ổn, giá hơi cao nhưng đáng để trải nghiệm vào chiều cuối tuần. Chỗ ngồi ngoài trời mát lắm! ☕🌅", img: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=680&h=480&fit=crop", tags: ['Cafe', 'Rooftop'], likes: 128, comments: 24 },
+  { name: "Phúc Nguyễn", avatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=128&h=128&fit=crop", time: "8h", location: "Dĩ An", spotName: "Hủ Tiếu Nam Vang Chú Sáu", rating: 4.9, review: "Hủ tiếu khô ở đây xịn nhất vùng, nước lèo thơm béo, hoành thánh giòn tan. Quán đông nhưng phục vụ nhanh. Sẽ quay lại! 🤤", img: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=680&h=480&fit=crop", tags: ['Noodles', 'Budget'], likes: 89, comments: 15 },
+  { name: "Thanh Vũ", avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=128&h=128&fit=crop", time: "12h", location: "Bình Dương", spotName: "BBQ Garden Night", rating: 4.3, review: "Thịt nướng ướp khói thơm phức, bia đá lạnh. Không gian ngoài trời thoáng mát, nhạc acoustic live nữa. 🍖🍻", img: "https://images.unsplash.com/photo-1544025162-d76694265947?w=680&h=480&fit=crop", tags: ['BBQ', 'Night Life'], likes: 67, comments: 11 },
+];
 
 const radarData = [
   { subject: 'Street Food', A: 120, fullMark: 150 },
@@ -35,6 +71,14 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isCreateRoomOpen, setIsCreateRoomOpen] = useState(false);
+  const [isRightExpanded, setIsRightExpanded] = useState(false);
+
+  // Modal States
+  const [selectedReel, setSelectedReel] = useState<ReelData | null>(null);
+  const [selectedLobby, setSelectedLobby] = useState<LobbyData | null>(null);
+  const [selectedPost, setSelectedPost] = useState<PostData | null>(null);
+
+  const handleComingSoon = () => toast("Will be updated in the next version 🚀");
 
   const groupToursRef = useRef<HTMLDivElement>(null);
   const eatItAgainRef = useRef<HTMLDivElement>(null);
@@ -53,7 +97,7 @@ export default function DashboardPage() {
   const sidebarWidth = isSidebarOpen ? 260 : 80;
 
   return (
-    <Row fillWidth fillHeight style={{ height: '100vh', overflow: 'hidden', backgroundColor: '#0A0A0A' }}>
+    <Row fillWidth fillHeight style={{ height: '100vh', overflow: 'hidden', backgroundColor: '#0A0A0A', paddingRight: '80px' }}>
 
       {/* ═══════════ 1. LEFT SIDEBAR ═══════════ */}
       <Column
@@ -103,9 +147,9 @@ export default function DashboardPage() {
           {isSidebarOpen && (
             <Text variant="body-default-xs" style={{ color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '8px', paddingLeft: '12px' }}>Menu</Text>
           )}
-          <SidebarItem icon={<Compass size={20} />} label="Discover" active collapsed={!isSidebarOpen} />
-          <SidebarItem icon={<Hand size={20} />} label="Food Tour Builder" collapsed={!isSidebarOpen} />
-          <SidebarItem icon={<MapPin size={20} />} label="Local Hot Routes" collapsed={!isSidebarOpen} />
+          <SidebarItem icon={<Compass size={20} />} label="Discover" active collapsed={!isSidebarOpen} onClick={() => {}} />
+          <SidebarItem icon={<Hand size={20} />} label="Food Tour Builder" collapsed={!isSidebarOpen} onClick={handleComingSoon} />
+          <SidebarItem icon={<MapPin size={20} />} label="Local Hot Routes" collapsed={!isSidebarOpen} onClick={handleComingSoon} />
         </Column>
 
         {/* Social Section */}
@@ -113,8 +157,8 @@ export default function DashboardPage() {
           {isSidebarOpen && (
             <Text variant="body-default-xs" style={{ color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '8px', paddingLeft: '12px' }}>Social</Text>
           )}
-          <SidebarItem icon={<Users size={20} />} label="Foodies" collapsed={!isSidebarOpen} />
-          <SidebarItem icon={<Mic size={20} />} label="Group Rooms" collapsed={!isSidebarOpen} />
+          <SidebarItem icon={<Users size={20} />} label="Foodies" collapsed={!isSidebarOpen} onClick={handleComingSoon} />
+          <SidebarItem icon={<Mic size={20} />} label="Group Rooms" collapsed={!isSidebarOpen} onClick={handleComingSoon} />
         </Column>
 
         {/* Spacer */}
@@ -147,7 +191,7 @@ export default function DashboardPage() {
                 </RadarChart>
               </ResponsiveContainer>
             </div>
-            <Button size="s" variant="secondary" fillWidth>Challenge Data</Button>
+            <Button size="s" variant="secondary" fillWidth onClick={handleComingSoon}>Challenge Data</Button>
           </Column>
         ) : (
           <Column style={{ alignItems: 'center', width: '100%', paddingBottom: '8px' }}>
@@ -162,42 +206,64 @@ export default function DashboardPage() {
         fillHeight
         style={{ flex: 1, minWidth: 0, overflowY: 'auto', position: 'relative' }}
       >
-        {/* Sticky Header */}
+        {/* Sticky Glassmorphism Header */}
         <Row fillWidth style={{
           position: 'sticky',
           top: 0,
-          zIndex: 50,
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          backgroundColor: 'rgba(10, 10, 10, 0.8)',
+          zIndex: 100,
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          backgroundColor: 'rgba(10, 10, 10, 0.65)',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
-          padding: '16px 40px',
+          padding: '14px 40px',
           justifyContent: 'space-between',
           alignItems: 'center',
         }}>
           <Row style={{ gap: '16px', alignItems: 'center' }}>
+            {/* Location Pill */}
             <Row style={{
-              backgroundColor: 'rgba(255,255,255,0.08)',
+              backgroundColor: 'rgba(255,255,255,0.06)',
               padding: '8px 18px',
               borderRadius: '999px',
-              border: '1px solid rgba(255,255,255,0.1)',
+              border: '1px solid rgba(255,255,255,0.08)',
               cursor: 'pointer',
               gap: '8px',
               alignItems: 'center',
-              transition: 'background-color 0.2s',
+              transition: 'all 0.2s',
             }}>
-              <MapPin size={18} color="#ED1B24" />
-              <Text style={{ color: 'white', fontWeight: 600, fontSize: '0.85rem' }}>Dĩ An, Bình Dương</Text>
-              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', marginLeft: '2px' }}>▼</span>
+              <MapPin size={16} color="#ED1B24" />
+              <Text style={{ color: 'white', fontWeight: 600, fontSize: '0.82rem' }}>Dĩ An, Bình Dương</Text>
+              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem', marginLeft: '2px' }}>▼</span>
             </Row>
-            <div style={{ width: '420px' }}>
-              <Input placeholder="Search locations, tours, foodies..." style={{ borderRadius: '999px', padding: '10px 20px' }} />
-            </div>
+            {/* Command Palette Search */}
+            <Row style={{ width: '420px', position: 'relative' }}>
+              <Input placeholder="Search locations, tours, foodies..." style={{ borderRadius: '999px', padding: '10px 20px', width: '100%' }} />
+              <Row style={{
+                position: 'absolute',
+                right: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                gap: '3px',
+                alignItems: 'center',
+                pointerEvents: 'none',
+              }}>
+                <span style={{
+                  padding: '2px 6px',
+                  backgroundColor: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '4px',
+                  fontSize: '0.6rem',
+                  fontWeight: 700,
+                  color: 'rgba(255,255,255,0.35)',
+                  lineHeight: 1.2,
+                }}>Ctrl + K</span>
+              </Row>
+            </Row>
           </Row>
           <Row style={{ gap: '8px', alignItems: 'center' }}>
-            <IconButton icon={<Bell size={20} color="rgba(255,255,255,0.6)" />} variant="tertiary" style={{ borderRadius: '10px' }} />
-            <IconButton icon={<MessageSquare size={20} color="rgba(255,255,255,0.6)" />} variant="tertiary" style={{ borderRadius: '10px' }} />
-            <Row style={{ alignItems: 'center', gap: '10px', marginLeft: '12px' }}>
+            <IconButton icon={<Bell size={20} color="rgba(255,255,255,0.5)" />} variant="tertiary" onClick={handleComingSoon} style={{ borderRadius: '10px' }} />
+            <IconButton icon={<MessageSquare size={20} color="rgba(255,255,255,0.5)" />} variant="tertiary" onClick={handleComingSoon} style={{ borderRadius: '10px' }} />
+            <Row style={{ alignItems: 'center', gap: '10px', marginLeft: '12px', cursor: 'pointer' }} onClick={handleComingSoon}>
               <Avatar src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=64&h=64&fit=crop" size="m" />
               <Column>
                 <Text style={{ color: 'white', fontWeight: 600, fontSize: '0.85rem' }}>Ramona F.</Text>
@@ -245,11 +311,8 @@ export default function DashboardPage() {
                 <Column style={{ position: 'relative', zIndex: 10, justifyContent: 'center', padding: '36px 40px', height: '100%', gap: '16px' }}>
                   {/* Tags */}
                   <Row style={{ gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span style={{ padding: '5px 12px', backgroundColor: 'rgba(245,158,11,0.15)', backdropFilter: 'blur(10px)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px', color: '#FBBF24', fontSize: '0.7rem', fontWeight: 700 }}>Ad • Sponsored</span>
                     <span style={{ padding: '5px 12px', backgroundColor: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)', borderRadius: '6px', color: 'white', fontSize: '0.7rem', fontWeight: 700 }}>100XP / spot</span>
-                    <Row style={{ padding: '5px 12px', backgroundColor: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '6px', gap: '5px', alignItems: 'center' }}>
-                      <Flame size={12} color="#F59E0B" />
-                      <Text style={{ fontSize: '0.7rem', fontWeight: 700, color: '#F59E0B' }}>Trending in Dĩ An</Text>
-                    </Row>
                     <Row style={{ padding: '5px 12px', backgroundColor: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', gap: '5px', alignItems: 'center' }}>
                       <CloudRain size={12} color="#60A5FA" />
                       <Text style={{ fontSize: '0.7rem', fontWeight: 700, color: '#60A5FA' }}>Light Rain • 1.2km</Text>
@@ -271,8 +334,8 @@ export default function DashboardPage() {
 
                   {/* CTA */}
                   <Row style={{ gap: '12px', alignItems: 'center', marginTop: '4px' }}>
-                    <Button size="l" style={{ backgroundColor: '#ED1B24', borderRadius: '14px' }}>Start Tour</Button>
-                    <IconButton icon={<Maximize2 size={20} color="white" />} style={{
+                    <Button size="l" onClick={handleComingSoon} style={{ backgroundColor: '#ED1B24', borderRadius: '14px' }}>Book Now</Button>
+                    <IconButton icon={<Navigation size={20} color="white" />} onClick={handleComingSoon} style={{
                       backgroundColor: 'rgba(255,255,255,0.12)',
                       backdropFilter: 'blur(10px)',
                       width: '48px',
@@ -293,57 +356,21 @@ export default function DashboardPage() {
                 <Flame size={20} color="#ED1B24" />
                 <Heading variant="heading-strong-m" style={{ color: 'white' }}>Trending Reels</Heading>
               </Row>
-              <Text style={{ color: '#ED1B24', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.2s' }}>View all</Text>
+              <Text onClick={handleComingSoon} style={{ color: '#ED1B24', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.2s' }}>View all</Text>
             </Row>
             <Row className="no-scrollbar" fillWidth style={{ gap: '16px', overflowX: 'auto', paddingBottom: '4px', scrollBehavior: 'smooth' }}>
-              <ReelCard
-                title="Crispy Pork Belly ASMR 🔥"
-                user="@foodie_ramona"
-                views="1.2M"
-                avatar="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=64&h=64&fit=crop"
-                img="https://images.unsplash.com/photo-1544025162-d76694265947?w=400&h=700&fit=crop"
-                delay={0}
-              />
-              <ReelCard
-                title="Hidden Ramen Spot in District 1"
-                user="@noodle_king"
-                views="890K"
-                avatar="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=64&h=64&fit=crop"
-                img="https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&h=700&fit=crop"
-                delay={0.05}
-              />
-              <ReelCard
-                title="Vietnamese Coffee Art ☕"
-                user="@cafe_hunter"
-                views="2.1M"
-                avatar="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=64&h=64&fit=crop"
-                img="https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400&h=700&fit=crop"
-                delay={0.1}
-              />
-              <ReelCard
-                title="Street Bánh Mì at 3AM 🌙"
-                user="@midnight_bites"
-                views="567K"
-                avatar="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=64&h=64&fit=crop"
-                img="https://images.unsplash.com/photo-1600454021915-de1c1cb0e91f?w=400&h=700&fit=crop"
-                delay={0.15}
-              />
-              <ReelCard
-                title="Dragon Fruit Smoothie Bowl"
-                user="@healthy_vibes"
-                views="340K"
-                avatar="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=64&h=64&fit=crop"
-                img="https://images.unsplash.com/photo-1590301157890-4810ed352733?w=400&h=700&fit=crop"
-                delay={0.2}
-              />
-              <ReelCard
-                title="Seafood Hot Pot Mukbang 🦐"
-                user="@ocean_eats"
-                views="1.8M"
-                avatar="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=64&h=64&fit=crop"
-                img="https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400&h=700&fit=crop"
-                delay={0.25}
-              />
+              {MOCK_REELS.map((reel, idx) => (
+                <div key={idx} onClick={() => setSelectedReel(reel)} style={{ cursor: 'pointer' }}>
+                  <ReelCard
+                    title={reel.title}
+                    user={reel.user}
+                    views={reel.views}
+                    avatar={reel.userAvatar}
+                    img={reel.img}
+                    delay={idx * 0.05}
+                  />
+                </div>
+              ))}
             </Row>
           </Column>
 
@@ -370,7 +397,7 @@ export default function DashboardPage() {
                       ))}
                     </Row>
                   </Row>
-                  <Row style={{ alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                  <Row onClick={handleComingSoon} style={{ alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                     <Sparkles size={14} color={ctx.accent} />
                     <Text style={{ color: ctx.accent, fontSize: '0.85rem', fontWeight: 600 }}>AI Picks</Text>
                   </Row>
@@ -435,38 +462,18 @@ export default function DashboardPage() {
               </Row>
             </Row>
             <Row ref={groupToursRef} className="no-scrollbar" fillWidth style={{ overflowX: 'auto', gap: '16px', paddingBottom: '8px', scrollBehavior: 'smooth' }}>
-              <LobbyCard
-                title="Spicy Noodle Challenge"
-                desc="District 1 Mapping"
-                img="https://images.unsplash.com/photo-1552611052-33e04de081de?w=600&h=320&fit=crop"
-                status="Waiting for 1..."
-                members={3}
-                delay={0.05}
-              />
-              <LobbyCard
-                title="Coffee Lovers"
-                desc="Hidden cafes tour"
-                img="https://images.unsplash.com/photo-1497935586351-b67a49e012bf?w=600&h=320&fit=crop"
-                status="Starting soon"
-                members={5}
-                delay={0.1}
-              />
-              <LobbyCard
-                title="Midnight Seafood"
-                desc="Coastal group run"
-                img="https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=600&h=320&fit=crop"
-                status="2 spots left"
-                members={4}
-                delay={0.15}
-              />
-              <LobbyCard
-                title="Vegan Discoveries"
-                desc="Healthy spots only"
-                img="https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&h=320&fit=crop"
-                status="Just started"
-                members={6}
-                delay={0.2}
-              />
+              {MOCK_LOBBIES.map((lobby, idx) => (
+                <LobbyCard
+                  key={idx}
+                  title={lobby.name}
+                  desc={lobby.route}
+                  img={lobby.bg}
+                  status={`${lobby.spots - lobby.members.length} spots left`}
+                  members={lobby.members.length}
+                  delay={idx * 0.05}
+                  onJoin={() => setSelectedLobby(lobby)}
+                />
+              ))}
             </Row>
           </Column>
 
@@ -507,99 +514,192 @@ export default function DashboardPage() {
 
             {/* Horizontal Feed Cards */}
             <Row className="no-scrollbar" fillWidth style={{ overflowX: 'auto', gap: '16px', paddingBottom: '8px', scrollBehavior: 'smooth' }}>
-              <PostCard
-                name="Minh T."
-                avatar="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=128&h=128&fit=crop"
-                time="2h"
-                location="Dĩ An"
-                spotName="Bún Bò O Trắng"
-                rating={4.8}
-                review="Tìm được quán bún bò chân ái mới ở Dĩ An! Nước dùng thanh, siêu nhiều thịt. Mọi người nên thử nhé. 🍜🔥"
-                img="https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=680&h=480&fit=crop"
-                tags={['Street Food', 'Spicy']}
-                likes={42}
-                comments={8}
-                delay={0}
-              />
-              <PostCard
-                name="Lê Hương"
-                avatar="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=128&h=128&fit=crop"
-                time="5h"
-                location="Thủ Đức"
-                spotName="Cafe Rooftop Sunset"
-                rating={4.5}
-                review="View đẹp, cà phê ổn, giá hơi cao nhưng đáng để trải nghiệm vào chiều cuối tuần. Chỗ ngồi ngoài trời mát lắm! ☕🌅"
-                img="https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=680&h=480&fit=crop"
-                tags={['Cafe', 'Rooftop']}
-                likes={128}
-                comments={24}
-                delay={0.05}
-              />
-              <PostCard
-                name="Phúc Nguyễn"
-                avatar="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=128&h=128&fit=crop"
-                time="8h"
-                location="Dĩ An"
-                spotName="Hủ Tiếu Nam Vang Chú Sáu"
-                rating={4.9}
-                review="Hủ tiếu khô ở đây xịn nhất vùng, nước lèo thơm béo, hoành thánh giòn tan. Quán đông nhưng phục vụ nhanh. Sẽ quay lại! 🤤"
-                img="https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=680&h=480&fit=crop"
-                tags={['Noodles', 'Budget']}
-                likes={89}
-                comments={15}
-                delay={0.1}
-              />
-              <PostCard
-                name="Thanh Vũ"
-                avatar="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=128&h=128&fit=crop"
-                time="12h"
-                location="Bình Dương"
-                spotName="BBQ Garden Night"
-                rating={4.3}
-                review="Thịt nướng ướp khói thơm phức, bia đá lạnh. Không gian ngoài trời thoáng mát, nhạc acoustic live nữa. 🍖🍻"
-                img="https://images.unsplash.com/photo-1544025162-d76694265947?w=680&h=480&fit=crop"
-                tags={['BBQ', 'Night Life']}
-                likes={67}
-                comments={11}
-                delay={0.15}
-              />
+              {MOCK_POSTS.map((post, idx) => (
+                <div key={idx} onClick={() => setSelectedPost(post)}>
+                  <PostCard
+                    {...post}
+                    delay={idx * 0.05}
+                  />
+                </div>
+              ))}
             </Row>
           </Column>
         </Column>
+
+          {/* ═══ MINI STATUS BAR (Dashboard Footer) ═══ */}
+          <Row fillWidth style={{
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '10px 40px',
+            borderTop: '1px solid rgba(255,255,255,0.04)',
+            backgroundColor: 'rgba(10,10,10,0.5)',
+            flexShrink: 0,
+          }}>
+            <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.65rem' }}>TasteMap v1.0.0-beta</Text>
+            <Row style={{ alignItems: 'center', gap: '6px' }}>
+              <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#00D1B2', boxShadow: '0 0 4px #00D1B260' }} />
+              <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.65rem' }}>All systems operational</Text>
+            </Row>
+            <Row style={{ gap: '16px' }}>
+              <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.65rem', cursor: 'pointer', transition: 'color 0.2s' }} onClick={handleComingSoon}>Feedback</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.65rem', cursor: 'pointer', transition: 'color 0.2s' }} onClick={handleComingSoon}>Terms</Text>
+            </Row>
+          </Row>
       </Column>
 
-      {/* ═══════════ 3. RIGHT SIDEBAR ═══════════ */}
-      <Column fillHeight style={{
-        width: '80px',
-        minWidth: '80px',
-        flexShrink: 0,
-        borderLeft: '1px solid rgba(255,255,255,0.08)',
-        backgroundColor: '#111111',
-        alignItems: 'center',
-        paddingTop: '24px',
-        gap: '24px',
-      }}>
-        <IconButton
-          icon={<Plus size={20} color="#ED1B24" />}
-          onClick={() => setIsCreateRoomOpen(true)}
-          style={{
-            backgroundColor: 'transparent',
-            border: '1px solid rgba(255,255,255,0.12)',
-            borderRadius: '50%',
-            width: '44px',
-            height: '44px',
-            cursor: 'pointer',
-            transition: 'border-color 0.2s',
-          }}
-        />
-        <Column style={{ gap: '20px', alignItems: 'center', marginTop: '16px' }}>
-          <AvatarWithStatus src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=64&h=64&fit=crop" status="online" />
-          <AvatarWithStatus src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=64&h=64&fit=crop" status="offline" />
-          <AvatarWithStatus src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=64&h=64&fit=crop" status="online" />
-          <AvatarWithStatus src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=64&h=64&fit=crop" status="busy" />
-          <AvatarWithStatus src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=64&h=64&fit=crop" status="online" />
-        </Column>
-      </Column>
+      {/* ═══════════ MODALS ═══════════ */}
+      <AnimatePresence>
+        {selectedReel && <ReelModal data={selectedReel} onClose={() => setSelectedReel(null)} />}
+        {selectedLobby && <LobbyModal data={selectedLobby} onClose={() => setSelectedLobby(null)} />}
+        {selectedPost && <PostModal data={selectedPost} onClose={() => setSelectedPost(null)} />}
+      </AnimatePresence>
+
+      {/* ═══════════ 3. RIGHT SIDEBAR (Social Tracking Panel) ═══════════ */}
+      {(() => {
+        const friends = [
+          { name: 'Ramona F.', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=64&h=64&fit=crop', status: 'eating' as const, statusText: '🍜 On a Spicy Tour' },
+          { name: 'Mai Linh', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=64&h=64&fit=crop', status: 'online' as const, statusText: '🟢 Online' },
+          { name: 'Thảo Vy', avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=64&h=64&fit=crop', status: 'lobby' as const, statusText: '🎮 In Group Lobby' },
+          { name: 'Hùng Đạt', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=64&h=64&fit=crop', status: 'eating' as const, statusText: '☕ Cafe Hopping' },
+          { name: 'Khôi Nguyên', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=64&h=64&fit=crop', status: 'online' as const, statusText: '🟢 Online' },
+        ];
+
+        const statusDotColor = (s: typeof friends[0]['status']) =>
+          s === 'eating' ? '#F59E0B' : s === 'lobby' ? '#A855F7' : '#00D1B2';
+        const statusTextColor = (s: typeof friends[0]['status']) =>
+          s === 'eating' ? '#F59E0B' : s === 'lobby' ? '#A855F7' : '#00D1B2';
+
+        return (
+          <Column
+            onMouseEnter={() => setIsRightExpanded(true)}
+            onMouseLeave={() => setIsRightExpanded(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              right: 0,
+              bottom: 0,
+              width: isRightExpanded ? '280px' : '80px',
+              zIndex: 50,
+              backgroundColor: '#111111',
+              borderLeft: '1px solid rgba(255,255,255,0.08)',
+              transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              overflow: 'hidden',
+              paddingTop: '24px',
+            }}
+          >
+            {/* Top Action */}
+            <Row style={{
+              padding: '0 18px 20px 18px',
+              alignItems: 'center',
+              justifyContent: isRightExpanded ? 'space-between' : 'center',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              paddingBottom: '20px',
+              gap: '12px',
+              minHeight: '44px',
+            }}>
+              {isRightExpanded && (
+                <Heading variant="heading-strong-s" style={{ color: 'white', whiteSpace: 'nowrap', opacity: isRightExpanded ? 1 : 0, transition: 'opacity 0.2s 0.1s' }}>Friends</Heading>
+              )}
+              <IconButton
+                icon={<Plus size={20} color="#ED1B24" />}
+                onClick={() => setIsCreateRoomOpen(true)}
+                style={{
+                  backgroundColor: 'transparent',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: '50%',
+                  width: '44px',
+                  height: '44px',
+                  minWidth: '44px',
+                  cursor: 'pointer',
+                  transition: 'border-color 0.2s',
+                  flexShrink: 0,
+                }}
+              />
+            </Row>
+
+            {/* Friend List */}
+            <Column style={{ gap: '4px', paddingTop: '16px', overflowY: 'auto', flex: 1 }}>
+              {friends.map((f) => (
+                <Row
+                  key={f.name}
+                  style={{
+                    padding: '10px 18px',
+                    alignItems: 'center',
+                    gap: '14px',
+                    cursor: 'pointer',
+                    borderRadius: '12px',
+                    margin: '0 8px',
+                    transition: 'background-color 0.15s',
+                  }}
+                  onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => { if (isRightExpanded) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)'; }}
+                  onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                >
+                  {/* Avatar with Status Dot */}
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <Avatar src={f.avatar} size="m" />
+                    <div style={{
+                      position: 'absolute', bottom: 1, right: -1,
+                      width: '12px', height: '12px',
+                      backgroundColor: statusDotColor(f.status),
+                      borderRadius: '50%',
+                      border: '2px solid #111111',
+                      boxShadow: `0 0 6px ${statusDotColor(f.status)}60`,
+                    }} />
+                  </div>
+
+                  {/* Expanded Details */}
+                  <Row style={{
+                    flex: 1,
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    opacity: isRightExpanded ? 1 : 0,
+                    transition: 'opacity 0.2s ease 0.1s',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    minWidth: 0,
+                  }}>
+                    {/* Info */}
+                    <Column style={{ gap: '2px', minWidth: 0 }}>
+                      <Text style={{ color: 'white', fontWeight: 700, fontSize: '0.8rem' }}>{f.name}</Text>
+                      <Text style={{ color: statusTextColor(f.status), fontSize: '0.65rem', fontWeight: 500 }}>{f.statusText}</Text>
+                    </Column>
+
+                    {/* Actions */}
+                    {isRightExpanded && (
+                      <Row style={{ gap: '4px', flexShrink: 0 }}>
+                        <IconButton
+                          icon={<MessageCircle size={14} color="rgba(255,255,255,0.5)" />}
+                          variant="tertiary"
+                          style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.06)' }}
+                        />
+                        <IconButton
+                          icon={<Beer size={14} color="#F59E0B" />}
+                          variant="tertiary"
+                          style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: 'rgba(245,158,11,0.08)' }}
+                        />
+                      </Row>
+                    )}
+                  </Row>
+                </Row>
+              ))}
+            </Column>
+
+            {/* Bottom Online Count */}
+            <Row style={{
+              padding: '16px 18px',
+              borderTop: '1px solid rgba(255,255,255,0.06)',
+              alignItems: 'center',
+              justifyContent: isRightExpanded ? 'flex-start' : 'center',
+              gap: '8px',
+            }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#00D1B2', boxShadow: '0 0 6px #00D1B260' }} />
+              {isRightExpanded && (
+                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', whiteSpace: 'nowrap' }}>3 friends online</Text>
+              )}
+            </Row>
+          </Column>
+        );
+      })()}
 
       {/* ═══════════ MODAL ═══════════ */}
       <AnimatePresence>
@@ -730,7 +830,7 @@ function LobbyCard({ title, desc, img, status, members, delay }: { title: string
               <Avatar key={i} src={src} size="s" style={{ border: '2px solid rgba(20,20,20,0.9)', marginLeft: i > 0 ? '-8px' : '0', zIndex: members - i }} />
             ))}
           </Row>
-          <Button size="s" style={{ backgroundColor: '#00D1B2', color: '#000', fontWeight: 700, borderRadius: '10px', padding: '6px 18px', fontSize: '0.8rem', border: 'none' }}>Join</Button>
+          <Button size="s" onClick={(e) => { e.stopPropagation(); onJoin?.(); }} style={{ backgroundColor: '#00D1B2', color: '#000', fontWeight: 700, borderRadius: '10px', padding: '6px 18px', fontSize: '0.8rem', border: 'none' }}>Join</Button>
         </Row>
       </Column>
     </motion.div>
@@ -787,12 +887,12 @@ function VaultCard({ title, xp, img, tags, rating, delay }: { title: string; xp:
   );
 }
 
-function AvatarWithStatus({ src, status }: { src: string; status: 'online' | 'offline' | 'busy' }) {
-  const color = status === 'online' ? '#00D1B2' : status === 'busy' ? '#ED1B24' : 'rgba(255,255,255,0.2)';
+function AvatarWithStatus({ src, status }: { src: string; status: 'online' | 'offline' | 'busy' | 'eating' | 'lobby' }) {
+  const color = status === 'online' ? '#00D1B2' : status === 'eating' ? '#F59E0B' : status === 'lobby' ? '#A855F7' : status === 'busy' ? '#ED1B24' : 'rgba(255,255,255,0.2)';
   return (
     <div style={{ position: 'relative' }}>
       <Avatar src={src} size="m" />
-      <div style={{ position: 'absolute', bottom: 1, right: -1, width: '11px', height: '11px', backgroundColor: color, borderRadius: '50%', border: '2px solid #111111' }} />
+      <div style={{ position: 'absolute', bottom: 1, right: -1, width: '11px', height: '11px', backgroundColor: color, borderRadius: '50%', border: '2px solid #111111', boxShadow: `0 0 6px ${color}60` }} />
     </div>
   );
 }
