@@ -38,6 +38,8 @@ def _calculate_context_score_sync(U: np.ndarray, candidates: List[Dict[str, Any]
             "place_id": place["id"],
             "name": place["name"],
             "match_score": round(final_score * 100, 2),
+            "lat": place["lat"],
+            "lng": place["lng"],
             "vector": place["vector"]
         })
         
@@ -62,6 +64,8 @@ async def recommend_top_n_places(db: AsyncSession, user_vector: List[float], top
         {
             "id": loc.id,
             "name": loc.name,
+            "lat": loc.lat,
+            "lng": loc.lng,
             "vector": loc.vector
         }
         for loc in locations if loc.vector is not None

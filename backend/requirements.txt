@@ -8,5 +8,6 @@ redis
 pydantic
 pydantic-settings
 alembic
+greenlet
 httpx
 numpy

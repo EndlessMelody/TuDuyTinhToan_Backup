@@ -12,6 +12,16 @@ ALPHA_NORMAL = 0.1       # Hệ số học bình thường
 ALPHA_PENALTY = 0.01     # Hệ số học khi bị phạt (vuốt quá nhanh)
 PENALTY_THRESHOLD = 0.5  # Ngưỡng thời gian tối thiểu giữa 2 lần vuốt (giây)
 
+def _normalize_timestamp(ts: float) -> float:
+    """
+    Chuẩn hoá timestamp về đơn vị Giây.
+    - Nếu ts > 1e12 → Frontend gửi Mili-giây (JavaScript Date.now()), chia 1000.
+    - Nếu ts <= 1e12 → Đã là Giây (Python time.time()), giữ nguyên.
+    """
+    if ts > 1e12:
+        return ts / 1000.0
+    return ts
+
 def _calculate_math_sync(U: np.ndarray, sorted_actions: List[Dict[str, Any]], db_vectors: Dict[int, np.ndarray]) -> Tuple[np.ndarray, int, bool]:
     """
     Hàm tính toán thuật toán Active Learning chạy đồng bộ.
@@ -23,7 +33,7 @@ def _calculate_math_sync(U: np.ndarray, sorted_actions: List[Dict[str, Any]], db
     for i, action in enumerate(sorted_actions):
         place_id = action["place_id"]
         direction = action["direction"]
-        timestamp = action["client_timestamp"]
+        timestamp = _normalize_timestamp(action["client_timestamp"])
         
         P = db_vectors.get(place_id)
         if P is None or len(P) != 15:
@@ -31,7 +41,7 @@ def _calculate_math_sync(U: np.ndarray, sorted_actions: List[Dict[str, Any]], db
             
         alpha = ALPHA_NORMAL
         if i > 0:
-            prev_timestamp = sorted_actions[i - 1]["client_timestamp"]
+            prev_timestamp = _normalize_timestamp(sorted_actions[i - 1]["client_timestamp"])
             time_diff = timestamp - prev_timestamp
             if time_diff < PENALTY_THRESHOLD:
                 alpha = ALPHA_PENALTY
@@ -47,13 +57,17 @@ def _calculate_math_sync(U: np.ndarray, sorted_actions: List[Dict[str, Any]], db
         
     return U, processed_count, penalty_triggered
 
+from typing import List, Dict, Any, Union
+
 async def process_swipe_batch(
     db: AsyncSession,
     redis: aioredis.Redis,
-    user_id: str,
+    user_id: Union[int, str],
     domain: str,
     actions: List[Dict[str, Any]]
 ) -> dict:
+    from src.users.models import User
+    
     # 1. Quét Redis tìm key user tương ứng
     user_key = None
     cursor = 0
@@ -65,12 +79,39 @@ async def process_swipe_batch(
             data = await redis.get(key)
             if data:
                 parsed = json.loads(data)
-                if parsed.get("user_id") == user_id:
+                # So sánh dạng string để khớp cả UUID (guest) lẫn ID (db)
+                if str(parsed.get("user_id")) == str(user_id):
                     user_key = key
                     break
         if user_key or cursor == 0:
             break
             
+    # NẾU KHÔNG CÓ TRONG REDIS (ví dụ: User vừa đăng ký xong chưa quét), LOAD TỪ DB CỦA HỌ
+    if not user_key:
+        try:
+            db_user_id = int(user_id)
+            user_db = await db.scalar(select(User).filter(User.id == db_user_id))
+            if user_db:
+                # Nạp vào Redis
+                user_key = f"user:{domain}:db_{db_user_id}"
+                vec = user_db.place_vector if domain == "place" else user_db.food_vector
+                # ⚠️ QUAN TRỌNG: pgvector trả về object Vector, KHÔNG phải list Python
+                # Phải ép float() từng phần tử để json.dumps() không crash TypeError
+                if vec is not None:
+                    if isinstance(vec, str):
+                        vec = json.loads(vec)
+                    vec = [float(x) for x in vec]
+                else:
+                    vec = [0.5] * 15
+                user_data = {
+                    "user_id": db_user_id,
+                    "vector": vec
+                }
+                await redis.set(user_key, json.dumps(user_data))
+        except ValueError:
+            pass # Lỗi ép int -> đây là chuỗi UUID (Guest User), không query DB
+            
+    # NẾU VẪN KHÔNG CÓ, TỨC LÀ SESSION LỖI HOẶC GUEST CHƯA INIT
     if not user_key:
         return {
             "status": "error",
@@ -78,8 +119,9 @@ async def process_swipe_batch(
             "penalty_triggered": False,
             "updated_vector": []
         }
+    else:
+        user_data = json.loads(await redis.get(user_key))
         
-    user_data = json.loads(await redis.get(user_key))
     U = np.array(user_data["vector"], dtype=float)
     if len(U) != 15:
         return {"status": "error", "message": "User vector is not 15-dimensional.", "updated_vector": []}
@@ -92,6 +134,9 @@ async def process_swipe_batch(
     db_vectors = {}
     for loc_id, loc_vec in locations:
         if loc_vec is not None:
+            # Handle possible string representation from DB driver
+            if isinstance(loc_vec, str):
+                loc_vec = json.loads(loc_vec)
             db_vectors[loc_id] = np.array(loc_vec, dtype=float)
             
     sorted_actions = sorted(actions, key=lambda a: a["client_timestamp"])
@@ -101,11 +146,24 @@ async def process_swipe_batch(
         _calculate_math_sync, U, sorted_actions, db_vectors
     )
     
-    # 4. Save updated vector to redis
+    # 4. Save updated vector to redis AND POSTGRESQL
     updated_vector = [round(float(x), 4) for x in U]
     user_data["vector"] = updated_vector
     await redis.set(user_key, json.dumps(user_data))
     
+    # Đồng bộ ngược lại DB để profile / DB check luôn up to date!
+    try:
+        db_user_id = int(user_id)
+        user_to_update = await db.scalar(select(User).filter(User.id == db_user_id))
+        if user_to_update:
+            if domain == "place":
+                user_to_update.place_vector = updated_vector
+            else:
+                user_to_update.food_vector = updated_vector
+            await db.commit()
+    except ValueError:
+        pass # UUID Guest User -> không đồng bộ PostgreSQL
+        
     return {
         "status": "success",
         "processed_count": processed_count,

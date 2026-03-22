@@ -15,7 +15,9 @@ async def register_user(
     service: UserService = Depends(get_user_service)
 ):
     """
-    Register a new user in the system.
+    Đăng ký người dùng mới.
+    - username: Tên người dùng
+    - email: Email người dùng
     """
     return await service.create_user(user_in)
 
@@ -25,6 +27,7 @@ async def get_user(
     service: UserService = Depends(get_user_service)
 ):
     """
-    Retrieve user by ID.
+    Lấy thông tin người dùng.
+    - user_id: ID người dùng
     """
     return await service.get_user_by_id(user_id)

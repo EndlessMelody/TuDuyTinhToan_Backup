@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Literal
+from typing import List, Literal, Union
 
 class SwipeAction(BaseModel):
     place_id: int
@@ -7,7 +7,7 @@ class SwipeAction(BaseModel):
     client_timestamp: float
 
 class SwipeBatchRequest(BaseModel):
-    user_id: str
+    user_id: Union[int, str]  # Hỗ trợ cả DB ID (int) và Guest UUID (str)
     domain: Literal["food", "place"] = "place"
     actions: List[SwipeAction]
 

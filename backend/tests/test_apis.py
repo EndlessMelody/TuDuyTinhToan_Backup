@@ -38,10 +38,6 @@ def get(path):
         print(f"  ❌ Không kết nối được server: {e.reason}")
         return None, 0
 
-print("=" * 60)
-print("🧪 TEST 3 API LÕI")
-print("=" * 60)
-
 # ────────────── TEST 1: Init Session ──────────────
 print("\n📌 TEST 1: POST /users/init (Lần đầu)")
 data, status = post("/users/init", {"device_id": "test-device-001", "domain": "place"})
