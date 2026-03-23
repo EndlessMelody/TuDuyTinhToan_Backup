@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+asyncpg
+psycopg2-binary
+pgvector
+redis
+pydantic
+pydantic-settings
+alembic
+greenlet
+httpx
+numpy
