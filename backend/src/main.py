@@ -31,6 +31,11 @@ async def lifespan(app: FastAPI):
     except Exception:
         app.state.redis = InMemoryRedis()
         print("⚠️  Redis không khả dụng — dùng bộ nhớ tạm (InMemoryRedis) để test.")
+
+    # Khởi động cronjob dọn dẹp interaction (3:00 AM hàng ngày)
+    from src.tasks.interaction_cleanup import schedule_cleanup
+    schedule_cleanup(app)
+
     yield
     await app.state.redis.close()
 

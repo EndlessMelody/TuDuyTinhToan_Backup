@@ -11,9 +11,11 @@ from alembic import context
 from src.core.config import settings
 from src.db.database import Base
 
-# 2. Import models so they are registered on Base.metadata
+# 2. Import ALL models so they are registered on Base.metadata
 from src.users.models import User
 from src.locations.models import Location
+from src.interactions.models import Interaction  # noqa: F401
+from src.groups.models import Group, GroupMember  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
