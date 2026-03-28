@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Column, Row, Heading, Text, Button, IconButton, Input, Avatar } from '@/components/OnceUI';
-import { Compass, Hand, MapPin, Users, Mic, Bell, MessageSquare, Plus, CloudRain, Flame, ChevronLeft, ChevronRight, Maximize2, X, PanelLeftClose, PanelLeftOpen, Play, Eye, Sun, Moon, Coffee, Wine, UtensilsCrossed, Sparkles, Navigation, Heart, MessageCircle, Bookmark, MoreHorizontal, Star, SlidersHorizontal, Beer } from 'lucide-react';
+import { Compass, Hand, MapPin, Users, Mic, Bell, MessageSquare, Plus, CloudRain, Flame, ChevronLeft, ChevronRight, Maximize2, X, PanelLeftClose, PanelLeftOpen, Play, Eye, Sun, Moon, Coffee, Wine, UtensilsCrossed, Sparkles, Navigation, Heart, MessageCircle, Bookmark, MoreHorizontal, Star, SlidersHorizontal, Beer, User, Settings, Info, LogOut, Monitor, Globe, LifeBuoy, Github, ExternalLink, BellRing, Palette, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts';
 import { toast } from 'sonner';
@@ -82,6 +82,21 @@ export default function DashboardPage() {
   const handleComingSoon = () => toast("Will be updated in the next version 🚀");
   const router = useRouter();
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [activeSettingsTab, setActiveSettingsTab] = useState('appearance');
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  // Click-outside to close profile menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+    if (isProfileMenuOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isProfileMenuOpen]);
 
   const groupToursRef = useRef<HTMLDivElement>(null);
   const eatItAgainRef = useRef<HTMLDivElement>(null);
@@ -344,13 +359,80 @@ export default function DashboardPage() {
               </AnimatePresence>
             </div>
             <IconButton icon={<MessageSquare size={20} color="rgba(255,255,255,0.5)" />} variant="tertiary" onClick={handleComingSoon} style={{ borderRadius: '10px' }} />
-            <Row style={{ alignItems: 'center', gap: '10px', marginLeft: '12px', cursor: 'pointer' }} onClick={handleComingSoon}>
-              <Avatar src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=64&h=64&fit=crop" size="m" />
-              <Column>
-                <Text style={{ color: 'white', fontWeight: 600, fontSize: '0.85rem' }}>Ramona F.</Text>
-                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem' }}>Level 12</Text>
-              </Column>
-            </Row>
+            <div ref={profileMenuRef} style={{ position: 'relative' }}>
+              <Row style={{ alignItems: 'center', gap: '10px', marginLeft: '12px', cursor: 'pointer' }} onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}>
+                <Avatar src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=64&h=64&fit=crop" size="m" />
+                <Column>
+                  <Text style={{ color: 'white', fontWeight: 600, fontSize: '0.85rem' }}>Ramona F.</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem' }}>Level 12</Text>
+                </Column>
+              </Row>
+
+              {/* Profile Dropdown Menu */}
+              <AnimatePresence>
+                {isProfileMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                    transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                    style={{
+                      position: 'absolute', top: '56px', right: 0, zIndex: 999,
+                      width: '280px',
+                      backgroundColor: 'rgba(18,18,23,0.95)',
+                      backdropFilter: 'blur(24px)',
+                      WebkitBackdropFilter: 'blur(24px)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: '16px',
+                      overflow: 'hidden',
+                      boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
+                      padding: '6px',
+                    }}
+                  >
+                    {/* User Summary */}
+                    <Column style={{ padding: '18px 18px 16px', gap: '0' }}>
+                      <Row style={{ gap: '16px', alignItems: 'center' }}>
+                        <Avatar src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=64&h=64&fit=crop" size="l" />
+                        <Column style={{ gap: '4px' }}>
+                          <Text style={{ color: 'white', fontWeight: 700, fontSize: '0.95rem' }}>Ramona F.</Text>
+                          <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.72rem' }}>Level 12 • Taste Explorer</Text>
+                        </Column>
+                      </Row>
+                    </Column>
+
+                    {/* Divider */}
+                    <div style={{ padding: '0 10px' }}><div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.06)' }} /></div>
+
+                    {/* Action Items */}
+                    <Column style={{ padding: '8px 0' }}>
+                      <ProfileMenuItem icon={<User size={16} />} label="Hồ sơ cá nhân" onClick={() => { setIsProfileMenuOpen(false); router.push('/profile'); }} />
+                      <ProfileMenuItem icon={<Settings size={16} />} label="Tùy chỉnh hệ thống" onClick={() => { setIsProfileMenuOpen(false); setActiveSettingsTab('appearance'); setIsSettingsModalOpen(true); }} />
+                      <ProfileMenuItem icon={<Info size={16} />} label="Thông tin & Trợ giúp" onClick={() => { setIsProfileMenuOpen(false); setActiveSettingsTab('support'); setIsSettingsModalOpen(true); }} />
+                    </Column>
+
+                    {/* Divider */}
+                    <div style={{ padding: '0 10px' }}><div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.06)' }} /></div>
+
+                    {/* Logout */}
+                    <Column style={{ padding: '8px 0' }}>
+                      <Row
+                        onClick={() => { setIsProfileMenuOpen(false); toast('Đã đăng xuất! 👋'); }}
+                        style={{
+                          padding: '12px 18px', gap: '16px', alignItems: 'center', cursor: 'pointer',
+                          borderRadius: '8px', margin: '0 4px',
+                          transition: 'background-color 0.15s',
+                        }}
+                        onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => (e.currentTarget.style.backgroundColor = 'rgba(237,27,36,0.08)')}
+                        onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                      >
+                        <LogOut size={16} color="#ED1B24" />
+                        <Text style={{ color: '#ED1B24', fontWeight: 600, fontSize: '0.85rem' }}>Đăng xuất</Text>
+                      </Row>
+                    </Column>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </Row>
         </Row>
 
@@ -898,6 +980,349 @@ export default function DashboardPage() {
         )}
       </AnimatePresence>
 
+      {/* ═══════ SETTINGS & INFO MODAL ═══════ */}
+      <AnimatePresence>
+        {isSettingsModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setIsSettingsModalOpen(false)}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 1000,
+              backgroundColor: 'rgba(0,0,0,0.6)',
+              backdropFilter: 'blur(8px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 16, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.96 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              onClick={(e: React.MouseEvent) => e.stopPropagation()}
+              style={{
+                width: '900px', maxWidth: '95vw', height: '600px', maxHeight: '90vh',
+                backgroundColor: '#08080C',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '20px',
+                overflow: 'hidden',
+                boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
+                display: 'flex', flexDirection: 'row',
+              }}
+            >
+              {/* Left Sidebar Tabs */}
+              <Column style={{
+                width: '240px', minWidth: '240px',
+                backgroundColor: '#0F0F14',
+                borderRight: '1px solid rgba(255,255,255,0.06)',
+                padding: '20px 12px',
+                gap: '4px',
+                display: 'flex', flexDirection: 'column',
+              }}>
+                <Row style={{ justifyContent: 'space-between', alignItems: 'center', padding: '0 8px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: '8px' }}>
+                  <Heading variant="heading-strong-s" style={{ color: 'white' }}>Cài đặt</Heading>
+                  <IconButton
+                    icon={<X size={16} color="rgba(255,255,255,0.4)" />}
+                    onClick={() => setIsSettingsModalOpen(false)}
+                    style={{ backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '8px', width: '32px', height: '32px', cursor: 'pointer' }}
+                  />
+                </Row>
+
+                {[
+                  { id: 'appearance', label: 'Giao diện', icon: <Palette size={16} /> },
+                  { id: 'language', label: 'Ngôn ngữ', icon: <Globe size={16} /> },
+                  { id: 'notifications', label: 'Thông báo', icon: <BellRing size={16} /> },
+                ].map(tab => (
+                  <Row
+                    key={tab.id}
+                    onClick={() => setActiveSettingsTab(tab.id)}
+                    style={{
+                      padding: '10px 12px', gap: '12px', alignItems: 'center',
+                      borderRadius: '8px', cursor: 'pointer',
+                      backgroundColor: activeSettingsTab === tab.id ? 'rgba(255,255,255,0.06)' : 'transparent',
+                      color: activeSettingsTab === tab.id ? 'white' : 'rgba(255,255,255,0.45)',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', color: 'inherit' }}>{tab.icon}</div>
+                    <Text style={{ color: 'inherit', fontWeight: activeSettingsTab === tab.id ? 600 : 400, fontSize: '0.85rem' }}>{tab.label}</Text>
+                  </Row>
+                ))}
+
+                <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />
+
+                {[
+                  { id: 'support', label: 'Trợ giúp', icon: <LifeBuoy size={16} /> },
+                  { id: 'about', label: 'Thông tin', icon: <Info size={16} /> },
+                ].map(tab => (
+                  <Row
+                    key={tab.id}
+                    onClick={() => setActiveSettingsTab(tab.id)}
+                    style={{
+                      padding: '10px 12px', gap: '12px', alignItems: 'center',
+                      borderRadius: '8px', cursor: 'pointer',
+                      backgroundColor: activeSettingsTab === tab.id ? 'rgba(255,255,255,0.06)' : 'transparent',
+                      color: activeSettingsTab === tab.id ? 'white' : 'rgba(255,255,255,0.45)',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', color: 'inherit' }}>{tab.icon}</div>
+                    <Text style={{ color: 'inherit', fontWeight: activeSettingsTab === tab.id ? 600 : 400, fontSize: '0.85rem' }}>{tab.label}</Text>
+                  </Row>
+                ))}
+
+                {/* Bottom branding */}
+                <div style={{ flex: 1 }} />
+                <Text style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.65rem', padding: '0 8px' }}>TasteMap v1.0.0-beta</Text>
+              </Column>
+
+              {/* Right Content Area */}
+              <Column style={{ flex: 1, padding: '32px 40px', overflowY: 'auto', gap: '24px' }}>
+
+                {/* ─── APPEARANCE TAB ─── */}
+                {activeSettingsTab === 'appearance' && (
+                  <>
+                    <Column style={{ gap: '4px' }}>
+                      <Heading variant="heading-strong-m" style={{ color: 'white' }}>Giao diện (Appearance)</Heading>
+                      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>Chọn theme hiển thị cho ứng dụng</Text>
+                    </Column>
+                    <Row style={{ gap: '16px' }}>
+                      {[
+                        { id: 'light', label: 'Sáng', icon: <Sun size={24} />, active: false },
+                        { id: 'dark', label: 'Tối', icon: <Moon size={24} />, active: true },
+                        { id: 'system', label: 'Hệ thống', icon: <Monitor size={24} />, active: false },
+                      ].map(theme => (
+                        <Column
+                          key={theme.id}
+                          onClick={handleComingSoon}
+                          style={{
+                            flex: 1, padding: '24px 16px', alignItems: 'center', gap: '12px',
+                            backgroundColor: theme.active ? 'rgba(0,209,178,0.08)' : 'rgba(255,255,255,0.03)',
+                            border: theme.active ? '2px solid #00D1B2' : '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: '14px', cursor: 'pointer',
+                            boxShadow: theme.active ? '0 0 20px rgba(0,209,178,0.15)' : 'none',
+                            transition: 'all 0.2s',
+                          }}
+                        >
+                          <div style={{ color: theme.active ? '#00D1B2' : 'rgba(255,255,255,0.4)' }}>{theme.icon}</div>
+                          <Text style={{ color: theme.active ? '#00D1B2' : 'rgba(255,255,255,0.5)', fontWeight: 600, fontSize: '0.85rem' }}>{theme.label}</Text>
+                        </Column>
+                      ))}
+                    </Row>
+
+                    {/* Accent Color */}
+                    <Column style={{ gap: '12px', marginTop: '8px' }}>
+                      <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>Màu nhấn</Text>
+                      <Row style={{ gap: '10px' }}>
+                        {['#ED1B24', '#00D1B2', '#A855F7', '#FBBF24', '#3B82F6', '#F97316'].map(c => (
+                          <div
+                            key={c}
+                            onClick={handleComingSoon}
+                            style={{
+                              width: '36px', height: '36px', borderRadius: '50%', backgroundColor: c,
+                              border: c === '#ED1B24' ? '3px solid white' : '2px solid transparent',
+                              cursor: 'pointer', transition: 'transform 0.15s',
+                              boxShadow: c === '#ED1B24' ? `0 0 12px ${c}60` : 'none',
+                            }}
+                          />
+                        ))}
+                      </Row>
+                    </Column>
+                  </>
+                )}
+
+                {/* ─── LANGUAGE TAB ─── */}
+                {activeSettingsTab === 'language' && (
+                  <>
+                    <Column style={{ gap: '4px' }}>
+                      <Heading variant="heading-strong-m" style={{ color: 'white' }}>Ngôn ngữ (Language)</Heading>
+                      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>Chọn ngôn ngữ hiển thị</Text>
+                    </Column>
+                    <Column style={{ gap: '8px' }}>
+                      {[
+                        { code: 'vi', label: 'Tiếng Việt', flag: '🇻🇳', active: true },
+                        { code: 'en', label: 'English', flag: '🇺🇸', active: false },
+                        { code: 'ja', label: '日本語', flag: '🇯🇵', active: false },
+                        { code: 'ko', label: '한국어', flag: '🇰🇷', active: false },
+                      ].map(lang => (
+                        <Row
+                          key={lang.code}
+                          onClick={handleComingSoon}
+                          style={{
+                            padding: '14px 16px', gap: '14px', alignItems: 'center',
+                            borderRadius: '12px', cursor: 'pointer',
+                            backgroundColor: lang.active ? 'rgba(0,209,178,0.08)' : 'rgba(255,255,255,0.03)',
+                            border: lang.active ? '1px solid rgba(0,209,178,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                            transition: 'all 0.15s',
+                          }}
+                        >
+                          <span style={{ fontSize: '1.2rem' }}>{lang.flag}</span>
+                          <Text style={{ color: lang.active ? 'white' : 'rgba(255,255,255,0.6)', fontWeight: lang.active ? 600 : 400, fontSize: '0.9rem', flex: 1 }}>{lang.label}</Text>
+                          {lang.active && <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#00D1B2' }} />}
+                        </Row>
+                      ))}
+                    </Column>
+                  </>
+                )}
+
+                {/* ─── NOTIFICATIONS TAB ─── */}
+                {activeSettingsTab === 'notifications' && (
+                  <>
+                    <Column style={{ gap: '4px' }}>
+                      <Heading variant="heading-strong-m" style={{ color: 'white' }}>Thông báo (Notifications)</Heading>
+                      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>Quản lý cài đặt thông báo</Text>
+                    </Column>
+                    <Column style={{ gap: '8px' }}>
+                      {[
+                        { label: 'Bạn bè check-in gần đây', desc: 'Nhận thông báo khi bạn bè check-in', on: true },
+                        { label: 'Khuyến mãi lân cận', desc: 'Ưu đãi từ các quán xung quanh', on: true },
+                        { label: 'Taste Vector cập nhật', desc: 'Khi vector sở thích thay đổi', on: false },
+                        { label: 'Lời mời Lobby', desc: 'Khi bạn được mời vào nhóm', on: true },
+                      ].map(noti => (
+                        <Row
+                          key={noti.label}
+                          style={{
+                            padding: '16px', gap: '16px', alignItems: 'center',
+                            borderRadius: '12px',
+                            backgroundColor: 'rgba(255,255,255,0.03)',
+                            border: '1px solid rgba(255,255,255,0.06)',
+                          }}
+                        >
+                          <Column style={{ flex: 1, gap: '2px' }}>
+                            <Text style={{ color: 'white', fontWeight: 500, fontSize: '0.85rem' }}>{noti.label}</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.75rem' }}>{noti.desc}</Text>
+                          </Column>
+                          {/* Toggle Switch */}
+                          <div
+                            onClick={handleComingSoon}
+                            style={{
+                              width: '44px', height: '24px', borderRadius: '12px',
+                              backgroundColor: noti.on ? '#00D1B2' : 'rgba(255,255,255,0.12)',
+                              position: 'relative', cursor: 'pointer',
+                              transition: 'background-color 0.2s',
+                            }}
+                          >
+                            <div style={{
+                              position: 'absolute', top: '3px',
+                              left: noti.on ? '23px' : '3px',
+                              width: '18px', height: '18px', borderRadius: '50%',
+                              backgroundColor: 'white',
+                              transition: 'left 0.2s',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                            }} />
+                          </div>
+                        </Row>
+                      ))}
+                    </Column>
+                  </>
+                )}
+
+                {/* ─── SUPPORT TAB ─── */}
+                {activeSettingsTab === 'support' && (
+                  <>
+                    <Column style={{ gap: '4px' }}>
+                      <Heading variant="heading-strong-m" style={{ color: 'white' }}>Trợ giúp & Hỗ trợ</Heading>
+                      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>Liên hệ hoặc tìm câu trả lời</Text>
+                    </Column>
+
+                    {/* Contact Card */}
+                    <Column style={{
+                      padding: '24px', borderRadius: '14px',
+                      background: 'linear-gradient(135deg, rgba(0,209,178,0.1) 0%, rgba(168,85,247,0.08) 100%)',
+                      border: '1px solid rgba(0,209,178,0.15)',
+                      gap: '12px',
+                    }}>
+                      <Heading variant="heading-strong-s" style={{ color: 'white' }}>Cần hỗ trợ?</Heading>
+                      <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' }}>Email: support@tastemap.io</Text>
+                      <Button size="m" onClick={handleComingSoon} style={{ backgroundColor: '#00D1B2', color: '#000', fontWeight: 700, borderRadius: '10px', padding: '10px 20px', cursor: 'pointer', border: 'none', alignSelf: 'flex-start' }}>
+                        <LifeBuoy size={14} style={{ marginRight: '8px' }} /> Start Live Chat
+                      </Button>
+                    </Column>
+
+                    {/* FAQ */}
+                    <Column style={{ gap: '8px' }}>
+                      <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>Câu hỏi thường gặp</Text>
+                      {[
+                        { q: 'Làm sao để sửa Taste Vector?', a: 'Hãy tiếp tục swipe để hệ thống tự động tối ưu theo sở thích của bạn.' },
+                        { q: 'Tôi có thể tạo bao nhiêu Tour?', a: 'Không giới hạn! Bạn có thể tạo và lưu nhiều tour khác nhau.' },
+                        { q: 'Dữ liệu có được bảo mật không?', a: 'Tất cả dữ liệu được mã hóa end-to-end và lưu trữ an toàn.' },
+                      ].map(faq => (
+                        <Column key={faq.q} style={{
+                          padding: '16px', borderRadius: '12px',
+                          backgroundColor: 'rgba(255,255,255,0.03)',
+                          border: '1px solid rgba(255,255,255,0.06)',
+                          gap: '8px',
+                        }}>
+                          <Text style={{ color: 'white', fontWeight: 600, fontSize: '0.85rem' }}>{faq.q}</Text>
+                          <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.8rem', lineHeight: 1.5 }}>{faq.a}</Text>
+                        </Column>
+                      ))}
+                    </Column>
+                  </>
+                )}
+
+                {/* ─── ABOUT TAB ─── */}
+                {activeSettingsTab === 'about' && (
+                  <>
+                    <Column style={{ gap: '4px' }}>
+                      <Heading variant="heading-strong-m" style={{ color: 'white' }}>Về TasteMap</Heading>
+                      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>Thông tin ứng dụng</Text>
+                    </Column>
+
+                    {/* App Info Card */}
+                    <Column style={{
+                      padding: '24px', borderRadius: '14px',
+                      backgroundColor: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                      gap: '12px', alignItems: 'center',
+                    }}>
+                      <Heading variant="heading-strong-l" style={{ color: '#ED1B24', letterSpacing: '-0.5px' }}>TasteMap.</Heading>
+                      <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>Food Tour Builder • Super App</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem' }}>Version 1.0.0-beta (Build 2026.03)</Text>
+                    </Column>
+
+                    {/* Links */}
+                    <Column style={{ gap: '4px' }}>
+                      <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Liên kết</Text>
+                      {[
+                        { label: 'Github Repository', icon: <Github size={16} /> },
+                        { label: 'Privacy Policy', icon: <ExternalLink size={16} /> },
+                        { label: 'Terms of Service', icon: <ExternalLink size={16} /> },
+                        { label: 'Open Source Licenses', icon: <ExternalLink size={16} /> },
+                      ].map(link => (
+                        <Row
+                          key={link.label}
+                          onClick={handleComingSoon}
+                          style={{
+                            padding: '12px 16px', gap: '14px', alignItems: 'center',
+                            borderRadius: '10px', cursor: 'pointer',
+                            transition: 'background-color 0.15s',
+                          }}
+                          onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)')}
+                          onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                        >
+                          <div style={{ color: 'rgba(255,255,255,0.35)', display: 'flex' }}>{link.icon}</div>
+                          <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', flex: 1 }}>{link.label}</Text>
+                          <ChevronRight size={14} color="rgba(255,255,255,0.2)" />
+                        </Row>
+                      ))}
+                    </Column>
+
+                    {/* Credits */}
+                    <Text style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.7rem', textAlign: 'center', marginTop: '16px' }}>
+                      Made with ❤️ by TasteMap Team • © 2026
+                    </Text>
+                  </>
+                )}
+
+              </Column>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </Row>
   );
 }
@@ -1381,5 +1806,23 @@ function ReelCard({ title, user, views, avatar, img, delay }: { title: string; u
         </Column>
       </Column>
     </motion.div>
+  );
+}
+
+function ProfileMenuItem({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
+  return (
+    <Row
+      onClick={onClick}
+      style={{
+        padding: '12px 18px', gap: '16px', alignItems: 'center', cursor: 'pointer',
+        borderRadius: '8px', margin: '0 4px',
+        transition: 'background-color 0.15s',
+      }}
+      onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)')}
+      onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => (e.currentTarget.style.backgroundColor = 'transparent')}
+    >
+      <div style={{ color: 'rgba(255,255,255,0.45)', display: 'flex', flexShrink: 0 }}>{icon}</div>
+      <Text style={{ color: 'rgba(255,255,255,0.85)', fontWeight: 500, fontSize: '0.85rem' }}>{label}</Text>
+    </Row>
   );
 }
