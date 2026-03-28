@@ -8,10 +8,16 @@
 - `password_hash` (VARCHAR)
 - `display_name` (VARCHAR)
 - `avatar_url` (VARCHAR)
+- `bio` (TEXT) - Mô tả bản thân
+- `cover_url` (VARCHAR) - Ảnh bìa profile
+- `location` (VARCHAR) - VD: "Dĩ An, Bình Dương"
+- `title` (VARCHAR) - Gamification title: "Taste Explorer"
+- `phone` (VARCHAR) - Số điện thoại (private)
 - `food_vector` (VECTOR(15), NOT NULL, DEFAULT) - default: [0.5]*15
 - `place_vector` (VECTOR(15), NOT NULL, DEFAULT) - default: [0.5]*15
 - `xp` (INTEGER, DEFAULT 0)
 - `level` (INTEGER, DEFAULT 1)
+- `settings` (JSONB) - VD: {"theme": "dark", "language": "vi", "notif_friends": true}
 - `created_at` (TIMESTAMP, DEFAULT NOW)
 - `updated_at` (TIMESTAMP, DEFAULT NOW)
 
@@ -72,6 +78,23 @@
 - `status` (VARCHAR, NOT NULL, DEFAULT 'pending') - pending / accepted / blocked
 - `created_at` (TIMESTAMP, DEFAULT NOW)
 - **Index:** `UNIQUE(user_id, friend_id)`
+
+## Badges
+
+- `id` (INTEGER, PK, AUTO-INCREMENT)
+- `icon` (VARCHAR, NOT NULL) - Emoji: "🔥", "🌙", "📸", "👑"
+- `label` (VARCHAR, NOT NULL) - "Spice Master", "Night Owl"
+- `color` (VARCHAR, NOT NULL) - Hex: "#E63946", "#7B2FF7"
+- `description` (VARCHAR)
+- `created_at` (TIMESTAMP, DEFAULT NOW)
+
+## User Badges
+
+- `id` (INTEGER, PK, AUTO-INCREMENT)
+- `user_id` (INTEGER, FK, NOT NULL)
+- `badge_id` (INTEGER, FK, NOT NULL)
+- `earned_at` (TIMESTAMP, DEFAULT NOW)
+- **Index:** `UNIQUE(user_id, badge_id)`
 
 ## Posts
 
