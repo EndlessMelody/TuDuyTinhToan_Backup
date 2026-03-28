@@ -17,9 +17,23 @@ async def get_db():
     async with AsyncSessionLocal() as session:
         yield session
 
-# Import toàn bộ Models ở cuối file để Base đăng ký đầy đủ vào Registry
-# Tránh lỗi InvalidRequestError khi SQLAlchemy mapper khởi tạo Class
-from src.users.models import User
-from src.locations.models import Location
-from src.interactions.models import Interaction
-from src.groups.models import Group, GroupMember
+# ─── Import toàn bộ Models ở cuối file để Base đăng ký đầy đủ vào Registry ───
+# Tránh lỗi InvalidRequestError khi SQLAlchemy mapper khởi tạo Class.
+# THỨ TỰ QUAN TRỌNG: import bảng không có FK trước, bảng có FK sau.
+
+# Tier 1 — Không phụ thuộc bảng nào
+from src.users.models import User                          # noqa: F401
+from src.locations.models import Location                  # noqa: F401
+
+# Tier 2 — Phụ thuộc users / locations
+from src.interactions.models import Interaction            # noqa: F401
+from src.groups.models import Group, GroupMember           # noqa: F401
+from src.social.models import Friendship                   # noqa: F401
+
+# Tier 3 — Social content (phụ thuộc users + locations)
+from src.reels.models import Reel                          # noqa: F401
+from src.posts.models import Post, PostLike, Comment       # noqa: F401  (Comment references Reel → Reel phải import trước)
+from src.tours.models import Tour, TourStop                # noqa: F401
+from src.bookmarks.models import Bookmark                  # noqa: F401
+from src.notifications.models import Notification          # noqa: F401
+from src.deals.models import Deal                          # noqa: F401

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Index
+from sqlalchemy import Column, Integer, String, Float, DateTime, func
 from sqlalchemy.dialects.postgresql import JSONB
 from pgvector.sqlalchemy import Vector
 from sqlalchemy.orm import relationship
@@ -32,12 +32,23 @@ class Location(Base):
     category = Column(String, index=True)  # "food" / "place"
     image_url = Column(String, nullable=True)
 
+    # Extended display info (từ thiết kế frontend)
+    price_range = Column(String, nullable=True)  # VD: "25k", "120k"
+    open_hours = Column(String, nullable=True)   # VD: "Open until 2AM"
+    rating = Column(Float, default=0.0)
+
     # JSONB thay vì JSON: hỗ trợ GIN index, query nhanh hơn
-    # Ví dụ: {"vibe": "chill", "price_range": "$$$", "cuisine": "Vietnamese"}
+    # Ví dụ: {"vibe": "chill", "cuisine": "Vietnamese", "noise_level": "quiet"}
     characteristics = Column(JSONB, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
     interactions = relationship("Interaction", back_populates="location", lazy="selectin")
+    posts = relationship("Post", back_populates="location", lazy="selectin")
+    bookmarks = relationship("Bookmark", back_populates="location", lazy="selectin")
+    tour_stops = relationship("TourStop", back_populates="location", lazy="selectin")
+    deals = relationship("Deal", back_populates="location", lazy="selectin")
 
     # Index cho pgvector ANN search (ivfflat hoặc hnsw) — sẽ tạo qua Alembic raw SQL
     # vì SQLAlchemy chưa hỗ trợ native CREATE INDEX ... USING ivfflat

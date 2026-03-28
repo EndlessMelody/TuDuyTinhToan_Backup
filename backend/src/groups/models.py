@@ -1,11 +1,11 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, func
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, func
 from sqlalchemy.orm import relationship
 from src.db.database import Base
 
 
 class Group(Base):
     """
-    Bảng Groups — đại diện một nhóm bạn bè cùng chọn địa điểm.
+    Bảng Groups — đại diện một nhóm bạn bè (Lobby) cùng chọn địa điểm.
     Minimax algorithm sẽ hoạt động trên các member của group này.
     """
     __tablename__ = "groups"
@@ -16,6 +16,13 @@ class Group(Base):
     # Status dùng String thay vì Enum — cùng triết lý với Interaction.action
     # Giá trị: "active", "completed", "cancelled"
     status = Column(String, nullable=False, default="active")
+
+    # Thông tin lobby (từ thiết kế frontend)
+    route_description = Column(String, nullable=True)  # VD: "District 1 Mapping"
+    scheduled_time = Column(DateTime(timezone=True), nullable=True)
+    max_spots = Column(Integer, default=6)
+    cover_image_url = Column(String, nullable=True)
+    accent_color = Column(String, nullable=True)  # Mã màu Hex cho UI lobby
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -41,6 +48,7 @@ class GroupMember(Base):
 
     # Minimax memory: Boost weight cho user bị "thiệt" ở quyết định trước
     compromise_score = Column(Float, default=0.0)
+    is_ready = Column(Boolean, default=False)
 
     joined_at = Column(DateTime(timezone=True), server_default=func.now())
 
