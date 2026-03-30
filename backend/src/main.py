@@ -60,6 +60,12 @@ app.add_middleware(
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
+# Serve uploaded media files at /static/uploads/
+import os
+from fastapi.staticfiles import StaticFiles
+os.makedirs("static/uploads", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}

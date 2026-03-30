@@ -1,10 +1,9 @@
 from pydantic import BaseModel
-from typing import List, Literal, Union
-from enum import Enum
+from typing import List, Literal, Union, Optional
+from datetime import datetime
 
 
-class InteractionAction(str, Enum):
-    """Pydantic Enum — validate ở API layer, DB lưu String thuần."""
+class InteractionAction(str):
     LIKED = "LIKED"
     DISLIKED = "DISLIKED"
     SKIPPED = "SKIPPED"
@@ -18,8 +17,8 @@ class SwipeAction(BaseModel):
 
 
 class SwipeBatchRequest(BaseModel):
-    user_id: Union[int, str]  # Hỗ trợ cả DB ID (int) và Guest UUID (str)
-    domain: Literal["food", "place"] = "place"
+    user_id: Union[int, str]
+    category: Literal["food", "place"] = "place"  # Unified: was "domain"
     actions: List[SwipeAction]
 
 
@@ -28,3 +27,19 @@ class SwipeBatchResponse(BaseModel):
     processed_count: int
     penalty_triggered: bool
     updated_vector: List[float]
+
+
+class InteractionHistoryItem(BaseModel):
+    id: int
+    location_id: int
+    location_name: Optional[str] = None
+    action: str
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class InteractionHistoryResponse(BaseModel):
+    items: List[InteractionHistoryItem]
+    total: int
