@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Column,
   Row,
@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppStatusBar } from "./common/AppStatusBar";
+import { MOCK_USER } from "@/constants/mock-data";
 import {
   Radar,
   RadarChart,
@@ -31,14 +32,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-const radarData = [
-  { subject: "Street Food", A: 120, fullMark: 150 },
-  { subject: "Spicy", A: 98, fullMark: 150 },
-  { subject: "Sweet", A: 86, fullMark: 150 },
-  { subject: "Luxury", A: 30, fullMark: 150 },
-  { subject: "Quiet", A: 65, fullMark: 150 },
-  { subject: "Group", A: 110, fullMark: 150 },
-];
+const radarData = MOCK_USER.radarData;
 
 function SidebarItem({
   icon,
@@ -158,13 +152,25 @@ export default function DashboardLayout({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isRightExpanded, setIsRightExpanded] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
 
-  const sidebarWidth = isSidebarOpen ? 280 : 80;
+  const isProfilePage = pathname === "/profile";
+
+  // Auto-collapse sidebars when entering the profile page
+  React.useEffect(() => {
+    if (isProfilePage) {
+      setIsSidebarOpen(false);
+      setIsRightExpanded(false);
+    }
+  }, [isProfilePage]);
+
+  const sidebarWidth = isProfilePage ? 0 : (isSidebarOpen ? 280 : 80);
+  const rightSidebarWidth = isProfilePage ? 0 : (isRightExpanded ? 320 : 80);
 
   return (
     <Row
       fillWidth
-      background="page"
+      background={isProfilePage ? "surface" : "page"}
       overflow="hidden"
       style={{ height: "100vh", color: "#1C1C1E" }}
     >
@@ -178,12 +184,13 @@ export default function DashboardLayout({
         style={{
           width: `${sidebarWidth}px`,
           minWidth: `${sidebarWidth}px`,
-          padding: isSidebarOpen ? "24px 20px" : "24px 12px",
+          padding: isProfilePage ? "0" : (isSidebarOpen ? "24px 20px" : "24px 12px"),
           flexShrink: 0,
           overflowX: "hidden",
           overflowY: "auto",
           transition: "all 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
           gap: "28px",
+          display: isProfilePage ? 'none' : 'flex',
         }}
       >
         {/* Logo + Toggle */}
@@ -314,18 +321,18 @@ export default function DashboardLayout({
           >
             <Row style={{ alignItems: "center", gap: "12px" }}>
               <Avatar
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=64&h=64&fit=crop"
+                src={MOCK_USER.avatar}
                 size="m"
               />
               <Column>
                 <Heading variant="heading-strong-s" style={{ color: "#1C1C1E" }}>
-                  Taste Explorer
+                  {MOCK_USER.title}
                 </Heading>
                 <Text
                   variant="body-default-xs"
                   style={{ color: "#8E8E93" }}
                 >
-                  Level 12 • Vector Map
+                  Level {MOCK_USER.level} • Vector Map
                 </Text>
               </Column>
             </Row>
@@ -374,7 +381,7 @@ export default function DashboardLayout({
             }}
           >
             <Avatar
-              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=64&h=64&fit=crop"
+              src={MOCK_USER.avatar}
               size="m"
               style={{ border: "2px solid #007AFF", cursor: "pointer" }}
             />
@@ -384,7 +391,9 @@ export default function DashboardLayout({
 
       {/* 2. CENTER PANEL (CHILDREN) */}
       <Column flex={1} fillHeight style={{ minWidth: 0, position: "relative" }}>
-        {children}
+        <Column flex={1} fillWidth style={{ overflowY: "auto", overflowX: "hidden" }}>
+          {children}
+        </Column>
         <AppStatusBar />
       </Column>
 
@@ -397,12 +406,13 @@ export default function DashboardLayout({
         borderLeft="neutral-alpha-weak"
         radius="none"
         style={{
-          width: isRightExpanded ? "320px" : "80px",
-          minWidth: isRightExpanded ? "320px" : "80px",
+          width: isProfilePage ? '0px' : (isRightExpanded ? "320px" : "80px"),
+          minWidth: isProfilePage ? '0px' : (isRightExpanded ? "320px" : "80px"),
           flexShrink: 0,
           transition: "all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)",
           overflow: "hidden",
-          paddingTop: "24px",
+          paddingTop: isProfilePage ? "0" : "24px",
+          display: isProfilePage ? 'none' : 'flex',
         }}
       >
         <Row

@@ -7,10 +7,14 @@ export function ProfileMenuItem({
   icon,
   label,
   onClick,
+  style,
+  textColor,
 }: {
   icon: React.ReactNode;
   label: string;
   onClick: () => void;
+  style?: React.CSSProperties;
+  textColor?: string;
 }) {
   return (
     <Row
@@ -23,6 +27,7 @@ export function ProfileMenuItem({
         borderRadius: "8px",
         margin: "0 4px",
         transition: "background-color 0.15s",
+        ...style,
       }}
       onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) =>
         (e.currentTarget.style.backgroundColor = "#F2F2F7")
@@ -33,7 +38,7 @@ export function ProfileMenuItem({
     >
       <div
         style={{
-          color: "#8E8E93",
+          color: textColor || "#8E8E93",
           display: "flex",
           flexShrink: 0,
         }}
@@ -42,7 +47,7 @@ export function ProfileMenuItem({
       </div>
       <Text
         style={{
-          color: "#1C1C1E",
+          color: textColor || "#1C1C1E",
           fontWeight: 500,
           fontSize: "0.85rem",
         }}
