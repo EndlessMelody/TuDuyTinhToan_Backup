@@ -1,0 +1,132 @@
+"use client";
+
+import React from "react";
+import { motion } from "framer-motion";
+import { Column, Row, Text } from "../OnceUI";
+import { Sparkles, Star } from "lucide-react";
+
+export function VaultCard({
+  title,
+  xp,
+  img,
+  tags,
+  rating,
+  delay,
+}: {
+  title: string;
+  xp: string;
+  img: string;
+  tags: string;
+  rating: number;
+  delay: number;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.4, delay }}
+      whileHover={{
+        y: -4,
+        boxShadow: "0 12px 40px rgba(0, 122, 255, 0.08)",
+      }}
+      style={{
+        borderRadius: "20px",
+        flexShrink: 0,
+        minWidth: "260px",
+        backgroundColor: "#FFFFFF",
+        border: "1px solid #E5E5EA",
+        overflow: "hidden",
+        cursor: "pointer",
+        transform: "translateZ(0)",
+      }}
+      className="group"
+    >
+      {/* Image Area */}
+      <div className="overflow-hidden relative" style={{ width: "100%", height: "150px" }}>
+        <img
+          src={img}
+          alt={title}
+          className="transition-transform duration-[700ms] ease-out group-hover:scale-[1.03]"
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+          }}
+        />
+        {/* Gradient for text/badge legibility */}
+        <div style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: "50%",
+          background: "linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, transparent 100%)",
+          zIndex: 2,
+        }} />
+
+        {/* XP badge — white glass, top left */}
+        <Row
+          style={{
+            position: "absolute",
+            top: "10px",
+            left: "10px",
+            zIndex: 3,
+            backgroundColor: "rgba(255,255,255,0.85)",
+            backdropFilter: "blur(8px)",
+            padding: "4px 10px",
+            borderRadius: "8px",
+            gap: "4px",
+            alignItems: "center",
+            border: "1px solid rgba(255,255,255,0.5)",
+          }}
+        >
+          <Sparkles size={10} color="#FBBF24" />
+          <Text
+            style={{ fontSize: "0.7rem", fontWeight: 700, color: "#D97706" }}
+          >
+            {xp}
+          </Text>
+        </Row>
+
+        {/* Rating badge — white glass, top right */}
+        <Row
+          style={{
+            position: "absolute",
+            top: "10px",
+            right: "10px",
+            zIndex: 3,
+            backgroundColor: "rgba(255,255,255,0.85)",
+            backdropFilter: "blur(8px)",
+            padding: "4px 8px",
+            borderRadius: "8px",
+            gap: "3px",
+            alignItems: "center",
+            border: "1px solid rgba(255,255,255,0.5)",
+          }}
+        >
+          <Star size={11} color="#FBBF24" fill="#FBBF24" />
+          <Text
+            style={{ fontSize: "0.7rem", fontWeight: 700, color: "#D97706" }}
+          >
+            {rating}
+          </Text>
+        </Row>
+      </div>
+
+      {/* Text Area — white bottom */}
+      <Column style={{ padding: "14px 16px", gap: "4px" }}>
+        <Text
+          style={{ color: "#1C1C1E", fontWeight: 700, fontSize: "0.95rem" }}
+        >
+          {title}
+        </Text>
+        <Text
+          style={{ color: "#8E8E93", fontSize: "0.75rem" }}
+        >
+          {tags}
+        </Text>
+      </Column>
+    </motion.div>
+  );
+}

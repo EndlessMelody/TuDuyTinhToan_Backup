@@ -18,6 +18,8 @@ export const metadata: Metadata = {
   description: "Social food discovery platform for friends and foodies",
 };
 
+import DashboardLayout from "@/components/DashboardLayout";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -28,8 +30,10 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
-        {children}
+      <body className="min-h-full flex flex-col m-0 p-0 overflow-hidden">
+        <DashboardLayout>
+          {children}
+        </DashboardLayout>
         <Toaster
           theme="dark"
           position="bottom-center"

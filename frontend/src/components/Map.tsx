@@ -9,8 +9,8 @@ const MapWidget = dynamic(
   { 
     ssr: false,
     loading: () => (
-      <div style={{ width: '100%', height: '100%', backgroundColor: '#1A1A1A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ width: '20px', height: '20px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.1)', borderTopColor: '#ED1B24', animation: 'spin 1s linear infinite' }} />
+      <div style={{ width: '100%', height: '100%', backgroundColor: '#F2F2F7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: '20px', height: '20px', borderRadius: '50%', border: '2px solid #E5E5EA', borderTopColor: '#ED1B24', animation: 'spin 1s linear infinite' }} />
       </div>
     )
   }

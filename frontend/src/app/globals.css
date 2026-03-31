@@ -1,34 +1,167 @@
 @import "tailwindcss";
 
 :root {
-  --background: #121212;
-  --foreground: #ededed;
+  /* Base */
+  --background: #F2F2F7;
+  --foreground: #1C1C1E;
+
+  /* Brand colors */
+  --color-primary-raw: 237 27 36;
+  --color-teal-raw: 0 209 178;
+
+  /* Surfaces */
+  --surface-page: #F2F2F7;
+  --surface-base: #FFFFFF;
+  --surface-elevated: #FFFFFF;
+  --surface-overlay: rgba(0, 0, 0, 0.2);
+
+  /* Borders */
+  --border-weak: #F2F2F7;
+  --border-medium: #E5E5EA;
+  --border-strong: #D1D1D6;
+
+  /* Typography */
+  --text-primary: #1C1C1E;
+  --text-secondary: #636366;
+  --text-tertiary: #8E8E93;
+  --text-disabled: #C7C7CC;
+
+  /* Shadows */
+  --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.04);
+  --shadow-elevated: 0 20px 48px rgba(0, 0, 0, 0.08);
+  --shadow-glow-primary: 0 0 20px rgba(237, 27, 36, 0.15);
+  --shadow-glow-teal: 0 0 12px rgba(0, 209, 178, 0.2);
+
+  /* Motion */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 300ms;
+  --duration-slow: 500ms;
 }
 
 @theme inline {
+  /* Framework tokens */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
   --font-mono: var(--font-geist-mono);
+
+  /* Brand */
+  --color-primary: rgb(237 27 36);
+  --color-primary-hover: rgb(196 21 28);
+  --color-teal: rgb(0 209 178);
+
+  /* Surface palette */
+  --color-surface-page: var(--surface-page);
+  --color-surface: #FFFFFF;
+  --color-surface-elevated: var(--surface-elevated);
+  --color-overlay: var(--surface-overlay);
+
+  /* Border */
+  --color-border-weak: var(--border-weak);
+  --color-border-medium: var(--border-medium);
+  --color-border-strong: var(--border-strong);
+
+  /* Radius scale */
+  --radius-xs: 6px;
+  --radius-s: 8px;
+  --radius-m: 12px;
+  --radius-l: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 32px;
+  --radius-full: 9999px;
+
+  /* Spacing scale (for gap/padding utilities) */
+  --spacing-xs: 4px;
+  --spacing-s: 8px;
+  --spacing-m: 16px;
+  --spacing-l: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+  --spacing-3xl: 64px;
+
+  /* Animation utilities */
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
 }
 
-/* Hide scrollbar for Chrome, Safari and Opera */
+/* Hide scrollbar */
 .no-scrollbar::-webkit-scrollbar {
-    display: none;
+  display: none;
 }
-/* Hide scrollbar for IE, Edge and Firefox */
 .no-scrollbar {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
+/* Shimmer skeleton animation */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Legacy pulse (keep for compatibility) */
 @keyframes pulse {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   PHASE 2: Micro-interaction Utility Classes
+   ═══════════════════════════════════════════════ */
+
+
+
+/* 2c. Card-level hover glow — apply to the card wrapper */
+.card-hover {
+  transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1),
+              box-shadow 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 122, 255, 0.08);
+}
+
+/* 2d. Skeleton shimmer placeholder */
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: #E5E5EA;
+  border-radius: 12px;
+}
+.skeleton-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    transparent 100%
+  );
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* 2e. Focus ring for keyboard accessibility */
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px #EAF2FF, 0 0 0 6px #007AFF40;
+  border-radius: inherit;
 }
