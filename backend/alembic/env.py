@@ -21,8 +21,10 @@ from src.groups.models import Group, GroupMember  # noqa: F401
 # access to the values within the .ini file in use.
 config = context.config
 
-# 3. Overwrite sqlalchemy.url with our settings.DATABASE_URL
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# 3. Overwrite sqlalchemy.url với DATABASE_URL_DIRECT (port 5432 — direct connection).
+#    QUAN TRỌNG: Alembic cần direct connection (không qua pgBouncer/pooler)
+#    để thực hiện DDL migrations. Pooler ở port 6543 không hỗ trợ DDL.
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL_DIRECT)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -32,6 +34,7 @@ if config.config_file_name is not None:
 # add your model's MetaData object here
 # for 'autogenerate' support
 target_metadata = Base.metadata
+
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.

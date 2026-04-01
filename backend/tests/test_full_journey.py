@@ -197,7 +197,7 @@ def main():
 
     # ═══ PHẦN 0: HEALTH CHECK ═══════════════════════════════════════════════
     log_step("PHẦN 0: HEALTH CHECK", "Kiểm tra server có đang chạy không")
-    call("Health check", "GET", "/health")   # thường /health nằm ngoài /api/v1
+    call("Health check", "GET", "/api/v1/health")
 
     # ═══ PHẦN 1: GUEST USER (Init Session → Feed → Swipe → Recommend) ═══════
     log_step("PHẦN 1: GUEST USER", "Không cần tài khoản, dùng device_id")

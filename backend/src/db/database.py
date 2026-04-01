@@ -3,7 +3,14 @@ from sqlalchemy.orm import declarative_base
 
 from src.core.config import settings
 
-engine = create_async_engine(settings.DATABASE_URL, echo=False)
+# Supabase sử dụng pgBouncer ở transaction mode → không hỗ trợ server-side
+# prepared statements. Tắt cache bằng connect_args để đảm bảo tương thích,
+# phòng trường hợp URL không chứa sẵn tham số ?prepared_statement_cache_size=0.
+engine = create_async_engine(
+    settings.DATABASE_URL,
+    echo=False,
+    connect_args={"prepared_statement_cache_size": 0},
+)
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
@@ -13,9 +20,11 @@ AsyncSessionLocal = async_sessionmaker(
 
 Base = declarative_base()
 
+
 async def get_db():
     async with AsyncSessionLocal() as session:
         yield session
+
 
 # ─── Import toàn bộ Models ở cuối file để Base đăng ký đầy đủ vào Registry ───
 # Tránh lỗi InvalidRequestError khi SQLAlchemy mapper khởi tạo Class.
