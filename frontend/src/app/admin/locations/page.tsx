@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Column, Row, Heading, Text, Button, IconButton } from "@/components/OnceUI";
+import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import {
-  MapPin, Save, RotateCcw, LogOut, Plus, ChevronDown, ChevronUp, Info,
+  MapPin, Save, RotateCcw, LogOut, Plus, ChevronDown, ChevronUp, Info, UploadCloud, Download
 } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -374,6 +375,11 @@ export default function AdminLocationsPage() {
   const [expandedDim, setExpandedDim] = useState<number | null>(null);
   const [recentLocations, setRecentLocations] = useState<Array<{ id: number; name: string }>>([]);
 
+  // Bulk Import state
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ total: 0, current: 0, success: 0, error: 0 });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // ─── Handlers ────────────────────────────────────────────────
   const updateVector = (index: number, value: number) => {
     setVector((prev) => {
@@ -451,6 +457,151 @@ export default function AdminLocationsPage() {
       toast.error(`❌ ${err instanceof Error ? err.message : "Lỗi không xác định"}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    try {
+      const wsTemplate = XLSX.utils.json_to_sheet([
+        {
+          name: "Quán Ăn Mẫu", category: "food", lat: 10.7769, lng: 106.7009,
+          city: "Ho Chi Minh", address: "123 Mẫu, Q1", price_range: "50k", open_hours: "7:00-22:00",
+          image_url: "", rating: 4.5, characteristics: '{"vibe": "chill"}',
+          v0: 0.5, v1: 0.5, v2: 0.5, v3: 0.5, v4: 0.5, v5: 0.5, v6: 0.5, v7: 0.5, v8: 0.5, v9: 0.5, v10: 0.5, v11: 0.5, v12: 0.5, v13: 0.5, v14: 0.5
+        },
+        {
+          name: "Khu Vui Chơi Mẫu", category: "place", lat: 10.7750, lng: 106.7020,
+          city: "Ho Chi Minh", address: "456 Mẫu, Q1", price_range: "100k", open_hours: "8:00-20:00",
+          image_url: "", rating: 4.0, characteristics: '{}',
+          v0: 0.8, v1: 0.2, v2: 0.9, v3: 0.1, v4: 0.5, v5: 0.5, v6: 0.5, v7: 0.6, v8: 0.8, v9: 0.9, v10: 0.5, v11: 0.5, v12: 0.7, v13: 0.2, v14: 0.3
+        }
+      ]);
+
+      const formatLevel = (levels: any[], index: number) => {
+        if (!levels || !levels[index]) return "N/A";
+        return levels[index].label + " - " + levels[index].example;
+      };
+
+      const foodInfo = FOOD_VECTOR_DIMENSIONS.map(d => ({
+        "Cột Vector": `v${d.index}`,
+        "Tên Thuộc Tính": d.name,
+        "Đại diện 0.0 (Thấp)": formatLevel(d.levels, 0),
+        "Đại diện 1.0 (Cao)": formatLevel(d.levels, d.levels.length - 1),
+        "Giải thích": d.description
+      }));
+
+      const placeInfo = PLACE_VECTOR_DIMENSIONS.map(d => ({
+        "Cột Vector": `v${d.index}`,
+        "Tên Thuộc Tính": d.name,
+        "Đại diện 0.0 (Thấp)": formatLevel(d.levels, 0),
+        "Đại diện 1.0 (Cao)": formatLevel(d.levels, d.levels.length - 1),
+        "Giải thích": d.description
+      }));
+
+      const wsFood = XLSX.utils.json_to_sheet(foodInfo);
+      const wsPlace = XLSX.utils.json_to_sheet(placeInfo);
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, wsTemplate, "Template");
+      // EXCEL SHEET NAMES CANNOT CONTAIN: [ ] * / \ ? :
+      XLSX.utils.book_append_sheet(wb, wsFood, "HuongDan_Food_Vector");
+      XLSX.utils.book_append_sheet(wb, wsPlace, "HuongDan_Place_Vector");
+      XLSX.writeFile(wb, "TasteMap_Locations_Template.xlsx");
+    } catch (error) {
+      console.error("Lỗi tạo file excel:", error);
+      toast.error("Không thể tạo file Mẫu");
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    try {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<any>(ws);
+
+      if (rows.length === 0) {
+        toast.error("File trống hoặc không có dòng dữ liệu nào");
+        setImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+
+      setImportProgress({ total: rows.length, current: 0, success: 0, error: 0 });
+
+      let successCount = 0;
+      let errorCount = 0;
+      const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        try {
+          // Check vector cols
+          const vectorArray = [];
+          for (let v = 0; v < 15; v++) {
+            const val = row[`v${v}`];
+            if (val === undefined || isNaN(Number(val))) {
+              throw new Error(`Thiếu hoặc sai định dạng value ở cột v${v}`);
+            }
+            vectorArray.push(Number(val));
+          }
+
+          if (!row.name || row.lat === undefined || row.lng === undefined || !row.category) {
+            throw new Error(`Thiếu field bắt buộc (name/category/lat/lng)`);
+          }
+
+          const body: Record<string, unknown> = {
+            name: String(row.name).trim(),
+            category: String(row.category).trim() === "food" ? "food" : "place",
+            lat: Number(row.lat),
+            lng: Number(row.lng),
+            vector: vectorArray,
+          };
+          
+          if (row.address) body.address = String(row.address).trim();
+          if (row.city) body.city = String(row.city).trim();
+          if (row.price_range) body.price_range = String(row.price_range).trim();
+          if (row.open_hours) body.open_hours = String(row.open_hours).trim();
+          if (row.image_url) body.image_url = String(row.image_url).trim();
+          if (row.rating) body.rating = Number(row.rating);
+          if (row.characteristics) {
+             try {
+                body.characteristics = JSON.parse(String(row.characteristics));
+             } catch {
+                // Ignore if invalid
+             }
+          }
+
+          const res = await fetch(`${API}/api/v1/locations/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+
+          if (!res.ok) throw new Error("API error");
+
+          successCount++;
+        } catch (err: any) {
+          console.error(`Lỗi dòng ${i + 2}:`, err);
+          errorCount++;
+        }
+
+        setImportProgress({ total: rows.length, current: i + 1, success: successCount, error: errorCount });
+        // Nhỏ xíu delay để UI không freeze
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+
+      toast.success(`Nạp xong! Thành công: ${successCount}, Thất bại: ${errorCount}`);
+    } catch (err) {
+      toast.error("Lỗi khi đọc file Excel");
+      console.error(err);
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -541,6 +692,78 @@ export default function AdminLocationsPage() {
       </Row>
 
       {/* ─── Content ───────────────────────────────────── */}
+      <Column
+        fillWidth
+        align="center"
+        style={{ padding: "0 16px 20px", maxWidth: 960, margin: "0 auto" }}
+      >
+        {/* Bulk Import Card */}
+        <Column fillWidth gap={16} style={{ ...cardStyle, padding: 24 }}>
+          <Row horizontal="between" vertical="center" fillWidth style={{ flexWrap: "wrap", gap: 16 }}>
+            <Row gap={12} vertical="center">
+              <Row
+                vertical="center"
+                horizontal="center"
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  background: "var(--surface-overlay)",
+                }}
+              >
+                <UploadCloud size={18} color="var(--brand-solid-strong)" />
+              </Row>
+              <Column gap={2}>
+                <Heading variant="heading-strong-s">Bulk Import từ Excel</Heading>
+                <Text variant="body-default-xs" style={{ color: "var(--text-tertiary)" }}>
+                  Nạp hàng loạt địa điểm từ file biểu mẫu. Yêu cầu có đủ 15 cột vector (v0 - v14).
+                </Text>
+              </Column>
+            </Row>
+
+            <Row gap={12} style={{ flexWrap: "wrap" }}>
+              <Button size="s" variant="tertiary" onClick={handleDownloadTemplate} disabled={importing}>
+                <Download size={14} style={{ marginRight: 6 }} />
+                Tải File Mẫu
+              </Button>
+
+              <input
+                type="file"
+                accept=".xlsx, .xls, .csv"
+                ref={fileInputRef}
+                style={{ display: "none" }}
+                onChange={handleFileUpload}
+              />
+              <Button size="s" variant="primary" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+                <UploadCloud size={14} style={{ marginRight: 6 }} />
+                Chọn File Tải Lên
+              </Button>
+            </Row>
+          </Row>
+
+          {importing && (
+            <Column fillWidth gap={8} style={{ background: "var(--surface-overlay)", padding: 16, borderRadius: 12 }}>
+              <Row horizontal="between" vertical="center" fillWidth>
+                <Text variant="body-strong-s">Tiến trình nạp dữ liệu...</Text>
+                <Text variant="body-strong-s">{importProgress.current} / {importProgress.total}</Text>
+              </Row>
+              <div style={{ width: "100%", height: 6, background: "var(--border-medium)", borderRadius: 3, overflow: "hidden" }}>
+                <div style={{
+                  height: "100%",
+                  width: `${(importProgress.current / (importProgress.total || 1)) * 100}%`,
+                  background: "var(--brand-solid-strong)",
+                  transition: "width 0.2s"
+                }} />
+              </div>
+              <Row gap={16} fillWidth>
+                <Text variant="body-default-xs" style={{ color: "var(--success-on-solid)" }}>Đã thêm: {importProgress.success}</Text>
+                <Text variant="body-default-xs" style={{ color: "var(--danger-on-solid)" }}>Lỗi dòng: {importProgress.error}</Text>
+              </Row>
+            </Column>
+          )}
+        </Column>
+      </Column>
+
       <Column
         fillWidth
         align="center"
