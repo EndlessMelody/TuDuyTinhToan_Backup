@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
-router = APIRouter(tags=["0. Health Check"])
+router = APIRouter(tags=["Health Check"])
 
-@router.get("/health")
+@router.get("/")
 async def health_check():
     return {"status": "ok", "message": "TasteMap Server is running smoothly!"}

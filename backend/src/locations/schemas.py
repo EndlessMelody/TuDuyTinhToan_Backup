@@ -14,6 +14,7 @@ class LocationCreate(BaseModel):
     price_range: Optional[str] = None
     open_hours: Optional[str] = None
     characteristics: Optional[dict] = None
+    vector: Optional[List[float]] = None  # 15-dim feature vector cho recommendations
 
 
 class LocationResponse(BaseModel):

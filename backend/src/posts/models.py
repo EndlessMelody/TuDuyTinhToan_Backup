@@ -32,8 +32,8 @@ class Post(Base):
     # Relationships
     user = relationship("User", back_populates="posts")
     location = relationship("Location", back_populates="posts")
-    likes = relationship("PostLike", back_populates="post", lazy="selectin")
-    comments = relationship("Comment", back_populates="post", lazy="selectin")
+    likes = relationship("PostLike", back_populates="post", lazy="selectin", cascade="all, delete-orphan")
+    comments = relationship("Comment", back_populates="post", lazy="selectin", cascade="all, delete-orphan")
 
 
 class PostLike(Base):

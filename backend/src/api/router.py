@@ -46,15 +46,12 @@ from src.health.router import router as health_router
 
 api_router = APIRouter()
 
-# Existing
 api_router.include_router(users_router,            prefix="/users",            tags=["users"])
 api_router.include_router(health_router,           prefix="/health",           tags=["health"])
 api_router.include_router(sessions_router,         prefix="/users",            tags=["sessions"])
 api_router.include_router(feed_router,             prefix="/feed",             tags=["feed"])
 api_router.include_router(interactions_router,     prefix="/interactions",     tags=["interactions"])
 api_router.include_router(recommendations_router,  prefix="/recommendations",  tags=["recommendations"])
-
-# New
 api_router.include_router(auth_router,             prefix="/auth",             tags=["auth"])
 api_router.include_router(locations_router,        prefix="/locations",        tags=["locations"])
 api_router.include_router(groups_router,           prefix="/groups",           tags=["groups"])

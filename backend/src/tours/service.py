@@ -1,6 +1,7 @@
 """Tours Service — CRUD + Graph routing (Dijkstra stub)."""
 import math
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import Optional, List
@@ -50,7 +51,11 @@ async def add_stop(db: AsyncSession, tour_id: int, user_id: int, data: StopCreat
 
     stop = TourStop(tour_id=tour_id, location_id=data.location_id, stop_order=data.stop_order)
     db.add(stop)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=404, detail=f"Location {data.location_id} không tồn tại")
     return {"id": stop.id, "stop_order": stop.stop_order, "location_id": stop.location_id}
 
 

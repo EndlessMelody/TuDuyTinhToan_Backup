@@ -41,6 +41,8 @@ def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
 
 def _normalize_distances(distances: List[float]) -> NDArray:
     """Min-Max normalize distances so they don't overpower cosine similarity."""
+    if not distances:
+        return np.array([], dtype=float)
     arr = np.array(distances, dtype=float)
     mn, mx = arr.min(), arr.max()
     if mx - mn < 1e-9:

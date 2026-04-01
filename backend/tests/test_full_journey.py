@@ -197,7 +197,7 @@ def main():
 
     # ═══ PHẦN 0: HEALTH CHECK ═══════════════════════════════════════════════
     log_step("PHẦN 0: HEALTH CHECK", "Kiểm tra server có đang chạy không")
-    call("Health check", "GET", "/api/v1/health")
+    call("Health check", "GET", "/health")
 
     # ═══ PHẦN 1: GUEST USER (Init Session → Feed → Swipe → Recommend) ═══════
     log_step("PHẦN 1: GUEST USER", "Không cần tài khoản, dùng device_id")
@@ -318,10 +318,9 @@ def main():
         "address": "123 Nguyễn Trãi, Q.1",
         "lat": 10.7769,
         "lng": 106.7009,
-        "price_level": 2,
-        "tags": ["cơm", "bình dân", "trưa"],
-        "feature_vector": [0.8, 0.2, 0.6, 0.4, 0.5, 0.7, 0.3, 0.6, 0.5, 0.4,
-                           0.7, 0.3, 0.8, 0.5, 0.6]
+        "price_range": "25k-50k",
+        "vector": [0.8, 0.2, 0.6, 0.4, 0.5, 0.7, 0.3, 0.6, 0.5, 0.4,
+                   0.7, 0.3, 0.8, 0.5, 0.6]
     }, expected_status=201)
     if loc_res and loc_res.status_code == 201:
         location_id = loc_res.json().get("id")
