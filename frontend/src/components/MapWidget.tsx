@@ -32,22 +32,22 @@ export default function MapWidget() {
         center={position} 
         zoom={14} 
         scrollWheelZoom={false} 
-        style={{ height: '100%', width: '100%', backgroundColor: '#1A1A1A' }}
+        style={{ height: '100%', width: '100%', backgroundColor: '#F2F2F7' }}
         zoomControl={false}
         attributionControl={false}
       >
         {/* Dark Matter theme from CartoDB */}
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          url="https://{s}.basemaps.cartocdn.com/voyager/{z}/{x}/{y}{r}.png"
         />
         <Marker position={position} icon={customRedIcon} />
       </MapContainer>
       
       {/* Absolute overlay elements for UI */}
-      <div style={{ position: 'absolute', top: '16px', left: '16px', zIndex: 1000, padding: '6px 12px', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ position: 'absolute', top: '16px', left: '16px', zIndex: 1000, padding: '6px 12px', backgroundColor: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(12px)', borderRadius: '12px', border: '1px solid #E5E5EA', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
         <div style={{ width: '8px', height: '8px', backgroundColor: '#ED1B24', borderRadius: '50%', animation: 'pulse 2s infinite' }} />
-        <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'white' }}>LIVE</span>
+        <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#1C1C1E' }}>LIVE</span>
       </div>
     </div>
   );

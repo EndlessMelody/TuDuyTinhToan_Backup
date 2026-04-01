@@ -1,192 +1,402 @@
-import React from 'react';
+import React from "react";
+import { cn } from "@/lib/cn";
+
+// ---- Helpers ----
+const PADDING_MAP: Record<string, string> = {
+  xl: "48px",
+  l: "32px",
+  m: "16px",
+  s: "8px",
+};
+const RADIUS_MAP: Record<string, string> = {
+  none: "0px",
+  "2xl": "var(--radius-2xl)",
+  xl: "var(--radius-xl)",
+  l: "var(--radius-l)",
+  m: "var(--radius-m)",
+  s: "var(--radius-s)",
+};
+const BG_MAP: Record<string, string> = {
+  page: "var(--surface-page)",
+  surface: "var(--surface-base)",
+  overlay: "var(--surface-overlay)",
+};
+const BORDER_VAL = "1px solid var(--border-weak)";
+
+function resolvePadding(v?: string) {
+  if (!v) return undefined;
+  return PADDING_MAP[v] ?? v;
+}
 
 // ---- Flex Container (Column) ----
-export const Column = React.forwardRef<HTMLDivElement, any>(({
-  fillWidth, fillHeight, fill, align, justify, padding, paddingX, paddingY, paddingBottom,
-  gap, background, radius, overflow, position, border, borderRight, borderLeft, borderBottom, borderTop,
-  flex, className, style, children, ...props
-}, ref) => {
-  const paddingVal = padding === 'xl' ? '48px' : padding === 'l' ? '32px' : padding === 'm' ? '16px' : padding === 's' ? '8px' : undefined;
-  const px = paddingX === 'xl' ? '48px' : paddingX === 'l' ? '32px' : paddingX === 'm' ? '16px' : paddingX === 's' ? '8px' : undefined;
-  const py = paddingY === 'xl' ? '48px' : paddingY === 'l' ? '32px' : paddingY === 'm' ? '16px' : paddingY === 's' ? '8px' : undefined;
-  const pb = paddingBottom === 'xl' ? '48px' : paddingBottom === 'l' ? '32px' : paddingBottom === 'm' ? '16px' : paddingBottom === 's' ? '8px' : undefined;
+export const Column = React.forwardRef<HTMLDivElement, any>(
+  (
+    {
+      fillWidth,
+      fillHeight,
+      fill,
+      align,
+      justify,
+      padding,
+      paddingX,
+      paddingY,
+      paddingTop,
+      paddingBottom,
+      gap,
+      background,
+      onBackground,
+      radius,
+      overflow,
+      position,
+      border,
+      borderRight,
+      borderLeft,
+      borderBottom,
+      borderTop,
+      flex,
+      className,
+      style,
+      children,
+      ...props
+    },
+    ref,
+  ) => {
+    const computedStyle: React.CSSProperties = {
+      gap: gap != null ? `${gap}px` : undefined,
+      padding: resolvePadding(padding),
+      paddingLeft: resolvePadding(paddingX),
+      paddingRight: resolvePadding(paddingX),
+      paddingTop: resolvePadding(paddingTop) ?? resolvePadding(paddingY),
+      paddingBottom: resolvePadding(paddingBottom) ?? resolvePadding(paddingY),
+      backgroundColor: background ? BG_MAP[background] : undefined,
+      borderRadius: radius ? RADIUS_MAP[radius] : undefined,
+      border: border === "neutral-alpha-weak" ? BORDER_VAL : undefined,
+      borderRight:
+        borderRight === "neutral-alpha-weak" ? BORDER_VAL : undefined,
+      borderLeft: borderLeft === "neutral-alpha-weak" ? BORDER_VAL : undefined,
+      borderBottom:
+        borderBottom === "neutral-alpha-weak" ? BORDER_VAL : undefined,
+      borderTop: borderTop === "neutral-alpha-weak" ? BORDER_VAL : undefined,
+      flex,
+      ...style,
+    };
 
-  const borderVal = border === 'neutral-alpha-weak' ? '1px solid rgba(255,255,255,0.08)' : undefined;
-  const bgVal = background === 'page' ? '#0A0A0A' : background === 'surface' ? '#141414' : background === 'overlay' ? 'rgba(0,0,0,0.8)' : undefined;
-  const radiusVal = radius === 'xl' ? '32px' : radius === 'l' ? '24px' : radius === 'm' ? '16px' : radius === 's' ? '8px' : undefined;
-
-  return (
-    <div ref={ref} className={className} style={{
-      display: 'flex', flexDirection: 'column',
-      width: (fillWidth || fill) ? '100%' : undefined,
-      height: (fillHeight || fill) ? '100%' : undefined,
-      alignItems: align === 'center' ? 'center' : align === 'end' ? 'flex-end' : undefined,
-      justifyContent: justify === 'center' ? 'center' : justify === 'end' ? 'flex-end' : justify === 'between' ? 'space-between' : undefined,
-      padding: paddingVal,
-      paddingLeft: px, paddingRight: px,
-      paddingTop: py, paddingBottom: pb || py,
-      gap: gap ? `${gap}px` : undefined,
-      backgroundColor: bgVal,
-      borderRadius: radiusVal,
-      overflow: overflow === 'hidden' ? 'hidden' : undefined,
-      position: position === 'relative' ? 'relative' : position === 'sticky' ? 'sticky' : position === 'absolute' ? 'absolute' : undefined,
-      border: borderVal,
-      borderRight: borderRight === 'neutral-alpha-weak' ? '1px solid rgba(255,255,255,0.08)' : undefined,
-      borderLeft: borderLeft === 'neutral-alpha-weak' ? '1px solid rgba(255,255,255,0.08)' : undefined,
-      borderBottom: borderBottom === 'neutral-alpha-weak' ? '1px solid rgba(255,255,255,0.08)' : undefined,
-      borderTop: borderTop === 'neutral-alpha-weak' ? '1px solid rgba(255,255,255,0.08)' : undefined,
-      flex: flex,
-      ...style
-    }} {...props}>
-      {children}
-    </div>
-  );
-});
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          "flex flex-col",
+          (fillWidth || fill) && "w-full",
+          (fillHeight || fill) && "h-full",
+          align === "center" && "items-center",
+          align === "end" && "items-end",
+          justify === "center" && "justify-center",
+          justify === "end" && "justify-end",
+          justify === "between" && "justify-between",
+          overflow === "hidden" && "overflow-hidden",
+          position === "relative" && "relative",
+          position === "sticky" && "sticky",
+          position === "absolute" && "absolute",
+          className,
+        )}
+        style={computedStyle}
+        {...props}
+      >
+        {children}
+      </div>
+    );
+  },
+);
 Column.displayName = "Column";
 
 // ---- Flex Container (Row) ----
-export const Row = React.forwardRef<HTMLDivElement, any>(({
-  fillWidth, fillHeight, fill, align, justify, horizontal, vertical,
-  padding, paddingX, paddingY, gap, background, radius,
-  overflow, position, border, borderRight, borderLeft, borderBottom, borderTop,
-  flex, className, style, children, ...props
-}, ref) => {
-  const paddingVal = padding === 'xl' ? '48px' : padding === 'l' ? '32px' : padding === 'm' ? '16px' : padding === 's' ? '8px' : undefined;
-  const px = paddingX === 'xl' ? '48px' : paddingX === 'l' ? '32px' : paddingX === 'm' ? '16px' : paddingX === 's' ? '8px' : undefined;
-  const py = paddingY === 'xl' ? '48px' : paddingY === 'l' ? '32px' : paddingY === 'm' ? '16px' : paddingY === 's' ? '8px' : undefined;
+export const Row = React.forwardRef<HTMLDivElement, any>(
+  (
+    {
+      fillWidth,
+      fillHeight,
+      fill,
+      align,
+      justify,
+      horizontal,
+      vertical,
+      padding,
+      paddingX,
+      paddingY,
+      paddingTop,
+      paddingBottom,
+      gap,
+      background,
+      onBackground,
+      radius,
+      overflow,
+      position,
+      border,
+      borderRight,
+      borderLeft,
+      borderBottom,
+      borderTop,
+      flex,
+      className,
+      style,
+      children,
+      ...props
+    },
+    ref,
+  ) => {
+    const justifyVal = horizontal ?? justify;
+    const alignVal = vertical ?? align;
 
-  // horizontal/vertical map to justify/align for Row
-  const justifyVal = horizontal === 'between' ? 'space-between' : horizontal === 'center' ? 'center' : horizontal === 'end' ? 'flex-end' :
-    justify === 'between' ? 'space-between' : justify === 'center' ? 'center' : justify === 'end' ? 'flex-end' : undefined;
-  const alignVal = vertical === 'center' ? 'center' : vertical === 'end' ? 'flex-end' :
-    align === 'center' ? 'center' : align === 'end' ? 'flex-end' : undefined;
+    const computedStyle: React.CSSProperties = {
+      gap: gap != null ? `${gap}px` : undefined,
+      padding: resolvePadding(padding),
+      paddingLeft: resolvePadding(paddingX),
+      paddingRight: resolvePadding(paddingX),
+      paddingTop: resolvePadding(paddingTop) ?? resolvePadding(paddingY),
+      paddingBottom: resolvePadding(paddingBottom) ?? resolvePadding(paddingY),
+      backgroundColor: background ? BG_MAP[background] : undefined,
+      borderRadius: radius ? RADIUS_MAP[radius] : undefined,
+      border: border === "neutral-alpha-weak" ? BORDER_VAL : undefined,
+      borderRight:
+        borderRight === "neutral-alpha-weak" ? BORDER_VAL : undefined,
+      borderLeft: borderLeft === "neutral-alpha-weak" ? BORDER_VAL : undefined,
+      borderBottom:
+        borderBottom === "neutral-alpha-weak" ? BORDER_VAL : undefined,
+      borderTop: borderTop === "neutral-alpha-weak" ? BORDER_VAL : undefined,
+      flex,
+      ...style,
+    };
 
-  const borderVal = border === 'neutral-alpha-weak' ? '1px solid rgba(255,255,255,0.08)' : undefined;
-  const bgVal = background === 'page' ? '#0A0A0A' : background === 'surface' ? '#141414' : background === 'overlay' ? 'rgba(0,0,0,0.8)' : undefined;
-  const radiusVal = radius === 'xl' ? '32px' : radius === 'l' ? '24px' : radius === 'm' ? '16px' : radius === 's' ? '8px' : undefined;
-
-  return (
-    <div ref={ref} className={className} style={{
-      display: 'flex', flexDirection: 'row',
-      width: (fillWidth || fill) ? '100%' : undefined,
-      height: (fillHeight || fill) ? '100%' : undefined,
-      alignItems: alignVal,
-      justifyContent: justifyVal,
-      padding: paddingVal,
-      paddingLeft: px, paddingRight: px,
-      paddingTop: py, paddingBottom: py,
-      gap: gap ? `${gap}px` : undefined,
-      backgroundColor: bgVal,
-      borderRadius: radiusVal,
-      overflow: overflow === 'hidden' ? 'hidden' : undefined,
-      position: position === 'relative' ? 'relative' : position === 'sticky' ? 'sticky' : undefined,
-      border: borderVal,
-      borderRight: borderRight === 'neutral-alpha-weak' ? '1px solid rgba(255,255,255,0.08)' : undefined,
-      borderLeft: borderLeft === 'neutral-alpha-weak' ? '1px solid rgba(255,255,255,0.08)' : undefined,
-      borderBottom: borderBottom === 'neutral-alpha-weak' ? '1px solid rgba(255,255,255,0.08)' : undefined,
-      borderTop: borderTop === 'neutral-alpha-weak' ? '1px solid rgba(255,255,255,0.08)' : undefined,
-      flex: flex,
-      ...style
-    }} {...props}>
-      {children}
-    </div>
-  );
-});
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          "flex flex-row",
+          (fillWidth || fill) && "w-full",
+          (fillHeight || fill) && "h-full",
+          alignVal === "center" && "items-center",
+          alignVal === "end" && "items-end",
+          justifyVal === "center" && "justify-center",
+          justifyVal === "end" && "justify-end",
+          justifyVal === "between" && "justify-between",
+          overflow === "hidden" && "overflow-hidden",
+          position === "relative" && "relative",
+          position === "sticky" && "sticky",
+          className,
+        )}
+        style={computedStyle}
+        {...props}
+      >
+        {children}
+      </div>
+    );
+  },
+);
 Row.displayName = "Row";
 
 // ---- Grid ----
-export const Grid = React.forwardRef<HTMLDivElement, any>(({ columns, gap, padding, background, style, children, ...props }, ref) => (
-  <div ref={ref} style={{
-    display: 'grid',
-    gridTemplateColumns: columns || '1fr',
-    gap: gap ? `${gap}px` : undefined,
-    padding: padding === 'l' ? '64px' : padding === 'm' ? '32px' : undefined,
-    backgroundColor: background === 'page' ? '#0A0A0A' : background === 'surface' ? '#141414' : undefined,
-    ...style
-  }} {...props}>
-    {children}
-  </div>
-));
+export const Grid = React.forwardRef<HTMLDivElement, any>(
+  (
+    { columns, gap, padding, background, className, style, children, ...props },
+    ref,
+  ) => (
+    <div
+      ref={ref}
+      className={cn("grid", className)}
+      style={{
+        gridTemplateColumns: columns ?? "1fr",
+        gap: gap ? `${gap}px` : undefined,
+        padding: resolvePadding(padding),
+        backgroundColor: background ? BG_MAP[background] : undefined,
+        ...style,
+      }}
+      {...props}
+    >
+      {children}
+    </div>
+  ),
+);
 Grid.displayName = "Grid";
 
 // ---- Typography ----
-export const Heading = ({ variant, style, children, ...props }: any) => {
-  const sizeMap: Record<string, string> = {
-    'display-strong-xl': '4rem', 'display-strong-l': '3.5rem', 'display-strong-m': '2.5rem', 'display-strong-s': '2rem',
-    'heading-strong-xl': '2rem', 'heading-strong-l': '1.5rem', 'heading-strong-m': '1.25rem', 'heading-strong-s': '1rem', 'heading-strong-xs': '0.875rem',
-  };
-  const fontSize = (variant && sizeMap[variant]) || '1.25rem';
-  return <h2 style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif", margin: 0, fontSize, fontWeight: 700, lineHeight: 1.2, ...style }} {...props}>{children}</h2>;
+const HEADING_SIZE: Record<string, string> = {
+  "display-strong-xl": "4rem",
+  "display-strong-l": "3.5rem",
+  "display-strong-m": "2.5rem",
+  "display-strong-s": "2rem",
+  "display-strong-xs": "1.75rem",
+  "display-default-xs": "1.5rem",
+  "heading-strong-xl": "2rem",
+  "heading-strong-l": "1.5rem",
+  "heading-strong-m": "1.25rem",
+  "heading-strong-s": "1rem",
+  "heading-strong-xs": "0.875rem",
 };
 
-export const Text = ({ variant, style, children, ...props }: any) => {
-  const sizeMap: Record<string, string> = {
-    'body-default-xl': '1.125rem', 'body-default-l': '1rem', 'body-default-m': '0.9375rem',
-    'body-default-s': '0.875rem', 'body-default-xs': '0.75rem',
-  };
-  const fontSize = (variant && sizeMap[variant]) || '0.9375rem';
-  return <p style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif", margin: 0, fontSize, lineHeight: 1.5, ...style }} {...props}>{children}</p>;
+export const Heading = ({
+  variant,
+  className,
+  style,
+  children,
+  ...props
+}: any) => (
+  <h2
+    className={cn("font-sans m-0 font-bold leading-tight", className)}
+    style={{
+      fontSize: HEADING_SIZE[variant] ?? "1.25rem",
+      lineHeight: 1.2,
+      ...style,
+    }}
+    {...props}
+  >
+    {children}
+  </h2>
+);
+
+const TEXT_SIZE: Record<string, string> = {
+  "body-default-xl": "1.125rem",
+  "body-default-l": "1rem",
+  "body-default-m": "0.9375rem",
+  "body-default-s": "0.875rem",
+  "body-default-xs": "0.75rem",
 };
+
+export const Text = ({
+  variant,
+  onBackground,
+  className,
+  style,
+  children,
+  ...props
+}: any) => (
+  <p
+    className={cn("font-sans m-0 leading-relaxed", className)}
+    style={{ fontSize: TEXT_SIZE[variant] ?? "0.9375rem", ...style }}
+    {...props}
+  >
+    {children}
+  </p>
+);
 
 // ---- Button ----
-export const Button = ({ size, variant, fillWidth, onClick, style, children, ...props }: any) => (
-  <button onClick={onClick} style={{
-    padding: size === 'l' ? '14px 28px' : size === 's' ? '8px 16px' : '10px 20px',
-    backgroundColor: variant === 'secondary' ? 'rgba(255,255,255,0.1)' : variant === 'tertiary' ? 'transparent' : '#ED1B24',
-    color: 'white',
-    border: variant === 'secondary' ? '1px solid rgba(255,255,255,0.15)' : 'none',
-    borderRadius: '12px',
-    fontWeight: 600,
-    cursor: 'pointer',
-    width: fillWidth ? '100%' : 'auto',
-    fontFamily: "'Inter', 'Segoe UI', sans-serif",
-    fontSize: size === 'l' ? '0.95rem' : size === 's' ? '0.8rem' : '0.875rem',
-    transition: 'all 0.2s ease',
-    ...style
-  }} {...props}>
+export const Button = ({
+  size,
+  variant,
+  fillWidth,
+  onClick,
+  disabled,
+  className,
+  style,
+  children,
+  ...props
+}: any) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className={cn(
+      "font-sans font-semibold cursor-pointer transition-all duration-[var(--duration-fast)]",
+      "rounded-full",
+      size === "l"
+        ? "px-7 py-[14px] text-[0.95rem]"
+        : size === "s"
+          ? "px-4 py-2 text-[0.8rem]"
+          : "px-5 py-[10px] text-[0.875rem]",
+      variant === "secondary"
+        ? "bg-[#EAF2FF] text-[#007AFF] hover:bg-[#D6E6FF]"
+        : variant === "tertiary"
+          ? "bg-[#F2F2F7] text-[#1C1C1E] hover:bg-[#E5E5EA]"
+          : variant === "danger"
+            ? "bg-[#FFF0F0] text-[#FF3B30] hover:bg-[#FFE5E5]"
+            : "bg-[#007AFF] text-[#FFFFFF] hover:bg-[#0062CC]",
+      disabled && "bg-[#E5E5EA] text-[#8E8E93] cursor-not-allowed hover:bg-[#E5E5EA]",
+      fillWidth && "w-full",
+      className,
+    )}
+    style={style}
+    {...props}
+  >
     {children}
   </button>
 );
 
 // ---- IconButton ----
-export const IconButton = ({ icon, variant, size, onClick, disabled, style, tooltip, ...props }: any) => (
-  <button onClick={onClick} disabled={disabled} title={tooltip} style={{
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    border: variant === 'secondary' ? '1px solid rgba(255,255,255,0.15)' : 'none',
-    backgroundColor: variant === 'secondary' ? 'rgba(255,255,255,0.08)' : variant === 'tertiary' ? 'transparent' : 'transparent',
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    borderRadius: '12px',
-    width: size === 'l' ? '48px' : size === 's' ? '28px' : '36px',
-    height: size === 'l' ? '48px' : size === 's' ? '28px' : '36px',
-    padding: 0,
-    transition: 'all 0.2s ease',
-    ...style
-  }} {...props}>
+export const IconButton = ({
+  icon,
+  variant,
+  size,
+  onClick,
+  disabled,
+  className,
+  style,
+  tooltip,
+  ...props
+}: any) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    title={tooltip}
+    className={cn(
+      "flex items-center justify-center p-0 cursor-pointer transition-all duration-[var(--duration-fast)]",
+      "rounded-full",
+      size === "l" ? "w-12 h-12" : size === "s" ? "w-7 h-7" : "w-9 h-9",
+      variant === "secondary"
+        ? "bg-[#EAF2FF] text-[#007AFF] hover:bg-[#D6E6FF]"
+        : variant === "tertiary"
+          ? "bg-transparent text-[#8E8E93] hover:bg-[#F2F2F7]"
+          : variant === "danger"
+            ? "bg-[#FFF0F0] text-[#FF3B30] hover:bg-[#FFE5E5]"
+            : "bg-[#007AFF] text-[#FFFFFF] hover:bg-[#0062CC]",
+      disabled && "bg-[#E5E5EA] text-[#8E8E93] cursor-not-allowed hover:bg-[#E5E5EA]",
+      className,
+    )}
+    style={style}
+    {...props}
+  >
     {icon}
   </button>
 );
 
 // ---- Input ----
-export const Input = ({ placeholder, style, ...props }: any) => (
-  <input placeholder={placeholder} style={{
-    padding: '12px 16px',
-    borderRadius: '12px',
-    border: '1px solid rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    color: 'white',
-    outline: 'none',
-    width: '100%',
-    fontFamily: "'Inter', 'Segoe UI', sans-serif",
-    fontSize: '0.875rem',
-    ...style
-  }} {...props} />
+export const Input = ({ placeholder, className, style, ...props }: any) => (
+  <input
+    placeholder={placeholder}
+    className={cn(
+      "font-sans w-full text-[0.875rem] text-[#1C1C1E] outline-none",
+      "px-4 py-3 rounded-[16px]",
+      "bg-[#F2F2F7] border border-[#E5E5EA]",
+      "placeholder:text-[#8E8E93] transition-colors duration-[var(--duration-fast)]",
+      "focus:border-[#007AFF] focus:bg-[#FFFFFF]",
+      className,
+    )}
+    style={style}
+    {...props}
+  />
 );
 
 // ---- Avatar ----
-export const Avatar = ({ size = 'm', src, style, ...props }: any) => {
-  const sizeMap: Record<string, string> = { xl: '64px', l: '48px', m: '36px', s: '28px', xs: '20px' };
-  const dim = sizeMap[size] || '36px';
-  return <img src={src} alt="" style={{
-    width: dim, height: dim, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, ...style
-  }} {...props} />;
+const AVATAR_SIZE: Record<string, string> = {
+  xl: "64px",
+  l: "48px",
+  m: "36px",
+  s: "28px",
+  xs: "20px",
+};
+
+export const Avatar = ({
+  size = "m",
+  src,
+  className,
+  style,
+  ...props
+}: any) => {
+  const dim = AVATAR_SIZE[size] ?? "36px";
+  return (
+    <img
+      src={src}
+      alt=""
+      className={cn("rounded-full object-cover shrink-0", className)}
+      style={{ width: dim, height: dim, ...style }}
+      {...props}
+    />
+  );
 };
