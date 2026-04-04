@@ -110,66 +110,23 @@ function SidebarItem({
 
 const handleComingSoon = () => toast("Will be updated in the next version 🚀");
 
-const friends = [
-  {
-    name: "Ramona F.",
-    avatar:
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=64&h=64&fit=crop",
-    status: "eating" as const,
-    statusText: "🍜 On a Spicy Tour",
-  },
-  {
-    name: "Mai Linh",
-    avatar:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=64&h=64&fit=crop",
-    status: "online" as const,
-    statusText: "🟢 Online",
-  },
-  {
-    name: "Thảo Vy",
-    avatar:
-      "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=64&h=64&fit=crop",
-    status: "lobby" as const,
-    statusText: "🎮 In Group Lobby",
-  },
-  {
-    name: "Hùng Đạt",
-    avatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=64&h=64&fit=crop",
-    status: "eating" as const,
-    statusText: "☕ Cafe Hopping",
-  },
-  {
-    name: "Khôi Nguyên",
-    avatar:
-      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=64&h=64&fit=crop",
-    status: "online" as const,
-    statusText: "🟢 Online",
-  },
-];
-
-const statusDotColor = (s: string) =>
-  s === "eating" ? "#F59E0B" : s === "lobby" ? "#A855F7" : "#00D1B2";
-const statusTextColor = (s: string) =>
-  s === "eating" ? "#F59E0B" : s === "lobby" ? "#A855F7" : "#00D1B2";
-
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <UserVectorProvider>
-      <LayoutContent>{children}</LayoutContent>
-    </UserVectorProvider>
+    <AuthProvider>
+      <UserVectorProvider>
+        <ChatProvider>
+          <LayoutContent>{children}</LayoutContent>
+        </ChatProvider>
+      </UserVectorProvider>
+    </AuthProvider>
   );
 }
 
-function LayoutContent({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function LayoutContent({ children }: { children: React.ReactNode }) {
   const { radarData, mergedRadarData, isPulsing } = useUserVector();
   const { user } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -192,8 +149,37 @@ function LayoutContent({
     }
   }, [isFullScreenPage]);
 
-  const sidebarWidth = isFullScreenPage ? 0 : (isSidebarOpen ? 280 : 80);
-  const rightSidebarWidth = isFullScreenPage ? 0 : (isRightExpanded ? 320 : 80);
+  const { isChatOpen, setIsChatOpen, activeFriend } = useChat();
+
+  // Promo page: render full-screen, no chrome
+  if (isPromoPage) {
+    return (
+      <div
+        style={{
+          width: "100vw",
+          height: "100vh",
+          overflowY: "auto",
+          overflowX: "hidden",
+        }}
+      >
+        {children}
+      </div>
+    );
+  }
+
+  const sidebarWidth = isFullScreenPage ? 0 : isSidebarOpen ? 240 : 80;
+  const isFoodies = pathname.startsWith("/foodies");
+
+  const rightExpandedWidth = isFoodies ? "100%" : "320px";
+  const rightSidebarWidth = isFullScreenPage
+    ? "0px"
+    : isFoodies
+      ? isChatOpen
+        ? "flex-fill"
+        : "0px"
+      : isRightExpanded
+        ? "320px"
+        : "80px";
 
   return (
     <Row
@@ -203,27 +189,27 @@ function LayoutContent({
       style={{ height: "100vh", color: "#1C1C1E" }}
     >
       {/* ═══════════ 1. LEFT SIDEBAR ═══════════ */}
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+        isFullScreen={isFullScreenPage}
+        currentPath={pathname}
+        onComingSoon={handleComingSoon}
+      />
+
+      {/* 2. CENTER PANEL (CHATS LIST) */}
       <Column
-        className="no-scrollbar"
         fillHeight
-        background="surface"
-        borderRight="neutral-alpha-weak"
-        radius="none"
+        horizontal={isFoodies && isChatOpen ? "start" : "center"}
+        vertical="stretch"
+        gap="0"
+        flexGrow={isFoodies && isChatOpen ? 0 : 1}
+        flexShrink={isFoodies && isChatOpen ? 0 : 1}
+        flexBasis={isFoodies && isChatOpen ? "320px" : "0%"}
         style={{
-          width: isFullScreenPage ? "0px" : `${sidebarWidth}px`,
-          minWidth: isFullScreenPage ? "0px" : `${sidebarWidth}px`,
-          paddingTop: isFullScreenPage ? "0" : "24px",
-          paddingBottom: isFullScreenPage ? "0" : "24px",
-          paddingLeft: isFullScreenPage ? "0" : (isSidebarOpen ? "20px" : "12px"),
-          paddingRight: isFullScreenPage ? "0" : (isSidebarOpen ? "20px" : "12px"),
-          flexShrink: 0,
-          overflowX: "hidden",
-          overflowY: "auto",
-          transition: "all 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
-          gap: isFullScreenPage ? "0" : "28px",
-          borderRightWidth: isFullScreenPage ? "0" : "1px",
-          borderRightStyle: "solid",
-          borderRightColor: isFullScreenPage ? "transparent" : "rgba(0,0,0,0.06)",
+          minWidth: 0,
+          position: "relative",
+          backgroundColor: isFoodies && isChatOpen ? "white" : "transparent",
         }}
       >
         {/* Logo + Toggle */}
@@ -492,93 +478,107 @@ function LayoutContent({
             overflow: "hidden",
             position: "relative",
             minHeight: "1px",
-            flex: "1 1 0%",
+            transition: "all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)",
           }}
         >
           {children}
         </Column>
-        <AppStatusBar />
+        {!isFoodies && <AppStatusBar />}
       </Column>
 
       {/* 3. RIGHT SIDEBAR */}
       <Column
-        onMouseEnter={() => setIsRightExpanded(true)}
-        onMouseLeave={() => setIsRightExpanded(false)}
+        onMouseEnter={() => !isFoodies && setIsRightExpanded(true)}
+        onMouseLeave={() => !isFoodies && setIsRightExpanded(false)}
         fillHeight
         background="surface"
         borderLeft="neutral-alpha-weak"
         radius="none"
         style={{
-          width: isFullScreenPage ? "0px" : (isRightExpanded ? "320px" : "80px"),
-          minWidth: isFullScreenPage ? "0px" : (isRightExpanded ? "320px" : "80px"),
+          width: rightSidebarWidth === "flex-fill" ? "auto" : rightSidebarWidth,
+          minWidth: rightSidebarWidth === "flex-fill" ? "0" : rightSidebarWidth,
+          flexGrow: rightSidebarWidth === "flex-fill" ? 1 : 0,
+          flexShrink: 0,
+          flexBasis: rightSidebarWidth === "flex-fill" ? "0%" : "auto",
           paddingLeft: "0",
           paddingRight: "0",
-          flexShrink: 0,
           transition: "all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)",
           overflow: "hidden",
-          paddingTop: isFullScreenPage ? "0" : "24px",
-          paddingBottom: isFullScreenPage ? "0" : "24px",
-          borderLeftWidth: isFullScreenPage ? "0" : "1px",
+          paddingTop: isFullScreenPage || isFoodies ? "0" : "24px",
+          paddingBottom: isFullScreenPage || isFoodies ? "0" : "24px",
+          borderLeftWidth:
+            isFullScreenPage || (isFoodies && !isChatOpen) ? "0" : "1px",
           borderLeftStyle: "solid",
-          borderLeftColor: isFullScreenPage ? "transparent" : "rgba(0,0,0,0.06)",
+          borderLeftColor:
+            isFullScreenPage || (isFoodies && !isChatOpen)
+              ? "transparent"
+              : "rgba(0,0,0,0.06)",
         }}
       >
-        <Row
-          style={{
-            paddingTop: "0px",
-            paddingBottom: "20px",
-            paddingLeft: "18px",
-            paddingRight: "18px",
-            alignItems: "center",
-            justifyContent: isRightExpanded ? "space-between" : "center",
-            borderBottomWidth: "1px",
-            borderBottomStyle: "solid",
-            borderBottomColor: "#E5E5EA",
-            gap: "12px",
-            minHeight: "44px",
-          }}
-        >
-          {isRightExpanded && (
-            <Heading
-              variant="heading-strong-s"
-              style={{
-                color: "#1C1C1E",
-                whiteSpace: "nowrap",
-                opacity: isRightExpanded ? 1 : 0,
-                transition: "opacity 0.2s 0.1s",
-              }}
-            >
-              Friends
-            </Heading>
-          )}
-          <IconButton
-            icon={<Plus size={20} color="#ED1B24" />}
-            onClick={handleComingSoon}
-            style={{
-              backgroundColor: "transparent",
-              borderTopWidth: "1px",
-              borderBottomWidth: "1px",
-              borderLeftWidth: "1px",
-              borderRightWidth: "1px",
-              borderTopStyle: "solid",
-              borderBottomStyle: "solid",
-              borderLeftStyle: "solid",
-              borderRightStyle: "solid",
-              borderTopColor: "rgba(255,255,255,0.12)",
-              borderBottomColor: "rgba(255,255,255,0.12)",
-              borderLeftColor: "rgba(255,255,255,0.12)",
-              borderRightColor: "rgba(255,255,255,0.12)",
-              borderRadius: "50%",
-              width: "44px",
-              height: "44px",
-              minWidth: "44px",
-              cursor: "pointer",
-              transitionProperty: "border-color",
-              transitionDuration: "0.2s",
-              flexShrink: 0,
-            }}
+        {isFoodies ? (
+          <MessagingSidebar
+            isOpen={isChatOpen}
+            onToggle={() => setIsChatOpen(!isChatOpen)}
+            activeUser={activeFriend}
           />
-        </Row>
+        ) : (
+          <Row
+            style={{
+              paddingTop: "0px",
+              paddingBottom: "20px",
+              paddingLeft: "18px",
+              paddingRight: "18px",
+              alignItems: "center",
+              justifyContent: isRightExpanded ? "space-between" : "center",
+              borderBottomWidth: "1px",
+              borderBottomStyle: "solid",
+              borderBottomColor: "#E5E5EA",
+              gap: "12px",
+              minHeight: "44px",
+            }}
+          >
+            {isRightExpanded && (
+              <Heading
+                variant="heading-strong-s"
+                style={{
+                  color: "#1C1C1E",
+                  whiteSpace: "nowrap",
+                  opacity: isRightExpanded ? 1 : 0,
+                  transition: "opacity 0.2s 0.1s",
+                }}
+              >
+                Friends
+              </Heading>
+            )}
+            <IconButton
+              icon={<Plus size={20} color="#ED1B24" />}
+              onClick={handleComingSoon}
+              style={{
+                backgroundColor: "transparent",
+                borderTopWidth: "1px",
+                borderBottomWidth: "1px",
+                borderLeftWidth: "1px",
+                borderRightWidth: "1px",
+                borderTopStyle: "solid",
+                borderBottomStyle: "solid",
+                borderLeftStyle: "solid",
+                borderRightStyle: "solid",
+                borderTopColor: "rgba(255,255,255,0.12)",
+                borderBottomColor: "rgba(255,255,255,0.12)",
+                borderLeftColor: "rgba(255,255,255,0.12)",
+                borderRightColor: "rgba(255,255,255,0.12)",
+                borderRadius: "50%",
+                width: "44px",
+                height: "44px",
+                minWidth: "44px",
+                cursor: "pointer",
+                transitionProperty: "border-color",
+                transitionDuration: "0.2s",
+                flexShrink: 0,
+              }}
+            />
+          </Row>
+        )}
       </Column>
     </Row>
   );

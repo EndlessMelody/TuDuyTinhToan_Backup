@@ -1,5 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence, MotionValue, useTransform } from "framer-motion";
+import {
+  motion,
+  AnimatePresence,
+  MotionValue,
+  useTransform,
+} from "framer-motion";
 import {
   Row,
   Column,
@@ -9,15 +14,17 @@ import {
   Input,
   Avatar,
 } from "@/components/OnceUI";
-import {
-  MapPin,
-  Bell,
-  MessageSquare,
-  Sparkles,
-  Compass,
-} from "lucide-react";
+import { MapPin, Bell, MessageSquare, Sparkles, Compass } from "lucide-react";
 import { ProfileMenuItem } from "@/components/common/ProfileMenuItem";
-import { LogOut, User, Settings, Info, Palette, Globe, BellRing } from "lucide-react";
+import {
+  LogOut,
+  User,
+  Settings,
+  Info,
+  Palette,
+  Globe,
+  BellRing,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
@@ -36,6 +43,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   onNotifClick,
 }) => {
   const router = useRouter();
+  const { isLoggedIn, user, logout } = useAuth();
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -52,12 +60,15 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   const headerShadow = useTransform(
     scrollY,
     [0, 80],
-    ["none", "0 10px 30px -5px rgba(0, 0, 0, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.3)"]
+    [
+      "none",
+      "0 10px 30px -5px rgba(0, 0, 0, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.3)",
+    ],
   );
   const headerBorder = useTransform(
     scrollY,
     [0, 80],
-    ["rgba(0,0,0,0.05)", "rgba(0,0,0,0.1)"]
+    ["rgba(0,0,0,0.05)", "rgba(0,0,0,0.1)"],
   );
 
   // New transforms for Profile "Trim" (ẩn tên)
@@ -83,7 +94,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isProfileMenuOpen]);
 
-  const handleComingSoon = () => toast("Will be updated in the next version 🚀");
+  const handleComingSoon = () =>
+    toast("Will be updated in the next version 🚀");
 
   return (
     <motion.div
@@ -103,7 +115,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         borderRightWidth: "1px",
         borderStyle: "solid",
         borderColor: headerBorder,
-        marginLeft: "auto", 
+        marginLeft: "auto",
         marginRight: "auto",
         display: "flex",
         justifyContent: "space-between",
@@ -141,7 +153,11 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           <Text style={{ color: "#1C1C1E", fontWeight: 600, fontSize: "0.82rem" }}>
             {user?.location || "Khám phá"}
           </Text>
-          <span style={{ color: "#C7C7CC", fontSize: "0.7rem", marginLeft: "2px" }}>▼</span>
+          <span
+            style={{ color: "#C7C7CC", fontSize: "0.7rem", marginLeft: "2px" }}
+          >
+            ▼
+          </span>
         </Row>
 
         {/* Search */}
@@ -171,7 +187,9 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               borderRightColor: isSearchFocused ? "#007AFF" : "#E5E5EA",
               transitionProperty: "all",
               transitionDuration: "0.2s",
-              boxShadow: isSearchFocused ? "0 0 0 4px rgba(0, 122, 255, 0.1)" : "none",
+              boxShadow: isSearchFocused
+                ? "0 0 0 4px rgba(0, 122, 255, 0.1)"
+                : "none",
             }}
           />
           <Row
@@ -225,13 +243,13 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="focus-mask active"
-            style={{ 
-              position: "fixed", 
-              top: 0, 
-              left: 0, 
-              right: 0, 
-              bottom: 0, 
-              zIndex: -1 
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: -1,
             }}
           />
         )}
@@ -241,7 +259,9 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         {/* Notifications */}
         <div style={{ position: "relative" }}>
           <IconButton
-            icon={<Bell size={20} color={isNotifOpen ? "#FBBF24" : "#8E8E93"} />}
+            icon={
+              <Bell size={20} color={isNotifOpen ? "#FBBF24" : "#8E8E93"} />
+            }
             variant="tertiary"
             onClick={() => setIsNotifOpen(!isNotifOpen)}
             style={{ borderRadius: "10px" }}
@@ -296,14 +316,22 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 }}
               >
                 {/* Notification Content (Simplified for now) */}
-                <Column style={{ 
-                  paddingTop: "20px",
-                  paddingBottom: "20px",
-                  paddingLeft: "20px",
-                  paddingRight: "20px"
-                }}>
+                <Column
+                  style={{
+                    paddingTop: "20px",
+                    paddingBottom: "20px",
+                    paddingLeft: "20px",
+                    paddingRight: "20px",
+                  }}
+                >
                   <Heading variant="heading-strong-s">Notifications</Heading>
-                  <Text style={{ color: "#8E8E93", fontSize: "0.8rem", marginTop: "12px" }}>
+                  <Text
+                    style={{
+                      color: "#8E8E93",
+                      fontSize: "0.8rem",
+                      marginTop: "12px",
+                    }}
+                  >
                     No new notifications
                   </Text>
                 </Column>
@@ -321,37 +349,79 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
         {/* Profile */}
         <div ref={profileMenuRef} style={{ position: "relative" }}>
-          <motion.div
-            style={{
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: profileGap,
-              marginLeft: '12px',
-              cursor: 'pointer',
-            }}
-            onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-          >
-            <Avatar
-              src={user?.avatar_url || "https://i.pinimg.com/736x/46/83/99/46839974515f6ca59a6023ef5e061d3e.jpg"}
-              size="m"
-            />
-            <motion.div
+          {!isLoggedIn ? (
+            /* ── Guest: Sign In button ── */
+            <button
+              onClick={() => router.push("/login")}
               style={{
-                opacity: profileTextOpacity,
-                width: profileTextWidth,
-                overflow: "hidden",
                 display: "flex",
-                flexDirection: "column",
+                alignItems: "center",
+                gap: 8,
+                marginLeft: "12px",
+                padding: "8px 18px",
+                borderRadius: 10,
+                background: "linear-gradient(135deg, #1A7AFF, #0057D9)",
+                border: "none",
+                cursor: "pointer",
+                color: "white",
+                fontSize: 13,
+                fontWeight: 700,
+                boxShadow: "0 2px 10px rgba(0,100,255,0.25)",
+                transition: "box-shadow 0.15s, transform 0.15s",
                 whiteSpace: "nowrap",
               }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow =
+                  "0 4px 16px rgba(0,100,255,0.35)";
+                e.currentTarget.style.transform = "translateY(-1px)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow =
+                  "0 2px 10px rgba(0,100,255,0.25)";
+                e.currentTarget.style.transform = "none";
+              }}
             >
-              <Text style={{ color: "#1C1C1E", fontWeight: 600, fontSize: "0.85rem" }}>
-                {user?.display_name || user?.username || "Guest"}
-              </Text>
-              <Text style={{ color: "#AEAEB2", fontSize: "0.7rem" }}>Level {user?.level || 1}</Text>
+              Sign In
+            </button>
+          ) : (
+            /* ── Logged in: avatar + name + dropdown ── */
+            <motion.div
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "center",
+                gap: profileGap,
+                marginLeft: "12px",
+                cursor: "pointer",
+              }}
+              onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+            >
+              <Avatar src={user!.avatar} size="m" />
+              <motion.div
+                style={{
+                  opacity: profileTextOpacity,
+                  width: profileTextWidth,
+                  overflow: "hidden",
+                  display: "flex",
+                  flexDirection: "column",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#1C1C1E",
+                    fontWeight: 600,
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  {user!.name}
+                </Text>
+                <Text style={{ color: "#AEAEB2", fontSize: "0.7rem" }}>
+                  Level {user!.level}
+                </Text>
+              </motion.div>
             </motion.div>
-          </motion.div>
+          )}
 
           <AnimatePresence>
             {isProfileMenuOpen && (
@@ -382,51 +452,56 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   paddingRight: "6px",
                 }}
               >
-                <Column style={{ 
-                  paddingTop: "8px",
-                  paddingBottom: "8px",
-                  paddingLeft: "0px",
-                  paddingRight: "0px"
-                }}>
+                <Column
+                  style={{
+                    paddingTop: "8px",
+                    paddingBottom: "8px",
+                    paddingLeft: "0px",
+                    paddingRight: "0px",
+                  }}
+                >
                   <ProfileMenuItem
                     icon={<User size={16} />}
                     label="Hồ sơ cá nhân"
                     onClick={() => {
-                        setIsProfileMenuOpen(false);
-                        router.push("/profile");
+                      setIsProfileMenuOpen(false);
+                      router.push("/profile");
                     }}
                   />
                   <ProfileMenuItem
                     icon={<Settings size={16} />}
                     label="Tùy chỉnh hệ thống"
                     onClick={() => {
-                        setIsProfileMenuOpen(false);
-                        onSettingsClick();
+                      setIsProfileMenuOpen(false);
+                      onSettingsClick();
                     }}
                   />
                   <ProfileMenuItem
                     icon={<Info size={16} />}
                     label="Thông tin & Trợ giúp"
                     onClick={() => {
-                        setIsProfileMenuOpen(false);
-                        handleComingSoon();
+                      setIsProfileMenuOpen(false);
+                      handleComingSoon();
                     }}
                   />
                 </Column>
-                <div style={{ 
-                  height: "1px", 
-                  backgroundColor: "#F2F2F7", 
-                  marginTop: "4px",
-                  marginBottom: "4px",
-                  marginLeft: "10px",
-                  marginRight: "10px"
-                }} />
+                <div
+                  style={{
+                    height: "1px",
+                    backgroundColor: "#F2F2F7",
+                    marginTop: "4px",
+                    marginBottom: "4px",
+                    marginLeft: "10px",
+                    marginRight: "10px",
+                  }}
+                />
                 <ProfileMenuItem
                   icon={<LogOut size={16} color="#ED1B24" />}
                   label="Đăng xuất"
                   onClick={() => {
                     setIsProfileMenuOpen(false);
-                    toast("Đã đăng xuất! 👋");
+                    logout();
+                    router.push("/");
                   }}
                   style={{ color: "#ED1B24" }}
                 />

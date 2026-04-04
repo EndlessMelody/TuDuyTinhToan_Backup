@@ -34,6 +34,8 @@ import {
   Bell,
   MessageSquare,
   Star,
+  Check,
+  Heart,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -324,8 +326,8 @@ export default function TourBuilderPage() {
   }, [handleManualAction, isGenerating, isTourReady]);
 
   const x = useMotionValue(0);
-  const skipGlowOpacity = useTransform(x, [0, -200], [0, 0.4]);
-  const saveGlowOpacity = useTransform(x, [0, 200], [0, 0.5]);
+  const leftGlowOpacity = useTransform(x, [0, -150], [0, 1]);
+  const rightGlowOpacity = useTransform(x, [0, 150], [0, 1]);
 
   if (isTourReady) {
     return (
@@ -583,72 +585,59 @@ export default function TourBuilderPage() {
         </Row>
       </div>
 
-      {/* 2. CINEMATIC STAGE */}
-      <div style={{ 
-        flexGrow: 1, 
-        position: "relative", 
-        zIndex: 10, 
-        display: "grid", 
-        placeItems: "center", 
-        width: "100%", 
-        minHeight: 0,
-        overflow: "hidden" 
-      }}>
-        {/* SIDE INDICATORS */}
+      {/* 2. CINEMATIC STAGE (NO TAILWIND) */}
+      <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
+        
+        {/* Background Glows (Layer 0) */}
         <motion.div 
           style={{ 
-            opacity: skipGlowOpacity, 
             position: 'absolute', 
-            top: 0, 
-            left: 0, 
-            bottom: 0, 
-            width: '25%', 
-            zIndex: 15,
+            inset: 0, 
+            zIndex: 0, 
+            background: 'radial-gradient(circle at left, rgba(255,192,203,0.5) 0%, transparent 70%)', 
+            opacity: leftGlowOpacity,
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            background: 'linear-gradient(to right, rgba(0,0,0,0.06), transparent)',
-            pointerEvents: 'none'
-          }}
+            justifyContent: 'flex-start',
+            paddingLeft: '80px'
+          }} 
         >
-          <Column vertical="center" horizontal="center" style={{ gap: '12px', transform: 'translateX(-20px)' }}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: 'rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(0,0,0,0.1)' }}>
-              <Undo2 size={32} color="rgba(0,0,0,0.4)" />
+          <Column horizontal="center" style={{ gap: '16px' }}>
+            <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'rgba(255, 100, 100, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid rgba(255, 100, 100, 0.2)' }}>
+              <X size={40} color="rgba(255, 100, 100, 0.8)" strokeWidth={3} />
             </div>
-            <Text style={{ fontSize: '0.9rem', fontWeight: 900, color: 'rgba(0,0,0,0.4)', letterSpacing: '2px' }}>SKIP</Text>
+            <Text style={{ fontSize: '1rem', fontWeight: 900, color: "rgba(255, 100, 100, 0.8)", letterSpacing: '4px' }}>SKIP</Text>
+          </Column>
+        </motion.div>
+        <motion.div 
+          style={{ 
+            position: 'absolute', 
+            inset: 0, 
+            zIndex: 0, 
+            background: 'radial-gradient(circle at right, rgba(173,216,230,0.5) 0%, transparent 70%)', 
+            opacity: rightGlowOpacity,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            paddingRight: '80px'
+          }} 
+        >
+          <Column horizontal="center" style={{ gap: '16px' }}>
+            <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: `${accent.primary}10`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${accent.primary}25` }}>
+              <Star size={40} color={accent.primary} fill={accent.primary} strokeWidth={2.5} />
+            </div>
+            <Text style={{ fontSize: '1rem', fontWeight: 900, color: accent.primary, letterSpacing: '4px' }}>CHOOSE</Text>
           </Column>
         </motion.div>
 
+        {/* Foreground Layer (Layer 10) */}
         <motion.div 
-          style={{ 
-            opacity: saveGlowOpacity, 
-            position: 'absolute', 
-            top: 0, 
-            right: 0, 
-            bottom: 0, 
-            width: '25%', 
-            zIndex: 15,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: `linear-gradient(to left, ${accent.primary}15, transparent)`,
-            pointerEvents: 'none'
-          }}
+          drag="x" 
+          style={{ x, zIndex: 10, position: 'relative', width: "760px", height: "480px" }}
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.8}
+          onDragEnd={handleDragEnd}
         >
-          <Column vertical="center" horizontal="center" style={{ gap: '12px', transform: 'translateX(20px)' }}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: `${accent.primary}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${accent.primary}30` }}>
-              <Star size={32} color={accent.primary} fill={accent.primary} />
-            </div>
-            <Text style={{ fontSize: '0.9rem', fontWeight: 900, color: accent.primary, letterSpacing: '2px' }}>CHOOSE</Text>
-          </Column>
-        </motion.div>
-
-        <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-           <motion.div style={{ opacity: skipGlowOpacity, position: 'absolute', top: '50%', left: '-10%', transform: 'translateY(-50%)', width: '600px', height: '800px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,0,0,0.08) 0%, transparent 70%)', filter: 'blur(100px)' }} />
-           <motion.div style={{ opacity: saveGlowOpacity, position: 'absolute', top: '50%', right: '-10%', transform: 'translateY(-50%)', width: '600px', height: '800px', borderRadius: '50%', background: `radial-gradient(circle, ${accent.primary}25 0%, transparent 70%)`, filter: 'blur(100px)' }} />
-        </div>
-
-        <div style={{ position: "relative", width: "760px", height: "480px", zIndex: 20 }}>
           <AnimatePresence>
             {deck.length > 0 ? (
               <div style={{ width: "100%", height: "100%", position: "relative", display: "flex", justifyContent: "center", alignItems: "center" }}>
@@ -659,11 +648,17 @@ export default function TourBuilderPage() {
                     animate={{ scale: 0.94, y: -20, opacity: 0.15 }} 
                     style={{ position: "absolute", width: "100%", height: "100%", zIndex: 1, borderRadius: "48px", overflow: "hidden", backgroundColor: 'white', boxShadow: '0 20px 60px rgba(0,0,0,0.1)', border: '1px solid rgba(0,0,0,0.05)' }} 
                   >
-                    <StopCard card={deck[1]} />
+                    <StopCard card={deck[1] as any} />
                     <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(4px)' }} />
                   </motion.div>
                 )}
-                <DraggableCard key={`card-${deck[0].id}`} card={deck[0]} onDragEnd={handleDragEnd} x={x} />
+                <div style={{ perspective: '2000px', width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  <motion.div
+                    style={{ width: "100%", height: "100%" }}
+                  >
+                    <StopCard card={deck[0] as any} />
+                  </motion.div>
+                </div>
               </div>
             ) : (
               <motion.div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "24px" }}>
@@ -672,7 +667,7 @@ export default function TourBuilderPage() {
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
+        </motion.div>
       </div>
 
       {/* 3. FUNCTIONAL FOOTER - FLEX SHRINK 0 */}

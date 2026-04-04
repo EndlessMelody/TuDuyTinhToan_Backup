@@ -47,6 +47,8 @@ export const Column = React.forwardRef<HTMLDivElement, any>(
       paddingY,
       paddingTop,
       paddingBottom,
+      paddingLeft,
+      paddingRight,
       gap,
       background,
       onBackground,
@@ -70,14 +72,15 @@ export const Column = React.forwardRef<HTMLDivElement, any>(
     ref,
   ) => {
     const computedStyle: React.CSSProperties = {
-      gap: gap != null ? `${gap}px` : undefined,
-      padding: resolvePadding(padding),
-      paddingLeft: resolvePadding(paddingX),
-      paddingRight: resolvePadding(paddingX),
-      paddingTop: resolvePadding(paddingTop) ?? resolvePadding(paddingY),
-      paddingBottom: resolvePadding(paddingBottom) ?? resolvePadding(paddingY),
-      backgroundColor: background ? BG_MAP[background] : undefined,
-      borderRadius: radius ? RADIUS_MAP[radius] : undefined,
+      ...(gap != null && { gap: `${gap}px` }),
+      ...(padding && { padding: resolvePadding(padding) }),
+      ...(paddingX && { paddingLeft: resolvePadding(paddingX), paddingRight: resolvePadding(paddingX) }),
+      ...(paddingLeft && { paddingLeft: resolvePadding(paddingLeft) }),
+      ...(paddingRight && { paddingRight: resolvePadding(paddingRight) }),
+      ...((paddingTop || paddingY) && { paddingTop: resolvePadding(paddingTop) ?? resolvePadding(paddingY) }),
+      ...((paddingBottom || paddingY) && { paddingBottom: resolvePadding(paddingBottom) ?? resolvePadding(paddingY) }),
+      ...(background && { backgroundColor: BG_MAP[background] }),
+      ...(radius && { borderRadius: RADIUS_MAP[radius] }),
       
       // Hyper-Longhand Borders
       borderTopWidth: (border === "neutral-alpha-weak" || borderTop === "neutral-alpha-weak") ? BORDER_WIDTH : undefined,
@@ -95,10 +98,10 @@ export const Column = React.forwardRef<HTMLDivElement, any>(
       borderLeftColor: (border === "neutral-alpha-weak" || borderLeft === "neutral-alpha-weak") ? BORDER_COLOR : undefined,
       borderRightColor: (border === "neutral-alpha-weak" || borderRight === "neutral-alpha-weak") ? BORDER_COLOR : undefined,
       
-      flex: flex,
-      flexGrow: flexGrow,
-      flexShrink: flexShrink,
-      flexBasis: flexBasis,
+      ...(flex && { flex }),
+      ...(flexGrow !== undefined && { flexGrow }),
+      ...(flexShrink !== undefined && { flexShrink }),
+      ...(flexBasis !== undefined && { flexBasis }),
       ...style,
     };
 
@@ -149,6 +152,8 @@ export const Row = React.forwardRef<HTMLDivElement, any>(
       paddingY,
       paddingTop,
       paddingBottom,
+      paddingLeft,
+      paddingRight,
       gap,
       background,
       onBackground,
@@ -175,14 +180,15 @@ export const Row = React.forwardRef<HTMLDivElement, any>(
     const alignVal = vertical ?? align;
 
     const computedStyle: React.CSSProperties = {
-      gap: gap != null ? `${gap}px` : undefined,
-      padding: resolvePadding(padding),
-      paddingLeft: resolvePadding(paddingX),
-      paddingRight: resolvePadding(paddingX),
-      paddingTop: resolvePadding(paddingTop) ?? resolvePadding(paddingY),
-      paddingBottom: resolvePadding(paddingBottom) ?? resolvePadding(paddingY),
-      backgroundColor: background ? BG_MAP[background] : undefined,
-      borderRadius: radius ? RADIUS_MAP[radius] : undefined,
+      ...(gap != null && { gap: `${gap}px` }),
+      ...(padding && { padding: resolvePadding(padding) }),
+      ...(paddingX && { paddingLeft: resolvePadding(paddingX), paddingRight: resolvePadding(paddingX) }),
+      ...(paddingLeft && { paddingLeft: resolvePadding(paddingLeft) }),
+      ...(paddingRight && { paddingRight: resolvePadding(paddingRight) }),
+      ...((paddingTop || paddingY) && { paddingTop: resolvePadding(paddingTop) ?? resolvePadding(paddingY) }),
+      ...((paddingBottom || paddingY) && { paddingBottom: resolvePadding(paddingBottom) ?? resolvePadding(paddingY) }),
+      ...(background && { backgroundColor: BG_MAP[background] }),
+      ...(radius && { borderRadius: RADIUS_MAP[radius] }),
       
       // Hyper-Longhand Borders
       borderTopWidth: (border === "neutral-alpha-weak" || borderTop === "neutral-alpha-weak") ? BORDER_WIDTH : undefined,
@@ -200,10 +206,10 @@ export const Row = React.forwardRef<HTMLDivElement, any>(
       borderLeftColor: (border === "neutral-alpha-weak" || borderLeft === "neutral-alpha-weak") ? BORDER_COLOR : undefined,
       borderRightColor: (border === "neutral-alpha-weak" || borderRight === "neutral-alpha-weak") ? BORDER_COLOR : undefined,
       
-      flex: flex,
-      flexGrow: flexGrow,
-      flexShrink: flexShrink,
-      flexBasis: flexBasis,
+      ...(flex && { flex }),
+      ...(flexGrow !== undefined && { flexGrow }),
+      ...(flexShrink !== undefined && { flexShrink }),
+      ...(flexBasis !== undefined && { flexBasis }),
       ...style,
     };
 

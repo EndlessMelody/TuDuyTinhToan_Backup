@@ -34,7 +34,7 @@ export function StopCard({ card }: StopCardProps) {
         width: "100%",
         height: "100%",
         backgroundColor: "white",
-        borderRadius: radius["2xl"],
+        borderRadius: radius.l,
         overflow: "hidden",
         boxShadow: shadow.elevated,
         border: `1px solid ${border.medium}`,
@@ -59,7 +59,7 @@ export function StopCard({ card }: StopCardProps) {
           style={{
             position: "absolute",
             inset: 0,
-            background: "linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 50%)",
+            background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 60%)",
             pointerEvents: "none",
           }}
         />
@@ -94,7 +94,7 @@ export function StopCard({ card }: StopCardProps) {
             bottom: 0,
             left: 0,
             right: 0,
-            padding: `${spacing.xl}px ${spacing.l}px`,
+            padding: `${spacing.l}px`,
             gap: spacing.xs,
           }}
         >
@@ -117,7 +117,7 @@ export function StopCard({ card }: StopCardProps) {
           height: "100%",
           backgroundColor: "#F8FAFF",
           borderLeft: `1px solid ${border.subtle}`,
-          padding: `${spacing.xl}px`,
+          padding: `${spacing.l}px`,
           gap: spacing.l,
           overflowY: 'auto'
         }}
@@ -145,16 +145,18 @@ export function StopCard({ card }: StopCardProps) {
         <div style={{ height: '1px', backgroundColor: border.subtle, width: '100%' }} />
 
         {/* Pricing/Rating */}
-        <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-          <Column style={{ gap: '4px' }}>
-             <Text style={{ color: text.tertiary, fontSize: '0.75rem', fontWeight: 600 }}>Estimated Cost</Text>
-             <Row vertical="center" style={{ gap: '6px' }}>
-                <DollarSign size={16} color={accent.primary} />
-                <Text style={{ color: text.primary, fontSize: '1.1rem', fontWeight: 800 }}>~{card.price} VND</Text>
-             </Row>
-          </Column>
-          <StatusBadge type="rating" value="4.8" icon={<Sparkles size={14} color="#FBBF24" />} />
-        </Row>
+        <Column style={{ gap: spacing.xs }}>
+          <Text style={{ color: text.tertiary, fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>
+            Estimated Cost
+          </Text>
+          <Row vertical="center" horizontal="between" style={{ width: '100%' }}>
+            <Row vertical="center" style={{ gap: '8px' }}>
+              <DollarSign size={18} color={accent.primary} />
+              <Text style={{ color: text.primary, fontSize: '1.25rem', fontWeight: 800 }}>~{card.price} VND</Text>
+            </Row>
+            <StatusBadge type="rating" value="4.8" icon={<Sparkles size={14} color="#FBBF24" />} />
+          </Row>
+        </Column>
 
         <div style={{ height: '1px', backgroundColor: border.subtle, width: '100%' }} />
 
