@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppStatusBar } from "./common/AppStatusBar";
-import { MOCK_USER } from "@/constants/mock-data";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Radar,
   RadarChart,
@@ -33,8 +33,6 @@ import {
 } from "recharts";
 import ClientOnly from "./common/ClientOnly";
 import { UserVectorProvider, useUserVector } from "@/context/UserVectorContext";
-
-const radarDataSample = MOCK_USER.radarData;
 
 function SidebarItem({
   icon,
@@ -173,6 +171,7 @@ function LayoutContent({
   children: React.ReactNode;
 }) {
   const { radarData, mergedRadarData, isPulsing } = useUserVector();
+  const { user } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isRightExpanded, setIsRightExpanded] = useState(false);
   const router = useRouter();
@@ -381,18 +380,18 @@ function LayoutContent({
           >
             <Row style={{ alignItems: "center", gap: "12px" }}>
               <Avatar
-                src={MOCK_USER.avatar}
+                src={user?.avatar_url || ""}
                 size="m"
               />
               <Column>
                 <Heading variant="heading-strong-s" style={{ color: "#1C1C1E" }}>
-                  {MOCK_USER.title}
+                  {user?.display_name || user?.username || "Explorer"}
                 </Heading>
                 <Text
                   variant="body-default-xs"
                   style={{ color: "#8E8E93" }}
                 >
-                  Level {MOCK_USER.level} • Vector Map
+                  Level {user?.level || 1} • Vector Map
                 </Text>
               </Column>
             </Row>
@@ -454,7 +453,7 @@ function LayoutContent({
             }}
           >
             <Avatar
-              src={MOCK_USER.avatar}
+              src={user?.avatar_url || ""}
               size="m"
               style={{
                 borderTopWidth: "2px",

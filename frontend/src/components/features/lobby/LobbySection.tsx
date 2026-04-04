@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { Users } from "lucide-react";
 import type { LobbyData, LobbySectionProps } from "./types";
-import { MOCK_LOBBIES } from "./data";
+import { useGroups } from "@/hooks/useGroups";
 import LobbyCard from "./LobbyCard";
 import LobbyDetailModal from "./LobbyDetailModal";
 
@@ -14,7 +14,9 @@ import LobbyDetailModal from "./LobbyDetailModal";
  * Accepts optional `lobbies` prop; defaults to MOCK_LOBBIES.
  */
 export default function LobbySection({ lobbies }: LobbySectionProps) {
-  const data = lobbies ?? MOCK_LOBBIES;
+  const { lobbies: apiLobbies, loading, error } = useGroups("active");
+  // If lobbies prop is explicitly passed (e.g. from parent), use that; else use API
+  const data = lobbies ?? apiLobbies;
   const [selectedLobby, setSelectedLobby] = useState<LobbyData | null>(null);
 
   return (
@@ -49,14 +51,40 @@ export default function LobbySection({ lobbies }: LobbySectionProps) {
 
         {/* Cards Row */}
         <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
-          {data.map((lobby, idx) => (
-            <LobbyCard
-              key={idx}
-              lobby={lobby}
-              onClick={() => setSelectedLobby(lobby)}
-            />
-          ))}
+          {loading ? (
+            // Skeleton loader
+            [1, 2].map((i) => (
+              <div
+                key={i}
+                style={{
+                  minWidth: 280,
+                  height: 180,
+                  borderRadius: 16,
+                  background: "linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)",
+                  backgroundSize: "200% 100%",
+                  animation: "shimmer 1.4s infinite",
+                }}
+              />
+            ))
+          ) : error ? (
+            <p style={{ color: "#8E8E93", fontSize: "0.85rem", padding: "16px 0" }}>
+              Không thể tải lobby: {error}
+            </p>
+          ) : data.length === 0 ? (
+            <p style={{ color: "#8E8E93", fontSize: "0.85rem", padding: "16px 0" }}>
+              Chưa có lobby nào đang active.
+            </p>
+          ) : (
+            data.map((lobby, idx) => (
+              <LobbyCard
+                key={idx}
+                lobby={lobby}
+                onClick={() => setSelectedLobby(lobby)}
+              />
+            ))
+          )}
         </div>
+        <style>{`@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>
       </div>
 
       {/* Modal */}

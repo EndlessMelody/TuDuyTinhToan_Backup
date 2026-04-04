@@ -17,12 +17,14 @@ class Settings(BaseSettings):
     # --- Redis ---
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    # --- Gemini AI ---
-    GEMINI_API_KEY: str | None = None
+    # --- Supabase Auth ---
+    SUPABASE_JWT_SECRET: str | None = None
+    SUPABASE_ANON_KEY: str | None = None
 
     class Config:
         case_sensitive = True
         env_file = ".env"
+        extra = "ignore"
 
 
 settings = Settings()

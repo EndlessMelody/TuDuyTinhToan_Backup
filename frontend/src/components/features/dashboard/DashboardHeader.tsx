@@ -20,7 +20,7 @@ import { ProfileMenuItem } from "@/components/common/ProfileMenuItem";
 import { LogOut, User, Settings, Info, Palette, Globe, BellRing } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { MOCK_USER } from "@/constants/mock-data";
+import { useAuth } from "@/hooks/useAuth";
 
 interface DashboardHeaderProps {
   scrollY: MotionValue<number>;
@@ -40,6 +40,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  const { user } = useAuth();
 
   // Transforms for Dynamic Island effect
   const headerWidth = useTransform(scrollY, [0, 80], ["100%", "80%"]);
@@ -137,7 +139,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         >
           <MapPin size={16} color="#ED1B24" />
           <Text style={{ color: "#1C1C1E", fontWeight: 600, fontSize: "0.82rem" }}>
-            {MOCK_USER.location}
+            {user?.location || "Khám phá"}
           </Text>
           <span style={{ color: "#C7C7CC", fontSize: "0.7rem", marginLeft: "2px" }}>▼</span>
         </Row>
@@ -331,7 +333,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
           >
             <Avatar
-              src={MOCK_USER.avatar}
+              src={user?.avatar_url || "https://i.pinimg.com/736x/46/83/99/46839974515f6ca59a6023ef5e061d3e.jpg"}
               size="m"
             />
             <motion.div
@@ -345,9 +347,9 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               }}
             >
               <Text style={{ color: "#1C1C1E", fontWeight: 600, fontSize: "0.85rem" }}>
-                {MOCK_USER.name}
+                {user?.display_name || user?.username || "Guest"}
               </Text>
-              <Text style={{ color: "#AEAEB2", fontSize: "0.7rem" }}>Level {MOCK_USER.level}</Text>
+              <Text style={{ color: "#AEAEB2", fontSize: "0.7rem" }}>Level {user?.level || 1}</Text>
             </motion.div>
           </motion.div>
 

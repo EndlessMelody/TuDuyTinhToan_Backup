@@ -99,7 +99,7 @@ async def _fetch_candidates(db: AsyncSession, category: str, limit: int = 100) -
     locations = result.scalars().all()
     return [
         {"id": loc.id, "name": loc.name, "lat": loc.lat, "lng": loc.lng,
-         "vector": list(loc.vector or [0.5] * 15), "open_hours": loc.open_hours,
+         "vector": list(loc.vector) if loc.vector is not None else [0.5] * 15, "open_hours": loc.open_hours,
          "image_url": loc.image_url, "price_range": loc.price_range}
         for loc in locations if loc.vector is not None
     ]
@@ -111,7 +111,7 @@ async def _get_user_vector(db: AsyncSession, user_id: int, category: str) -> NDA
     if not user:
         return np.array([0.5] * 15)
     vec = user.food_vector if category == "food" else user.place_vector
-    return np.array(vec or [0.5] * 15, dtype=float)
+    return np.array(vec if vec is not None else [0.5] * 15, dtype=float)
 
 
 # ─── Public API functions ─────────────────────────────────────────────────
@@ -132,7 +132,8 @@ async def recommend_top_n_places(
     )
     return [
         {"place_id": c["id"], "name": c["name"], "match_score": round(c["final_score"] * 100, 2),
-         "lat": c["lat"], "lng": c["lng"], "vector": c["vector"]}
+         "lat": c["lat"], "lng": c["lng"], "vector": c["vector"],
+         "image_url": c.get("image_url"), "price_range": c.get("price_range")}
         for c in scored[:top_n]
     ]
 
@@ -170,6 +171,8 @@ async def recommend_contextual(
             "distance_km": round(c["distance_km"], 2),
             "reason": f"Matches your {category} preferences",
             "open_status": c.get("open_hours"),
+            "image_url": c.get("image_url"),
+            "price_range": c.get("price_range"),
         }
         for c in filtered[:top_n]
     ]

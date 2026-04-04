@@ -18,6 +18,8 @@ class PlaceRecommendation(BaseModel):
     lat: float
     lng: float
     vector: List[float]
+    image_url: Optional[str] = None
+    price_range: Optional[str] = None
 
 
 class RecommendationResponse(BaseModel):
@@ -43,6 +45,8 @@ class ContextualPlaceResult(BaseModel):
     distance_km: float
     reason: Optional[str] = None
     open_status: Optional[str] = None
+    image_url: Optional[str] = None
+    price_range: Optional[str] = None
 
 
 class ContextualResponse(BaseModel):

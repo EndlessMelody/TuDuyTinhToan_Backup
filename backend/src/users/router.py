@@ -12,7 +12,6 @@ router = APIRouter()
 def get_user_service(request: Request, db: AsyncSession = Depends(get_db)) -> UserService:
     return UserService(db=db, redis=request.app.state.redis)
 
-
 @router.post(
     "/",
     response_model=UserResponse,

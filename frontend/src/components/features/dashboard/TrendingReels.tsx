@@ -9,7 +9,7 @@ import {
 import { Flame } from "lucide-react";
 import { ReelCard } from "@/components/cards/ReelCard";
 import { StaggerContainer, StaggerItem } from "@/components/StaggerContainer";
-import { MOCK_REELS } from "@/constants/mock-data";
+import { useReels } from "@/hooks/useReels";
 import { ReelData } from "@/types/dashboard";
 
 interface TrendingReelsProps {
@@ -17,6 +17,8 @@ interface TrendingReelsProps {
 }
 
 export const TrendingReels: React.FC<TrendingReelsProps> = ({ onReelClick }) => {
+  const { reels, loading, error } = useReels(10);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -73,23 +75,31 @@ export const TrendingReels: React.FC<TrendingReelsProps> = ({ onReelClick }) => 
               paddingBottom: "4px",
             }}
           >
-            {MOCK_REELS.map((reel, idx) => (
-              <StaggerItem key={idx}>
-                <div
-                  onClick={() => onReelClick(reel)}
-                  style={{ cursor: "pointer" }}
-                >
-                  <ReelCard
-                    title={reel.title}
-                    user={reel.user}
-                    views={reel.views}
-                    avatar={reel.userAvatar}
-                    img={reel.img}
-                    delay={0}
-                  />
-                </div>
-              </StaggerItem>
-            ))}
+            {loading ? (
+              <Text style={{ color: "#8E8E93", padding: "20px" }}>Loading reels...</Text>
+            ) : error ? (
+              <Text style={{ color: "red", padding: "20px" }}>{error}</Text>
+            ) : reels.length > 0 ? (
+              reels.map((reel, idx) => (
+                <StaggerItem key={idx}>
+                  <div
+                    onClick={() => onReelClick(reel)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <ReelCard
+                      title={reel.title}
+                      user={reel.user}
+                      views={reel.views}
+                      avatar={reel.userAvatar}
+                      img={reel.img}
+                      delay={0}
+                    />
+                  </div>
+                </StaggerItem>
+              ))
+            ) : (
+              <Text style={{ color: "#8E8E93", padding: "20px" }}>No trending reels found.</Text>
+            )}
           </StaggerContainer>
         </Row>
       </Column>

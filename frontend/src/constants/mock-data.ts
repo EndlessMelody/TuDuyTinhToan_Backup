@@ -22,6 +22,7 @@ export const MOCK_PRO_BANNER: ProBannerData = {
 
 export const MOCK_REELS: ReelData[] = [
   {
+    id: 1,
     title: "Crispy Pork Belly ASMR 🔥",
     user: "@foodie_ramona",
     views: "1.2M",
@@ -29,6 +30,7 @@ export const MOCK_REELS: ReelData[] = [
     img: "https://images.unsplash.com/photo-1544025162-d76694265947?w=400&h=700&fit=crop",
   },
   {
+    id: 2,
     title: "Hidden Ramen Spot in District 1",
     user: "@noodle_king",
     views: "890K",
@@ -36,6 +38,7 @@ export const MOCK_REELS: ReelData[] = [
     img: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&h=700&fit=crop",
   },
   {
+    id: 3,
     title: "Vietnamese Coffee Art ☕",
     user: "@cafe_hunter",
     views: "2.1M",
@@ -43,6 +46,7 @@ export const MOCK_REELS: ReelData[] = [
     img: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400&h=700&fit=crop",
   },
   {
+    id: 4,
     title: "Street Bánh Mì at 3AM 🌙",
     user: "@midnight_bites",
     views: "567K",
@@ -50,6 +54,7 @@ export const MOCK_REELS: ReelData[] = [
     img: "https://images.unsplash.com/photo-1600454021915-de1c1cb0e91f?w=400&h=700&fit=crop",
   },
   {
+    id: 5,
     title: "Dragon Fruit Smoothie Bowl",
     user: "@healthy_vibes",
     views: "340K",
@@ -57,6 +62,7 @@ export const MOCK_REELS: ReelData[] = [
     img: "https://images.unsplash.com/photo-1590301157890-4810ed352733?w=400&h=700&fit=crop",
   },
   {
+    id: 6,
     title: "Seafood Hot Pot Mukbang 🦐",
     user: "@ocean_eats",
     views: "1.8M",

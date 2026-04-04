@@ -55,7 +55,7 @@ import { StatusBadge as StatusBadgeComponent } from "./components/StatusBadge";
 import { StopCard } from "./components/StopCard";
 import { TourSkeleton } from "./components/TourSkeleton";
 import ClientOnly from "@/components/common/ClientOnly";
-import { MOCK_USER } from "@/constants/mock-data";
+import { useAuth } from "@/hooks/useAuth";
 
 const MapWidget = dynamic(() => import("@/components/MapWidget"), {
   ssr: false,
@@ -186,6 +186,7 @@ export default function TourBuilderPage() {
   const [lastDiscarded, setLastDiscarded] = useState<CardData | null>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const { user } = useAuth();
   const { radarData, isPulsing, updateVector } = useUserVector();
   const [isGenerating, setIsGenerating] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
@@ -549,12 +550,12 @@ export default function TourBuilderPage() {
           <Row horizontal="end" style={{ flex: 1, alignItems: 'center', gap: '16px' }}>
             <Column style={{ gap: '2px', alignItems: 'flex-end', hide: 's' }}>
               <Text style={{ color: text.primary, fontSize: "0.9rem", fontWeight: 900, letterSpacing: '-0.3px' }}>
-                {MOCK_USER.name}
+                {user?.display_name || user?.username || "Explorer"}
               </Text>
               <Row vertical="center" style={{ gap: '6px' }}>
                 <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#00D1B2', boxShadow: '0 0 8px #00D1B2' }} />
                 <Text style={{ color: "rgba(0,0,0,0.45)", fontSize: "0.7rem", fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  {MOCK_USER.title}
+                  {user?.title || "Taste Explorer"}
                 </Text>
               </Row>
             </Column>
@@ -563,7 +564,7 @@ export default function TourBuilderPage() {
               <motion.div
                 animate={{ rotate: -360 }}
                 transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-                style={{ position: 'absolute', inset: -4, borderRadius: '50%', border: '1.5px dashed rgba(0, 122, 255, 0.2)' }}
+                style={{ position: 'absolute', inset: -4, borderRadius: '50%', border: '1px dashed rgba(0, 122, 255, 0.2)' }}
               />
               <div style={{ 
                 width: '46px', 
@@ -574,7 +575,7 @@ export default function TourBuilderPage() {
                 boxShadow: '0 4px 12px rgba(0, 122, 255, 0.2)'
               }}>
                 <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', border: '2px solid white' }}>
-                  <img src={MOCK_USER.avatar} alt={MOCK_USER.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={user?.avatar_url || ""} alt={user?.display_name || "User Avatar"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
               </div>
             </div>

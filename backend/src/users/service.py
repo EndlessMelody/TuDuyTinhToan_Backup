@@ -183,4 +183,51 @@ class UserService:
                 except Exception:
                     pass
 
-        return new_user
+    async def get_or_create_supabase_user(self, supabase_uid: str, email: str, display_name: str = None, avatar_url: str = None) -> User:
+        """
+        JIT Provisioning: Trả về user từ DB nếu có supabase_uid, 
+        nếu không thì tạo mới dựa vào email và UUID từ Supabase.
+        """
+        result = await self.db.execute(select(User).where(User.supabase_uid == supabase_uid))
+        user = result.scalars().first()
+        if user:
+            return user
+
+        # Check if user exists with same email but no supabase_uid
+        result = await self.db.execute(select(User).where(User.email == email))
+        user = result.scalars().first()
+        if user:
+            user.supabase_uid = supabase_uid
+            if display_name and not user.display_name:
+                user.display_name = display_name
+            if avatar_url and not user.avatar_url:
+                user.avatar_url = avatar_url
+            await self.db.commit()
+            await self.db.refresh(user)
+            return user
+
+        # Create new user
+        username = email.split("@")[0]
+        # Ensure username uniqueness (naive approach)
+        import random
+        username = f"{username}_{random.randint(1000, 9999)}"
+        
+        new_user = User(
+            username=username,
+            email=email,
+            supabase_uid=supabase_uid,
+            display_name=display_name or username,
+            avatar_url=avatar_url,
+            food_vector=[0.5] * 15,
+            place_vector=[0.5] * 15,
+            xp=0,
+            level=1
+        )
+        self.db.add(new_user)
+        try:
+            await self.db.commit()
+            await self.db.refresh(new_user)
+            return new_user
+        except Exception as e:
+            await self.db.rollback()
+            raise HTTPException(status_code=400, detail=f"Không thể tạo người dùng JIT: {str(e)}")

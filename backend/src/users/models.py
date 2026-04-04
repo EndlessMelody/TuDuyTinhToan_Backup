@@ -16,6 +16,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
+    supabase_uid = Column(String, unique=True, index=True, nullable=True) # UUID từ Supabase Auth
     password_hash = Column(String, nullable=True)  # Nullable cho giai đoạn chưa có auth
     display_name = Column(String, nullable=True)
     avatar_url = Column(String, nullable=True)

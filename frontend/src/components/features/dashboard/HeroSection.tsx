@@ -17,10 +17,18 @@ import {
 } from "lucide-react";
 import MapWidget from "@/components/Map";
 import { useRouter } from "next/navigation";
-import { MOCK_HERO_BANNER } from "@/constants/mock-data";
+import { useRecommendations } from "@/hooks/useRecommendations";
 
 export const HeroSection = () => {
   const router = useRouter();
+  const { picks, loading } = useRecommendations(1, undefined, "place");
+  const heroData = picks && picks.length > 0 ? picks[0] : null;
+
+  const bgImage = heroData?.image_url || "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&h=600&fit=crop";
+  const title = heroData?.name || "Weekend Street Food Tour";
+  const titleWords = title.split(' ');
+  const titleLine1 = titleWords.slice(0, 2).join(' ');
+  const titleLine2 = titleWords.slice(2).join(' ');
 
   return (
     <motion.div
@@ -58,7 +66,7 @@ export const HeroSection = () => {
             flex: 1,
             minWidth: 0,
             height: "300px",
-            backgroundImage: `url(${MOCK_HERO_BANNER.image})`,
+            backgroundImage: `url(${bgImage})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
             position: "relative",
@@ -98,7 +106,7 @@ export const HeroSection = () => {
                 flexWrap: "wrap",
               }}
             >
-              {MOCK_HERO_BANNER.sponsored && (
+              {heroData && (
                 <Row
                   className="glass-premium"
                   style={{
@@ -174,7 +182,7 @@ export const HeroSection = () => {
                     color: "#636366",
                   }}
                 >
-                  {MOCK_HERO_BANNER.tags[1]}
+                  {heroData?.price_range || "Light Rain • 1.2km"}
                 </Text>
               </Row>
             </Row>
@@ -189,25 +197,23 @@ export const HeroSection = () => {
                 letterSpacing: "-1px"
               }}
             >
-              {MOCK_HERO_BANNER.title.split(' ').slice(0, 2).join(' ')}
+              {titleLine1}
               <br />
-              {MOCK_HERO_BANNER.title.split(' ').slice(2).join(' ')}
+              {titleLine2}
             </Heading>
 
             {/* Description */}
-            {MOCK_HERO_BANNER.description && (
-                <Text
-                    style={{
-                        color: "#636366",
-                        fontSize: "0.95rem",
-                        fontWeight: 500,
-                        maxWidth: "380px",
-                        lineHeight: 1.4
-                    }}
-                >
-                    {MOCK_HERO_BANNER.description}
-                </Text>
-            )}
+            <Text
+                style={{
+                    color: "#636366",
+                    fontSize: "0.95rem",
+                    fontWeight: 500,
+                    maxWidth: "380px",
+                    lineHeight: 1.4
+                }}
+            >
+                {loading ? "Loading recommended tour..." : "Discover hidden gems and earn massive rewards this weekend."}
+            </Text>
 
             {/* Bottom Row: Social + CTA */}
             <Row
@@ -287,7 +293,7 @@ export const HeroSection = () => {
                         }}
                     >
                         <span style={{ position: "relative", zIndex: 1, fontWeight: 700 }}>
-                        {MOCK_HERO_BANNER.ctaText}
+                        Book Now
                         </span>
                         <motion.div
                         initial={{ x: "-200%", rotate: "-20deg" }}

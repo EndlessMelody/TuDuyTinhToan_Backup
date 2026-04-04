@@ -5,13 +5,9 @@ import { Column, Row, Text, Avatar, IconButton, Input } from "@/components/OnceU
 import { Heart, Share2, MessageCircle, Play, Send, Bookmark } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-export interface ReelData {
-  title: string;
-  user: string;
-  userAvatar: string;
-  views: string;
-  img: string;
-}
+import { ReelData } from "@/types/dashboard";
+import { apiGet, apiPost } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 
 interface ReelModalProps {
   isOpen: boolean;
@@ -20,8 +16,37 @@ interface ReelModalProps {
 }
 
 export default function ReelModal({ isOpen, data, onClose }: ReelModalProps) {
+  const { user: currentUser } = useAuth();
   const [isLiked, setIsLiked] = React.useState(false);
   const [isSaved, setIsSaved] = React.useState(false);
+  const [comments, setComments] = React.useState<any[]>([]);
+  const [newComment, setNewComment] = React.useState("");
+  const [isLoadingComments, setIsLoadingComments] = React.useState(false);
+  const [likesCount, setLikesCount] = React.useState(data?.likes || 0);
+
+  React.useEffect(() => {
+    if (isOpen && data?.id) {
+      // Trigger API to increment view count natively
+      apiGet(`/api/v1/reels/${data.id}`).catch(console.error);
+      
+      setIsLoadingComments(true);
+      apiGet(`/api/v1/reels/${data.id}/comments`)
+        .then((res: any) => setComments(res.items || []))
+        .catch(console.error)
+        .finally(() => setIsLoadingComments(false));
+    }
+  }, [isOpen, data?.id]);
+
+  const handlePostComment = async () => {
+    if (!newComment.trim() || !data?.id) return;
+    try {
+      const res = await apiPost(`/api/v1/reels/${data.id}/comments`, { content: newComment });
+      setComments([res, ...comments]);
+      setNewComment("");
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -77,41 +102,59 @@ export default function ReelModal({ isOpen, data, onClose }: ReelModalProps) {
                 justifyContent: "center",
               }}
             >
-              <img
-                src={data.img}
-                alt={data.title}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "contain",
-                  display: "block",
-                }}
-              />
-              {/* Center play button overlay */}
-              <motion.div
-                whileTap={{ scale: 0.9 }}
-                transition={{ type: "spring", stiffness: 400, damping: 15 }}
-                style={{
-                  position: "absolute",
-                  top: "50%",
-                  left: "50%",
-                  transform: "translate(-50%, -50%)",
-                  width: 64,
-                  height: 64,
-                  borderRadius: "50%",
-                  backgroundColor: "rgba(255,255,255,0.18)",
-                  backdropFilter: "blur(10px)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  borderWidth: "1px",
-                  borderStyle: "solid",
-                  borderColor: "rgba(255,255,255,0.25)",
-                }}
-              >
-                <Play size={26} color="white" fill="white" />
-              </motion.div>
+              {data.videoUrl ? (
+                <video
+                  src={data.videoUrl}
+                  autoPlay
+                  loop
+                  muted
+                  controls
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                    display: "block",
+                  }}
+                />
+              ) : (
+                <>
+                  <img
+                    src={data.img}
+                    alt={data.title}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "contain",
+                      display: "block",
+                    }}
+                  />
+                  {/* Center play button overlay */}
+                  <motion.div
+                    whileTap={{ scale: 0.9 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                    style={{
+                      position: "absolute",
+                      top: "50%",
+                      left: "50%",
+                      transform: "translate(-50%, -50%)",
+                      width: 64,
+                      height: 64,
+                      borderRadius: "50%",
+                      backgroundColor: "rgba(255,255,255,0.18)",
+                      backdropFilter: "blur(10px)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      borderWidth: "1px",
+                      borderStyle: "solid",
+                      borderColor: "rgba(255,255,255,0.25)",
+                    }}
+                  >
+                    <Play size={26} color="white" fill="white" />
+                  </motion.div>
+                </>
+              )}
             </Column>
 
             {/* Right Block (Info & Comments) */}
@@ -206,69 +249,56 @@ export default function ReelModal({ isOpen, data, onClose }: ReelModalProps) {
                   }}
                 />
 
-                {/* Mock Comments */}
+                {/* Comments List */}
                 <Column style={{ gap: "16px" }}>
-                  {[
-                    {
-                      src: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=64&h=64&fit=crop",
-                      name: "Minh Thu",
-                      text: "Video đẹp quá, mình cũng muốn đi!",
-                      time: "1h",
-                    },
-                    {
-                      src: "https://images.unsplash.com/photo-1521119989659-a83eee488004?w=64&h=64&fit=crop",
-                      name: "Hoàng Long",
-                      text: "Góc quay chấn động 😂",
-                      time: "3h",
-                    },
-                    {
-                      src: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=64&h=64&fit=crop",
-                      name: "Thảo Vy",
-                      text: "Lưu lại làm checklist tháng này ❤️",
-                      time: "4h",
-                    },
-                  ].map((c) => (
-                    <Row
-                      key={c.name}
-                      style={{ gap: "12px", alignItems: "flex-start" }}
-                    >
-                      <Avatar src={c.src} size="s" />
-                      <Column style={{ gap: "4px" }}>
-                        <Text
-                          style={{
-                            color: "#1C1C1E",
-                            fontSize: "0.8rem",
-                            lineHeight: 1.6,
-                          }}
-                        >
-                          <span style={{ fontWeight: 700, marginRight: "6px" }}>
-                            {c.name}
-                          </span>
-                          {c.text}
-                        </Text>
-                        <Row style={{ gap: "12px", alignItems: "center" }}>
-                          <Text style={{ color: "#AEAEB2", fontSize: "0.7rem" }}>
-                            {c.time}
-                          </Text>
+                  {isLoadingComments ? (
+                    <Text style={{ color: "#AEAEB2", fontSize: "0.85rem" }}>Loading comments...</Text>
+                  ) : comments.length > 0 ? (
+                    comments.map((c: any) => (
+                      <Row
+                        key={c.id || Math.random()}
+                        style={{ gap: "12px", alignItems: "flex-start" }}
+                      >
+                        <Avatar src={c.user?.avatar_url || "https://i.pinimg.com/736x/46/83/99/46839974515f6ca59a6023ef5e061d3e.jpg"} size="s" />
+                        <Column style={{ gap: "4px" }}>
                           <Text
                             style={{
-                              color: "#AEAEB2",
-                              fontSize: "0.7rem",
-                              fontWeight: 600,
-                              cursor: "pointer",
+                              color: "#1C1C1E",
+                              fontSize: "0.8rem",
+                              lineHeight: 1.6,
                             }}
                           >
-                            Reply
+                            <span style={{ fontWeight: 700, marginRight: "6px" }}>
+                              {c.user?.display_name || c.user?.username || "Unknown"}
+                            </span>
+                            {c.content}
                           </Text>
-                        </Row>
-                      </Column>
-                      <Heart
-                        size={12}
-                        color="#AEAEB2"
-                        style={{ marginLeft: "auto", cursor: "pointer", marginTop: "4px" }}
-                      />
-                    </Row>
-                  ))}
+                          <Row style={{ gap: "12px", alignItems: "center" }}>
+                            <Text style={{ color: "#AEAEB2", fontSize: "0.7rem" }}>
+                              {c.created_at ? new Date(c.created_at).toLocaleDateString() : "Just now"}
+                            </Text>
+                            <Text
+                              style={{
+                                color: "#AEAEB2",
+                                fontSize: "0.7rem",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Reply
+                            </Text>
+                          </Row>
+                        </Column>
+                        <Heart
+                          size={12}
+                          color="#AEAEB2"
+                          style={{ marginLeft: "auto", cursor: "pointer", marginTop: "4px" }}
+                        />
+                      </Row>
+                    ))
+                  ) : (
+                    <Text style={{ color: "#AEAEB2", fontSize: "0.85rem" }}>No comments yet. Be the first!</Text>
+                  )}
                 </Column>
               </Column>
 
@@ -285,7 +315,15 @@ export default function ReelModal({ isOpen, data, onClose }: ReelModalProps) {
                       gap="8"
                       vertical="center"
                       style={{ cursor: "pointer" }}
-                      onClick={() => setIsLiked(!isLiked)}
+                      onClick={async () => {
+                        if (!isLiked && data?.id) {
+                          try {
+                            const res: any = await apiPost(`/api/v1/reels/${data.id}/like`, {});
+                            setLikesCount(res.likes_count || likesCount + 1);
+                          } catch (err) { console.error(err); }
+                        }
+                        setIsLiked(!isLiked);
+                      }}
                     >
                       <Heart
                         size={24}
@@ -293,13 +331,13 @@ export default function ReelModal({ isOpen, data, onClose }: ReelModalProps) {
                         fill={isLiked ? "var(--brand-solid-strong)" : "none"}
                       />
                       <Text variant="label-default-l" weight="strong" onBackground="neutral-strong">
-                        {isLiked ? "12.5K" : "12.4K"}
+                        {likesCount}
                       </Text>
                     </Row>
                     <Row gap="8" vertical="center" style={{ cursor: "pointer" }}>
                       <MessageCircle size={24} color="var(--neutral-alpha-medium)" />
                       <Text variant="label-default-l" weight="strong" onBackground="neutral-strong">
-                        324
+                        {comments.length}
                       </Text>
                     </Row>
                   </Row>
@@ -329,6 +367,11 @@ export default function ReelModal({ isOpen, data, onClose }: ReelModalProps) {
                 }}
               >
                  <Input
+                  value={newComment}
+                  onChange={(e: any) => setNewComment(e.target.value)}
+                  onKeyPress={(e: any) => {
+                    if (e.key === 'Enter') handlePostComment();
+                  }}
                   placeholder="Add a comment..."
                   style={{
                     flex: 1,
@@ -343,11 +386,12 @@ export default function ReelModal({ isOpen, data, onClose }: ReelModalProps) {
                   }}
                 />
                 <Text
+                  onClick={handlePostComment}
                   style={{
-                    color: "#007AFF",
+                    color: newComment.trim() ? "#007AFF" : "#AEAEB2",
                     fontWeight: 600,
                     fontSize: "0.85rem",
-                    cursor: "pointer",
+                    cursor: newComment.trim() ? "pointer" : "default",
                   }}
                 >
                   Post

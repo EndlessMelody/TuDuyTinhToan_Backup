@@ -15,7 +15,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import ClientOnly from '@/components/common/ClientOnly';
-import { MOCK_USER } from '@/constants/mock-data';
+import { useAuth } from '@/hooks/useAuth';
+import { useUserVector } from '@/context/UserVectorContext';
 
 // ═══════════ PROFILE PAGE ═══════════ //
 
@@ -23,13 +24,25 @@ export default function ProfilePage() {
   const router = useRouter();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('Posts');
+  const { user, loading } = useAuth();
+  const { radarData } = useUserVector();
 
   // Form state
-  const [formName, setFormName] = useState(MOCK_USER.name);
-  const [formUsername, setFormUsername] = useState(MOCK_USER.username.replace('@', ''));
-  const [formBio, setFormBio] = useState(MOCK_USER.bio);
-  const [formEmail, setFormEmail] = useState('ramona.f@email.com');
+  const [formName, setFormName] = useState('');
+  const [formUsername, setFormUsername] = useState('');
+  const [formBio, setFormBio] = useState('');
+  const [formEmail, setFormEmail] = useState('guest@email.com');
   const [formPhone, setFormPhone] = useState('+84 901 234 567');
+
+  React.useEffect(() => {
+    if (user) {
+      setFormName(user.display_name || user.username || "");
+      setFormUsername(user.username || "");
+      setFormBio(user.bio || "");
+      setFormEmail(user.email || "");
+      setFormPhone(user.phone || "");
+    }
+  }, [user]);
 
   const handleSave = () => {
     setIsEditModalOpen(false);
@@ -49,7 +62,7 @@ export default function ProfilePage() {
 
       {/* ═══ COVER PHOTO ═══ */}
       <div style={{ position: 'relative', width: '100%', height: '320px', flexShrink: 0 }}>
-        <img src={MOCK_USER.cover} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <img src={user?.cover_url || "https://images.unsplash.com/photo-1543353071-087092ec393a?auto=format&fit=crop&q=80"} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.6) 100%)' }} />
 
         {/* Back Button */}
@@ -113,7 +126,7 @@ export default function ProfilePage() {
         {/* Avatar Area */}
         <Row fillWidth style={{ marginBottom: '32px' }}>
           <div style={{ position: 'relative' }}>
-            <Avatar src={MOCK_USER.avatar} size="xl" style={{
+            <Avatar src={user?.avatar_url || ""} size="xl" style={{
               width: '160px', height: '160px', borderRadius: '50%',
               borderTopWidth: '6px', borderBottomWidth: '6px', borderLeftWidth: '6px', borderRightWidth: '6px',
               borderStyle: 'solid', borderColor: '#FFFFFF',
@@ -128,17 +141,17 @@ export default function ProfilePage() {
               borderStyle: 'solid', borderColor: '#FFFFFF',
               boxShadow: '0 4px 12px rgba(0,122,255,0.3)',
             }}>
-              <Text style={{ color: 'white', fontSize: '0.75rem', fontWeight: 800 }}>LV {MOCK_USER.level}</Text>
+              <Text style={{ color: 'white', fontSize: '0.75rem', fontWeight: 800 }}>LV {user?.level || 1}</Text>
             </div>
           </div>
         </Row>
 
         {/* Name + Info */}
         <Column style={{ gap: '10px', marginBottom: '32px' }}>
-          <Heading variant="display-strong-s" style={{ color: '#1C1C1E', fontSize: '2.5rem' }}>{MOCK_USER.name}</Heading>
+          <Heading variant="display-strong-s" style={{ color: '#1C1C1E', fontSize: '2.5rem' }}>{user?.display_name || user?.username || "Guest"}</Heading>
           
           <Row style={{ gap: '12px', alignItems: 'center' }}>
-            <Text style={{ color: '#007AFF', fontWeight: 600, fontSize: '1rem' }}>{MOCK_USER.username} • {MOCK_USER.title}</Text>
+            <Text style={{ color: '#007AFF', fontWeight: 600, fontSize: '1rem' }}>@{user?.username || "guest"} • {user?.title || "Taste Explorer"}</Text>
             <div style={{ backgroundColor: '#EAF2FF', height: '14px', width: '2px' }} />
             <Row style={{ gap: '8px', alignItems: 'center' }}>
               <TrendingUp size={14} color="#007AFF" />
@@ -146,18 +159,18 @@ export default function ProfilePage() {
             </Row>
           </Row>
 
-          <Text style={{ color: '#636366', fontSize: '1rem', lineHeight: 1.6, maxWidth: '720px' }}>{MOCK_USER.bio}</Text>
+          <Text style={{ color: '#636366', fontSize: '1rem', lineHeight: 1.6, maxWidth: '720px' }}>{user?.bio || "Enjoying the food exploration journey!"}</Text>
 
           {/* Level Progress Bar */}
           <Column style={{ gap: '8px', maxWidth: '320px', marginTop: '8px' }}>
              <Row style={{ justifyContent: 'space-between' }}>
-                <Text style={{ color: '#8E8E93', fontSize: '0.75rem', fontWeight: 600 }}>Level {MOCK_USER.level} Progress</Text>
-                <Text style={{ color: '#1C1C1E', fontSize: '0.75rem', fontWeight: 700 }}>{MOCK_USER.xp} / {MOCK_USER.nextLevelXp} XP</Text>
+                <Text style={{ color: '#8E8E93', fontSize: '0.75rem', fontWeight: 600 }}>Level {user?.level || 1} Progress</Text>
+                <Text style={{ color: '#1C1C1E', fontSize: '0.75rem', fontWeight: 700 }}>{user?.xp || 0} / {((user?.level || 1) * 1000)} XP</Text>
              </Row>
              <div style={{ width: '100%', height: '6px', backgroundColor: '#EAF2FF', borderRadius: '3px', overflow: 'hidden' }}>
                 <motion.div 
                   initial={{ width: 0 }}
-                  animate={{ width: `${(MOCK_USER.xp / MOCK_USER.nextLevelXp) * 100}%` }}
+                  animate={{ width: `${((user?.xp || 0) / ((user?.level || 1) * 1000)) * 100}%` }}
                   transition={{ duration: 1, delay: 0.5 }}
                   style={{ height: '100%', backgroundColor: '#007AFF', borderRadius: '3px' }} 
                 />
@@ -167,11 +180,11 @@ export default function ProfilePage() {
           <Row style={{ gap: '24px', marginTop: '16px' }}>
             <Row style={{ gap: '8px', alignItems: 'center' }}>
               <MapPin size={16} color="#8E8E93" />
-              <Text style={{ color: '#8E8E93', fontSize: '0.9rem' }}>{MOCK_USER.location}</Text>
+              <Text style={{ color: '#8E8E93', fontSize: '0.9rem' }}>{user?.location || "Khám phá"}</Text>
             </Row>
             <Row style={{ gap: '8px', alignItems: 'center' }}>
               <Calendar size={16} color="#8E8E93" />
-              <Text style={{ color: '#8E8E93', fontSize: '0.9rem' }}>Joined {MOCK_USER.joined}</Text>
+              <Text style={{ color: '#8E8E93', fontSize: '0.9rem' }}>Joined {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'March 2025'}</Text>
             </Row>
           </Row>
         </Column>
@@ -207,7 +220,7 @@ export default function ProfilePage() {
             <div style={{ flexGrow: 1, flexShrink: 1, flexBasis: "0%", width: '100%', minHeight: '280px' }}>
               <ClientOnly>
                 <ResponsiveContainer width="100%" height={280} minWidth={100} debounce={50}>
-                  <RadarChart cx="50%" cy="50%" outerRadius="70%" data={MOCK_USER.radarData}>
+                  <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
                     <PolarGrid stroke="rgba(0,122,255,0.1)" />
                     <PolarAngleAxis dataKey="subject" tick={{ fill: '#8E8E93', fontSize: 12, fontWeight: 600 }} />
                     <Radar
@@ -332,44 +345,15 @@ export default function ProfilePage() {
               transition={{ duration: 0.2 }}
             >
               {activeTab === 'Posts' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-                  {MOCK_USER.posts.map(post => (
-                    <motion.div
-                      key={post.id}
-                      whileHover={{ scale: 1.02 }}
-                      style={{ 
-                        aspectRatio: '1/1', borderRadius: '24px', overflow: 'hidden', 
-                        position: 'relative', cursor: 'pointer',
-                        backgroundColor: '#EAF2FF'
-                      }}
-                    >
-                      <img src={post.img} alt="Post" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      <div style={{ 
-                        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.2)', 
-                        opacity: 0, transition: 'opacity 0.2s', display: 'flex', 
-                        alignItems: 'center', justifyContent: 'center', gap: '24px'
-                      }} 
-                      onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-                      onMouseLeave={e => e.currentTarget.style.opacity = '0'}
-                      >
-                         <Row style={{ gap: '8px', alignItems: 'center' }}>
-                            <Heart size={20} color="white" fill="white" />
-                            <Text style={{ color: 'white', fontWeight: 700 }}>{post.likes}</Text>
-                         </Row>
-                         <Row style={{ gap: '8px', alignItems: 'center' }}>
-                            <MessageCircle size={20} color="white" fill="white" />
-                            <Text style={{ color: 'white', fontWeight: 700 }}>{post.comments}</Text>
-                         </Row>
-                      </div>
-                    </motion.div>
-                  ))}
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
+                  <Text style={{ color: '#8E8E93' }}>No posts yet.</Text>
                 </div>
               )}
 
               {activeTab === 'Achievements' && (
                 <Column style={{ gap: '32px' }}>
                   <Row style={{ gap: '16px', flexWrap: 'wrap' }}>
-                    {MOCK_USER.badges.map(badge => (
+                    {(user?.badges || []).map((badge: any) => (
                       <Row key={badge.label} style={{
                         gap: '16px', alignItems: 'center',
                         paddingTop: '18px', paddingBottom: '18px', paddingLeft: '32px', paddingRight: '32px',
@@ -381,50 +365,20 @@ export default function ProfilePage() {
                         <span style={{ fontSize: '1.5rem' }}>{badge.icon}</span>
                         <Column>
                            <Text style={{ color: '#007AFF', fontWeight: 700, fontSize: '0.95rem' }}>{badge.label}</Text>
-                           <Text style={{ color: 'rgba(0,122,255,0.6)', fontSize: '0.75rem', fontWeight: 600 }}>Unlocked Mar 2025</Text>
+                           <Text style={{ color: 'rgba(0,122,255,0.6)', fontSize: '0.75rem', fontWeight: 600 }}>Unlocked recently</Text>
                         </Column>
                       </Row>
                     ))}
+                    {!user?.badges?.length && (
+                      <Text style={{ color: '#8E8E93', paddingTop: '16px', paddingBottom: '16px' }}>No achievements unlocked yet.</Text>
+                    )}
                   </Row>
                 </Column>
               )}
 
               {activeTab === 'Reviews' && (
-                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
-                    {MOCK_USER.topSpots.map(spot => (
-                      <Column key={spot.name} style={{
-                        paddingTop: '24px', paddingBottom: '24px', paddingLeft: '24px', paddingRight: '24px',
-                        backgroundColor: '#FFFFFF', borderRadius: '24px',
-                        gap: '16px', 
-                        borderTopWidth: '1px', borderBottomWidth: '1px', borderLeftWidth: '1px', borderRightWidth: '1px',
-                        borderStyle: 'solid', borderColor: '#EAF2FF',
-                        boxShadow: '0 8px 24px rgba(0,122,255,0.04)',
-                        transition: 'transform 0.2s',
-                        cursor: 'pointer'
-                      }}>
-                        <Row style={{ gap: '16px', alignItems: 'center' }}>
-                          <img src={spot.img} alt={spot.name} style={{ width: '64px', height: '64px', borderRadius: '14px', objectFit: 'cover', flexShrink: 0 }} />
-                          <Column style={{ flexGrow: 1, flexShrink: 1, flexBasis: '0%', gap: '4px' }}>
-                            <Heading variant="heading-strong-s" style={{ fontSize: '1rem', color: '#1C1C1E' }}>{spot.name}</Heading>
-                            <Row style={{ gap: '4px' }}>
-                              {[1,2,3,4,5].map(i => <Star key={i} size={12} color={i <= 4 ? '#FBBF24' : '#E5E5EA'} fill={i <= 4 ? '#FBBF24' : '#E5E5EA'} />)}
-                            </Row>
-                          </Column>
-                          <Text style={{ color: '#8E8E93', fontSize: '0.75rem', fontWeight: 600 }}>2d ago</Text>
-                        </Row>
-                        <Column style={{ gap: '12px' }}>
-                          <div style={{ 
-                            paddingTop: '4px', paddingBottom: '4px', paddingLeft: '10px', paddingRight: '10px', 
-                            backgroundColor: '#EAF2FF', borderRadius: '8px', alignSelf: 'flex-start' 
-                          }}>
-                             <Text style={{ color: '#007AFF', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase' }}>{spot.category}</Text>
-                          </div>
-                          <Text style={{ color: '#636366', fontSize: '0.9rem', lineHeight: 1.6, fontWeight: 500 }}>
-                            "The best {spot.category} in the area. Spicy level is perfect for my Taste DNA!"
-                          </Text>
-                        </Column>
-                      </Column>
-                    ))}
+                 <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
+                    <Text style={{ color: '#8E8E93' }}>No reviews yet.</Text>
                  </div>
               )}
 
@@ -534,7 +488,7 @@ export default function ProfilePage() {
                 <Column style={{ paddingTop: '32px', paddingRight: '32px', paddingBottom: '0', paddingLeft: '32px', gap: '20px' }}>
                   {/* Cover Photo */}
                   <div style={{ position: 'relative', height: '140px', borderRadius: '18px', overflow: 'hidden' }}>
-                    <img src={MOCK_USER.cover} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={user?.cover_url || "https://images.unsplash.com/photo-1543353071-087092ec393a?auto=format&fit=crop&q=80"} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.1)' }} />
                     <div
                       onClick={handleComingSoon}
@@ -556,7 +510,7 @@ export default function ProfilePage() {
                   {/* Avatar */}
                   <Row style={{ marginTop: '-54px', marginLeft: '24px', zIndex: 2 }}>
                     <div style={{ position: 'relative' }}>
-                      <Avatar src={MOCK_USER.avatar} size="xl" style={{
+                      <Avatar src={user?.avatar_url || ""} size="xl" style={{
                         width: '100px', height: '100px', borderRadius: '50%',
                         borderTopWidth: '4px', borderBottomWidth: '4px', borderLeftWidth: '4px', borderRightWidth: '4px',
                         borderStyle: 'solid', borderColor: '#FFFFFF',

@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-# ─── Core modules (existing) ─────────────────────────────────────────────
+# ─── Core modules ─────────────────────────────────────────────
 from src.users.router import router as users_router
 from src.recommendations.router import router as recommendations_router
 from src.sessions.router import router as sessions_router

@@ -7,13 +7,13 @@ from typing import Optional
 
 router = APIRouter()
 
-
 @router.get(
     "/cards",
     response_model=FeedResponse,
     summary="Lấy thẻ swipe (Tinder-style)",
     description="Trả kèm photos và reviews_preview để hỗ trợ Flip Card UI mà không cần gọi thêm API."
 )
+
 async def get_cards(
     user_id: Optional[str] = Query(None),
     category: str = Query("place", description="'food' hoặc 'place'"),
