@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { MapPin, Menu, X } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 const NAV_LINKS = [
   { label: "Features", href: "#features" },
@@ -14,6 +15,7 @@ const NAV_LINKS = [
 
 export function PromoNav() {
   const router = useRouter();
+  const { isLoggedIn } = useAuth();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -132,28 +134,31 @@ export function PromoNav() {
 
         {/* Right CTAs */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <button
-            onClick={() => router.push("/login")}
-            style={{
-              padding: "7px 16px",
-              borderRadius: 8,
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontSize: 14,
-              fontWeight: 600,
-              color: "rgba(0,0,0,0.55)",
-              transition: "color 0.15s",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.color = "#1C1C1E";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.color = "rgba(0,0,0,0.55)";
-            }}
-          >
-            Login
-          </button>
+          {!isLoggedIn && (
+            <button
+              onClick={() => router.push("/login")}
+              style={{
+                padding: "7px 16px",
+                borderRadius: 8,
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 14,
+                fontWeight: 600,
+                color: "rgba(0,0,0,0.55)",
+                transition: "color 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.color = "#1C1C1E";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.color =
+                  "rgba(0,0,0,0.55)";
+              }}
+            >
+              Login
+            </button>
+          )}
           <button
             onClick={() => router.push("/discover")}
             style={{
@@ -180,7 +185,7 @@ export function PromoNav() {
               (e.currentTarget as HTMLElement).style.transform = "";
             }}
           >
-            Start &rarr;
+            {isLoggedIn ? "Open App →" : "Start →"}
           </button>
           <button
             onClick={() => setMobileOpen(!mobileOpen)}

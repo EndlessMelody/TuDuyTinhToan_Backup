@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
+import { motion } from "framer-motion";
 import {
   Column,
   Row,
@@ -94,7 +95,10 @@ export const MessagingSidebar: React.FC<MessagingSidebarProps> = ({
   const [message, setMessage] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const chatHistory = activeUser ? MOCK_CHATS[activeUser.id] || [] : [];
+  const chatHistory = useMemo(
+    () => (activeUser ? MOCK_CHATS[activeUser.id] || [] : []),
+    [activeUser],
+  );
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -511,23 +515,29 @@ export const MessagingSidebar: React.FC<MessagingSidebarProps> = ({
           </Row>
         </Row>
 
-        <IconButton
-          icon={message.trim() ? <Send size={17} /> : <Mic size={17} />}
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: "50%",
-            background: message.trim()
-              ? "linear-gradient(135deg, #1A7AFF, #0057D9)"
-              : "#F2F2F7",
-            color: message.trim() ? "white" : "rgba(0,0,0,0.4)",
-            flexShrink: 0,
-            boxShadow: message.trim()
-              ? "0 4px 12px rgba(0,100,255,0.3)"
-              : "none",
-            transition: "all 0.2s",
-          }}
-        />
+        <motion.div
+          whileTap={{ scale: 0.82 }}
+          whileHover={{ scale: message.trim() ? 1.1 : 1.04 }}
+          transition={{ type: "spring", stiffness: 400, damping: 15 }}
+          style={{ flexShrink: 0 }}
+        >
+          <IconButton
+            icon={message.trim() ? <Send size={17} /> : <Mic size={17} />}
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: "50%",
+              background: message.trim()
+                ? "linear-gradient(135deg, #1A7AFF, #0057D9)"
+                : "#F2F2F7",
+              color: message.trim() ? "white" : "rgba(0,0,0,0.4)",
+              boxShadow: message.trim()
+                ? "0 4px 12px rgba(0,100,255,0.3)"
+                : "none",
+              transition: "background 0.2s, box-shadow 0.2s",
+            }}
+          />
+        </motion.div>
       </Row>
     </Column>
   );

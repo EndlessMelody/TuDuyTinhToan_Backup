@@ -39,7 +39,86 @@ const radarDataSample = MOCK_USER.radarData;
 import { Sidebar } from "./common/Sidebar";
 import { ChatProvider, useChat } from "@/context/ChatContext";
 import { MessagingSidebar } from "./features/foodies/MessagingSidebar";
-import { AuthProvider } from "@/context/AuthContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { ThemeProvider } from "@/context/ThemeContext";
+import { LanguageProvider } from "@/context/LanguageContext";
+import { motion } from "framer-motion";
+
+function SplashScreen() {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9999,
+        backgroundColor: "#FFFFFF",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 12,
+      }}
+    >
+      <motion.div
+        initial={{ scale: 0.85, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{
+          delay: 0.05,
+          type: "spring",
+          stiffness: 280,
+          damping: 22,
+        }}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 10,
+        }}
+      >
+        <span style={{ fontSize: 44 }}>🗺️</span>
+        <h1
+          style={{
+            margin: 0,
+            fontSize: 26,
+            fontWeight: 800,
+            color: "#1C1C1E",
+            letterSpacing: "-0.8px",
+          }}
+        >
+          TasteMap
+        </h1>
+        <p style={{ margin: 0, fontSize: 13, color: "rgba(0,0,0,0.35)" }}>
+          Discover food together
+        </p>
+      </motion.div>
+      <motion.div
+        style={{
+          position: "absolute",
+          bottom: 40,
+          width: 48,
+          height: 3,
+          borderRadius: 99,
+          backgroundColor: "#E5E5EA",
+          overflow: "hidden",
+        }}
+      >
+        <motion.div
+          style={{
+            height: "100%",
+            borderRadius: 99,
+            backgroundColor: "#007AFF",
+          }}
+          animate={{ x: ["-100%", "200%"] }}
+          transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+        />
+      </motion.div>
+    </motion.div>
+  );
+}
 
 const handleComingSoon = () => toast("Will be updated in the next version 🚀");
 
@@ -49,26 +128,45 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <AuthProvider>
-      <UserVectorProvider>
-        <ChatProvider>
-          <LayoutContent>{children}</LayoutContent>
-        </ChatProvider>
-      </UserVectorProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <UserVectorProvider>
+            <ChatProvider>
+              <LayoutContent>{children}</LayoutContent>
+            </ChatProvider>
+          </UserVectorProvider>
+        </AuthProvider>
+      </LanguageProvider>
+    </ThemeProvider>
   );
 }
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const { radarData, mergedRadarData, isPulsing } = useUserVector();
+  const { isLoggedIn, isInitializing } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isRightExpanded, setIsRightExpanded] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
-  const isPromoPage = pathname === "/" || pathname === "/login";
+  const isPublicPage = pathname === "/" || pathname === "/login";
+  const isPromoPage = isPublicPage;
   const isFullScreenPage =
-    pathname.startsWith("/profile") || pathname.startsWith("/tour-builder");
+    pathname.startsWith("/profile") ||
+    pathname.startsWith("/tour-builder") ||
+    pathname.startsWith("/explore") ||
+    pathname.startsWith("/ai-planner");
+
+  // ─── Route guard ─────────────────────────────────────────────────────────────
+  React.useEffect(() => {
+    if (isInitializing) return;
+    if (isLoggedIn && pathname === "/login") {
+      router.replace("/discover"); // logged-in users skip the login page
+    } else if (!isLoggedIn && !isPublicPage) {
+      router.replace("/login"); // unauthenticated users can't access app pages
+    }
+  }, [isInitializing, isLoggedIn, isPublicPage, pathname, router]);
 
   // Auto-collapse sidebars when entering fullscreen pages
   React.useEffect(() => {
@@ -82,6 +180,11 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   }, [isFullScreenPage]);
 
   const { isChatOpen, setIsChatOpen, activeFriend } = useChat();
+
+  // Show splash while auth state is resolving (SSR → client hydration)
+  if (isInitializing) {
+    return <SplashScreen />;
+  }
 
   // Promo page: render full-screen, no chrome
   if (isPromoPage) {
@@ -118,7 +221,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
       fillWidth
       background={isFullScreenPage ? "surface" : "page"}
       overflow="hidden"
-      style={{ height: "100vh", color: "#1C1C1E" }}
+      style={{ height: "100vh", color: "var(--foreground)" }}
     >
       {/* ═══════════ 1. LEFT SIDEBAR ═══════════ */}
       <Sidebar
@@ -126,7 +229,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
         onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
         isFullScreen={isFullScreenPage}
         currentPath={pathname}
-        onComingSoon={handleComingSoon}
       />
 
       {/* 2. CENTER PANEL (CHATS LIST) */}

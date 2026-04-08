@@ -3,29 +3,29 @@
 :root {
   color-scheme: light;
   /* Base */
-  --background: #F2F2F7;
-  --foreground: #1C1C1E;
+  --background: #f2f2f7;
+  --foreground: #1c1c1e;
 
   /* Brand colors */
   --color-primary-raw: 237 27 36;
   --color-teal-raw: 0 209 178;
 
   /* Surfaces */
-  --surface-page: #F2F2F7;
-  --surface-base: #FFFFFF;
-  --surface-elevated: #FFFFFF;
+  --surface-page: #f2f2f7;
+  --surface-base: #ffffff;
+  --surface-elevated: #ffffff;
   --surface-overlay: rgba(0, 0, 0, 0.2);
 
   /* Borders */
-  --border-weak: #F2F2F7;
-  --border-medium: #E5E5EA;
-  --border-strong: #D1D1D6;
+  --border-weak: #f2f2f7;
+  --border-medium: #e5e5ea;
+  --border-strong: #d1d1d6;
 
   /* Typography */
-  --text-primary: #1C1C1E;
+  --text-primary: #1c1c1e;
   --text-secondary: #636366;
-  --text-tertiary: #8E8E93;
-  --text-disabled: #C7C7CC;
+  --text-tertiary: #8e8e93;
+  --text-disabled: #c7c7cc;
 
   /* Shadows */
   --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.04);
@@ -41,11 +41,37 @@
   --duration-slow: 500ms;
 }
 
+/* ═══════════ DARK THEME ═══════════ */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #1c1c1e;
+  --foreground: #f2f2f7;
+
+  --surface-page: #1c1c1e;
+  --surface-base: #2c2c2e;
+  --surface-elevated: #3a3a3c;
+  --surface-overlay: rgba(0, 0, 0, 0.6);
+
+  --border-weak: #2c2c2e;
+  --border-medium: #3a3a3c;
+  --border-strong: #48484a;
+
+  --text-primary: #f2f2f7;
+  --text-secondary: #aeaeb2;
+  --text-tertiary: #636366;
+  --text-disabled: #48484a;
+
+  --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.3);
+  --shadow-elevated: 0 20px 48px rgba(0, 0, 0, 0.5);
+}
+
 @theme inline {
   /* Framework tokens */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    "Helvetica Neue", Arial, sans-serif;
   --font-mono: var(--font-geist-mono);
 
   /* Brand */
@@ -55,7 +81,7 @@
 
   /* Surface palette */
   --color-surface-page: var(--surface-page);
-  --color-surface: #FFFFFF;
+  --color-surface: #ffffff;
   --color-surface-elevated: var(--surface-elevated);
   --color-overlay: var(--surface-overlay);
 
@@ -89,7 +115,9 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    "Helvetica Neue", Arial, sans-serif;
 }
 
 /* Hide scrollbar */
@@ -144,12 +172,11 @@ body {
    PHASE 2: Micro-interaction Utility Classes
    ═══════════════════════════════════════════════ */
 
-
-
 /* 2c. Card-level hover glow — apply to the card wrapper */
 .card-hover {
-  transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1),
-              box-shadow 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+  transition:
+    transform 0.35s cubic-bezier(0.25, 1, 0.5, 1),
+    box-shadow 0.35s cubic-bezier(0.25, 1, 0.5, 1);
 }
 .card-hover:hover {
   transform: translateY(-4px);
@@ -166,7 +193,7 @@ body {
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 
+  box-shadow:
     0 8px 32px 0 rgba(31, 38, 135, 0.07),
     inset 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
@@ -208,11 +235,11 @@ body {
 .skeleton-shimmer {
   position: relative;
   overflow: hidden;
-  background-color: #E5E5EA;
+  background-color: #e5e5ea;
   border-radius: 12px;
 }
 .skeleton-shimmer::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   right: 0;
@@ -230,6 +257,8 @@ body {
 /* 2e. Focus ring for keyboard accessibility */
 .focus-ring:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 4px #EAF2FF, 0 0 0 6px #007AFF40;
+  box-shadow:
+    0 0 0 4px #eaf2ff,
+    0 0 0 6px #007aff40;
   border-radius: inherit;
 }

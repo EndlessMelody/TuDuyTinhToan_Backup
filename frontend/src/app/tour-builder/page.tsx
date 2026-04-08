@@ -36,6 +36,14 @@ import {
   Star,
   Check,
   Heart,
+  Share2,
+  Navigation2,
+  Timer,
+  Zap,
+  Plus,
+  Minus,
+  ChevronRight,
+  RotateCcw,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -177,6 +185,23 @@ const FOOD_CARDS: CardData[] = [
 
 const TOTAL_NODES = 4;
 
+const LOADING_MESSAGES = [
+  "Brewing the perfect evening vibe...",
+  "Optimizing your flavor discovery path...",
+  "Consulting the taste stars for you...",
+  "Syncing your cravings with the city...",
+  "Almost there... making it extra delicious...",
+];
+
+// Pre-computed outside render — satisfies React Compiler purity rules
+const PARTICLES = Array.from({ length: 20 }, () => ({
+  x0: Math.random() * 100 - 50 + "%",
+  y0: Math.random() * 100 - 50 + "%",
+  x1: Math.random() * 100 - 50 + "%",
+  y1: Math.random() * 100 - 50 + "%",
+  dur: 5 + Math.random() * 10,
+}));
+
 export default function TourBuilderPage() {
   const pathname = usePathname();
   const [deck, setDeck] = useState<CardData[]>(FOOD_CARDS);
@@ -190,31 +215,17 @@ export default function TourBuilderPage() {
 
   const { radarData, isPulsing, updateVector } = useUserVector();
   const [isGenerating, setIsGenerating] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState("");
-  
-  // New Team/Curation states
-  const [targetDishCount, setTargetDishCount] = useState(4);
-  const [memberReadyCount, setMemberReadyCount] = useState(1); 
-  const [totalMemberCount, setTotalMemberCount] = useState(1);
-
-  const LOADING_MESSAGES = [
-    "Brewing the perfect evening vibe...",
-    "Optimizing your flavor discovery path...",
-    "Consulting the taste stars for you...",
-    "Syncing your cravings with the city...",
-    "Almost there... making it extra delicious...",
-  ];
+  const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]);
+  const [stopCount, setStopCount] = useState(TOTAL_NODES);
 
   useEffect(() => {
-    if (isGenerating) {
-      let i = 0;
-      setLoadingMessage(LOADING_MESSAGES[0]);
-      const interval = setInterval(() => {
-        i = (i + 1) % LOADING_MESSAGES.length;
-        setLoadingMessage(LOADING_MESSAGES[i]);
-      }, 2000);
-      return () => clearInterval(interval);
-    }
+    if (!isGenerating) return;
+    let i = 0;
+    const interval = setInterval(() => {
+      i = (i + 1) % LOADING_MESSAGES.length;
+      setLoadingMessage(LOADING_MESSAGES[i]);
+    }, 2000);
+    return () => clearInterval(interval);
   }, [isGenerating]);
 
   const nextEmptyIndex = filledNodes.findIndex((n) => n === null);
@@ -224,11 +235,12 @@ export default function TourBuilderPage() {
   // Dynamic Tour DNA calculation
   const getTourDNA = useCallback(() => {
     const selectedFoods = filledNodes.filter((n): n is CardData => n !== null);
-    if (selectedFoods.length === 0) return [{ label: "Empty", value: 100, color: 'rgba(0,0,0,0.05)' }];
-    
+    if (selectedFoods.length === 0)
+      return [{ label: "Empty", value: 100, color: "rgba(0,0,0,0.05)" }];
+
     const tagCounts: Record<string, number> = {};
-    selectedFoods.forEach(food => {
-      food.tags.forEach(tag => {
+    selectedFoods.forEach((food) => {
+      food.tags.forEach((tag) => {
         tagCounts[tag] = (tagCounts[tag] || 0) + 1;
       });
     });
@@ -240,9 +252,14 @@ export default function TourBuilderPage() {
       .map(([label, count], i) => ({
         label,
         value: (count / totalTags) * 100,
-        color: i === 0 ? accent.primary : i === 1 ? accent.secondary : accent.warning
+        color:
+          i === 0
+            ? accent.primary
+            : i === 1
+              ? accent.secondary
+              : accent.warning,
       }));
-      
+
     return topTags;
   }, [filledNodes]);
 
@@ -265,32 +282,35 @@ export default function TourBuilderPage() {
     setLastDiscarded(null);
   }, [lastDiscarded]);
 
-  const handleManualAction = useCallback((direction: "select" | "skip") => {
-    if (!activeCard) return;
-    const card = activeCard;
+  const handleManualAction = useCallback(
+    (direction: "select" | "skip") => {
+      if (!activeCard) return;
+      const card = activeCard;
 
-    if (direction === "select" && nextEmptyIndex !== -1) {
-      updateVector(card.tags, "select");
-      setDiscardDir("right");
-      setFilledNodes((prev) => {
-        const next = [...prev];
-        next[nextEmptyIndex] = card;
-        return next;
-      });
-      setTimeout(() => {
-        setDeck((prev) => prev.slice(1));
-        setDiscardDir(null);
-      }, 300);
-    } else if (direction === "skip") {
-      updateVector(card.tags, "skip");
-      setDiscardDir("left");
-      setTimeout(() => {
-        setDeck((prev) => prev.slice(1));
-        setDiscardDir(null);
-        setLastDiscarded(card);
-      }, 300);
-    }
-  }, [activeCard, nextEmptyIndex, updateVector]);
+      if (direction === "select" && nextEmptyIndex !== -1) {
+        updateVector(card.tags, "select");
+        setDiscardDir("right");
+        setFilledNodes((prev) => {
+          const next = [...prev];
+          next[nextEmptyIndex] = card;
+          return next;
+        });
+        setTimeout(() => {
+          setDeck((prev) => prev.slice(1));
+          setDiscardDir(null);
+        }, 300);
+      } else if (direction === "skip") {
+        updateVector(card.tags, "skip");
+        setDiscardDir("left");
+        setTimeout(() => {
+          setDeck((prev) => prev.slice(1));
+          setDiscardDir(null);
+          setLastDiscarded(card);
+        }, 300);
+      }
+    },
+    [activeCard, nextEmptyIndex, updateVector],
+  );
 
   // ─── Drag Logic ─── //
   const handleDragEnd = useCallback(
@@ -300,14 +320,14 @@ export default function TourBuilderPage() {
 
       // Swipe RIGHT -> CHOOSE (SELECT)
       if (offset.x > swipeThreshold || velocity.x > 500) {
-         handleManualAction('select');
-         return;
+        handleManualAction("select");
+        return;
       }
 
       // Swipe LEFT -> SKIP
       if (offset.x < -swipeThreshold || velocity.x < -500) {
-         handleManualAction('skip');
-         return;
+        handleManualAction("skip");
+        return;
       }
     },
     [handleManualAction],
@@ -329,154 +349,610 @@ export default function TourBuilderPage() {
   const rightGlowOpacity = useTransform(x, [0, 150], [0, 1]);
 
   if (isTourReady) {
+    const stops = filledNodes.filter((n): n is CardData => n !== null);
+    const totalCost = stops.reduce((sum, s) => {
+      const n = parseInt(s.price.replace(/[^0-9]/g, ""), 10) || 0;
+      return sum + n;
+    }, 0);
+    const totalMinutes = stops.reduce((sum, s) => {
+      const p = parseInt(s.price.replace(/[^0-9]/g, ""), 10) || 0;
+      return sum + (p < 50 ? 20 : p < 120 ? 40 : 60);
+    }, 0);
+    const hrs = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    const durationLabel =
+      hrs > 0 ? `${hrs}h ${mins > 0 ? `${mins}m` : ""}` : `${mins}m`;
+    const totalXP = stops.reduce((sum, s) => sum + s.match, 0);
+
     return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ width: "100%", height: "100%", position: "relative", backgroundColor: surface.page }}>
-        <ClientOnly>
-          <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
-            <MapWidget 
-              mapId="tour-final-background"
-              points={filledNodes.filter((n): n is CardData => n !== null).map(n => n.location)}
-              center={[10.897, 106.772]} zoom={13}
-            />
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          backgroundColor: surface.page,
+          overflow: "hidden",
+        }}
+      >
+        {/* ── Top Action Bar ── */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "14px 28px",
+            backgroundColor: "rgba(255,255,255,0.9)",
+            backdropFilter: "blur(24px)",
+            borderBottom: `1px solid ${border.subtle}`,
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button
+              onClick={() => {
+                setIsTourReady(false);
+                setFilledNodes(Array(TOTAL_NODES).fill(null));
+                setDeck(FOOD_CARDS);
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 16px",
+                borderRadius: 12,
+                background: "none",
+                border: `1px solid ${border.medium}`,
+                cursor: "pointer",
+                fontSize: 13,
+                fontWeight: 700,
+                color: text.secondary,
+              }}
+            >
+              <RotateCcw size={14} /> Rebuild
+            </button>
+            <div>
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: 18,
+                  fontWeight: 900,
+                  color: text.primary,
+                  letterSpacing: "-0.5px",
+                }}
+              >
+                Your Tour is Ready
+              </h2>
+              <p style={{ margin: 0, fontSize: 12, color: text.tertiary }}>
+                {stops.length} stops · curated by Taste Vector
+              </p>
+            </div>
           </div>
-        </ClientOnly>
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(248,250,255,0.1), rgba(248,250,255,0.6))", zIndex: 1 }} />
-        <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ position: "absolute", bottom: "40px", left: "50%", transform: "translateX(-50%)", zIndex: 10, width: "680px", maxWidth: "92vw", backgroundColor: "rgba(255,255,255,0.85)", backdropFilter: "blur(40px)", borderRadius: "32px", padding: "32px 40px", boxShadow: shadow.elevated, border: `1px solid ${border.medium}` }}>
-          <Column style={{ gap: "24px" }}>
-            <Row fillWidth horizontal="between" vertical="center" style={{ gap: "24px" }}>
-              <Column style={{ flex: 1, gap: "4px" }}>
-                <Heading variant="heading-strong-l">Your Tour is Ready!</Heading>
-                <Text style={{ color: text.secondary, fontSize: "0.9rem" }}>{filledNodes.filter(Boolean).length} stops curated by your Taste Vector</Text>
-              </Column>
-              
-              <Row horizontal="end" style={{ flex: 0 }}>
-                <Link href="/">
-                  <IconButton icon={<ChevronLeft size={20} />} style={{ borderRadius: "14px", border: `1px solid ${border.medium}` }} />
-                </Link>
-              </Row>
-            </Row>
-            <Row style={{ gap: "12px", justifyContent: "center", alignItems: 'center' }}>
-              {filledNodes.map((node, i) => (
-                <React.Fragment key={i}>
-                  <TimelineNode
-                    index={i}
-                    imageUrl={node?.img}
-                    color={node?.color}
-                    isFilled={!!node}
-                  />
-                  {i < filledNodes.length - 1 && <TimelineConnector isActive={!!filledNodes[i + 1]} />}
-                </React.Fragment>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                padding: "10px 20px",
+                borderRadius: 12,
+                backgroundColor: surface.base,
+                border: `1px solid ${border.medium}`,
+                cursor: "pointer",
+                fontSize: 13,
+                fontWeight: 700,
+                color: text.primary,
+              }}
+            >
+              <Share2 size={14} /> Share
+            </button>
+            <button
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "10px 24px",
+                borderRadius: 12,
+                background: `linear-gradient(135deg, ${accent.primary}, #0057D9)`,
+                border: "none",
+                cursor: "pointer",
+                fontSize: 13,
+                fontWeight: 800,
+                color: "white",
+                boxShadow: `0 4px 16px ${accent.primaryGlow}`,
+              }}
+            >
+              <Navigation2 size={14} /> Start Tour
+            </button>
+          </div>
+        </div>
+
+        {/* ── Split Body ── */}
+        <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+          {/* LEFT: Map */}
+          <div style={{ flex: "1 1 55%", position: "relative", minWidth: 0 }}>
+            <ClientOnly>
+              <MapWidget
+                mapId="tour-final-background"
+                points={stops.map((n) => n.location)}
+                center={stops[0]?.location ?? [10.897, 106.772]}
+                zoom={13}
+              />
+            </ClientOnly>
+            {/* Stat pills floating over map */}
+            <div
+              style={{
+                position: "absolute",
+                bottom: 20,
+                left: 20,
+                display: "flex",
+                gap: 8,
+                zIndex: 10,
+              }}
+            >
+              {[
+                { icon: <MapPin size={13} />, label: `${stops.length} Stops` },
+                { icon: <Timer size={13} />, label: durationLabel },
+                {
+                  icon: <DollarSign size={13} />,
+                  label: `${totalCost.toLocaleString()}k`,
+                },
+                { icon: <Zap size={13} />, label: `+${totalXP} XP` },
+              ].map((s) => (
+                <div
+                  key={s.label}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    padding: "6px 12px",
+                    borderRadius: 20,
+                    backgroundColor: "rgba(255,255,255,0.9)",
+                    backdropFilter: "blur(16px)",
+                    border: `1px solid ${border.subtle}`,
+                    fontSize: 11,
+                    fontWeight: 800,
+                    color: text.primary,
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                  }}
+                >
+                  {s.icon}
+                  {s.label}
+                </div>
               ))}
-            </Row>
-          </Column>
-        </motion.div>
+            </div>
+          </div>
+
+          {/* RIGHT: Stop Detail Panel */}
+          <motion.div
+            initial={{ x: 40, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{
+              type: "spring",
+              stiffness: 260,
+              damping: 22,
+              delay: 0.1,
+            }}
+            style={{
+              width: 360,
+              flexShrink: 0,
+              display: "flex",
+              flexDirection: "column",
+              backgroundColor: surface.elevated,
+              borderLeft: `1px solid ${border.subtle}`,
+              overflow: "hidden",
+            }}
+          >
+            {/* Panel header */}
+            <div
+              style={{
+                padding: "20px 24px 14px",
+                borderBottom: `1px solid ${border.subtle}`,
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 10,
+                  fontWeight: 900,
+                  color: accent.primary,
+                  letterSpacing: "1.2px",
+                  textTransform: "uppercase",
+                }}
+              >
+                Route Itinerary
+              </p>
+              <h3
+                style={{
+                  margin: "4px 0 0",
+                  fontSize: 16,
+                  fontWeight: 900,
+                  color: text.primary,
+                  letterSpacing: "-0.4px",
+                }}
+              >
+                Today&apos;s Flavor Journey
+              </h3>
+            </div>
+
+            {/* Stop list */}
+            <div
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                padding: "16px 24px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 0,
+              }}
+            >
+              {stops.map((stop, i) => {
+                const stopMins =
+                  parseInt(stop.price.replace(/[^0-9]/g, ""), 10) < 50
+                    ? 20
+                    : parseInt(stop.price.replace(/[^0-9]/g, ""), 10) < 120
+                      ? 40
+                      : 60;
+                return (
+                  <React.Fragment key={stop.id}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.15 + i * 0.08 }}
+                      style={{
+                        display: "flex",
+                        gap: 12,
+                        alignItems: "flex-start",
+                        padding: "12px 0",
+                      }}
+                    >
+                      {/* Number chip */}
+                      <div
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: "50%",
+                          background: stop.color,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          fontSize: 12,
+                          fontWeight: 900,
+                          color: "white",
+                          marginTop: 4,
+                        }}
+                      >
+                        {i + 1}
+                      </div>
+                      {/* Thumb */}
+                      <div
+                        style={{
+                          width: 52,
+                          height: 52,
+                          borderRadius: 12,
+                          overflow: "hidden",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <img
+                          src={stop.img}
+                          alt={stop.title}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
+                        />
+                      </div>
+                      {/* Info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: 13,
+                            fontWeight: 800,
+                            color: text.primary,
+                            letterSpacing: "-0.3px",
+                          }}
+                        >
+                          {stop.title}
+                        </p>
+                        <p
+                          style={{
+                            margin: "2px 0 6px",
+                            fontSize: 11,
+                            color: text.tertiary,
+                          }}
+                        >
+                          {stop.subtitle}
+                        </p>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <span
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 3,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: text.secondary,
+                            }}
+                          >
+                            <Clock size={10} /> ~{stopMins}m
+                          </span>
+                          <span
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 3,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: text.secondary,
+                            }}
+                          >
+                            <DollarSign size={10} /> {stop.price}
+                          </span>
+                          <span
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 3,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: accent.warning,
+                            }}
+                          >
+                            <Sparkles size={10} /> {stop.match}%
+                          </span>
+                        </div>
+                      </div>
+                    </motion.div>
+                    {i < stops.length - 1 && (
+                      <div
+                        style={{
+                          marginLeft: 14,
+                          width: 1,
+                          height: 16,
+                          background: `linear-gradient(to bottom, ${border.medium}, transparent)`,
+                        }}
+                      />
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+
+            {/* Summary footer */}
+            <div
+              style={{
+                padding: "16px 24px",
+                borderTop: `1px solid ${border.subtle}`,
+                backgroundColor: surface.base,
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                {[
+                  {
+                    label: "Duration",
+                    value: durationLabel,
+                    color: accent.secondary,
+                  },
+                  { label: "Budget", value: `${totalCost}k`, color: "#059669" },
+                  {
+                    label: "XP Earned",
+                    value: `+${totalXP}`,
+                    color: accent.warning,
+                  },
+                ].map((s) => (
+                  <div key={s.label} style={{ textAlign: "center" }}>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 16,
+                        fontWeight: 900,
+                        color: s.color,
+                      }}
+                    >
+                      {s.value}
+                    </p>
+                    <p
+                      style={{
+                        margin: "2px 0 0",
+                        fontSize: 9,
+                        fontWeight: 700,
+                        color: text.muted,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.8px",
+                      }}
+                    >
+                      {s.label}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <Link href="/discover" style={{ textDecoration: "none" }}>
+                <button
+                  style={{
+                    width: "100%",
+                    padding: "12px",
+                    borderRadius: 14,
+                    background: `linear-gradient(135deg, ${accent.primary}, #0057D9)`,
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: "white",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                  }}
+                >
+                  <Navigation2 size={15} /> Open in Full Map
+                </button>
+              </Link>
+            </div>
+          </motion.div>
+        </div>
       </motion.div>
     );
   }
 
   return (
-    <Column fillHeight gap="0" style={{ flex: 1, backgroundColor: "#F8FAFF", overflow: "hidden", display: 'flex', flexDirection: 'column', paddingBottom: '0', paddingTop: '0', justifyContent: 'space-between' }}>
+    <Column
+      fillHeight
+      gap="0"
+      style={{
+        flex: 1,
+        backgroundColor: "#F8FAFF",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        paddingBottom: "0",
+        paddingTop: "0",
+        justifyContent: "space-between",
+      }}
+    >
       <AnimatePresence>
-        <motion.div key={activeColor} initial={{ opacity: 0 }} animate={{ opacity: 0.1 }} exit={{ opacity: 0 }} style={{ position: "absolute", inset: 0, background: `radial-gradient(circle at 50% 50%, ${activeColor}, transparent 70%)`, filter: "blur(100px)", pointerEvents: "none" }} />
+        <motion.div
+          key={activeColor}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.1 }}
+          exit={{ opacity: 0 }}
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: `radial-gradient(circle at 50% 50%, ${activeColor}, transparent 70%)`,
+            filter: "blur(100px)",
+            pointerEvents: "none",
+          }}
+        />
       </AnimatePresence>
 
       {/* 1. TOP IDENTITY BAR - FLEX SHRINK 0 */}
-      <div style={{ width: '100%', zIndex: 100, flexShrink: 0 }}>
-        <Row 
-          fillWidth 
-          horizontal="between" 
-          vertical="center" 
-          style={{ 
-            height: "80px", 
+      <div style={{ width: "100%", zIndex: 100, flexShrink: 0 }}>
+        <Row
+          fillWidth
+          horizontal="between"
+          vertical="center"
+          style={{
+            height: "80px",
             paddingTop: "0",
             paddingBottom: "0",
             paddingLeft: "40px",
             paddingRight: "40px",
-            backgroundColor: "rgba(255, 255, 255, 0.65)", 
-            backdropFilter: "blur(32px) saturate(180%)", 
+            backgroundColor: "rgba(255, 255, 255, 0.65)",
+            backdropFilter: "blur(32px) saturate(180%)",
             borderBottomWidth: "1px",
             borderBottomStyle: "solid",
             borderBottomColor: "rgba(0, 122, 255, 0.08)",
-            borderRadius: '0 0 32px 32px', 
-            boxShadow: '0 8px 32px rgba(0,0,0,0.02)', 
-            gap: '24px' 
+            borderRadius: "0 0 32px 32px",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.02)",
+            gap: "24px",
           }}
         >
           {/* LEFT: Navigation & Status */}
-          <Row style={{ flex: 1, alignItems: 'center', gap: '16px' }}>
-            <Link href="/">
-              <Row 
-                vertical="center" 
-                style={{ 
-                  height: '44px', 
+          <Row style={{ flex: 1, alignItems: "center", gap: "16px" }}>
+            <Link href="/discover">
+              <Row
+                vertical="center"
+                style={{
+                  height: "44px",
                   paddingTop: "0",
                   paddingBottom: "0",
                   paddingLeft: "20px",
                   paddingRight: "20px",
-                  borderRadius: '16px', 
-                  backgroundColor: 'rgba(255, 255, 255, 0.4)', 
-                  borderWidth: '1px',
-                  borderStyle: 'solid',
-                  borderColor: 'rgba(0, 122, 255, 0.1)', 
-                  cursor: 'pointer',
-                  gap: '8px',
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
+                  borderRadius: "16px",
+                  backgroundColor: "rgba(255, 255, 255, 0.4)",
+                  borderWidth: "1px",
+                  borderStyle: "solid",
+                  borderColor: "rgba(0, 122, 255, 0.1)",
+                  cursor: "pointer",
+                  gap: "8px",
+                  transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.03)",
                 }}
                 onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(0, 122, 255, 0.08)';
-                  e.currentTarget.style.borderColor = 'rgba(0, 122, 255, 0.2)';
-                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.backgroundColor =
+                    "rgba(0, 122, 255, 0.08)";
+                  e.currentTarget.style.borderColor = "rgba(0, 122, 255, 0.2)";
+                  e.currentTarget.style.transform = "translateY(-1px)";
                 }}
                 onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
-                  e.currentTarget.style.borderColor = 'rgba(0, 122, 255, 0.1)';
-                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.backgroundColor =
+                    "rgba(255, 255, 255, 0.4)";
+                  e.currentTarget.style.borderColor = "rgba(0, 122, 255, 0.1)";
+                  e.currentTarget.style.transform = "translateY(0)";
                 }}
               >
-                <ChevronLeft size={18} color={accent.primary} strokeWidth={2.5} />
-                <Text style={{ fontWeight: 800, color: accent.primary, fontSize: '0.9rem' }}>
-                  Lobby
+                <ChevronLeft
+                  size={18}
+                  color={accent.primary}
+                  strokeWidth={2.5}
+                />
+                <Text
+                  style={{
+                    fontWeight: 800,
+                    color: accent.primary,
+                    fontSize: "0.9rem",
+                  }}
+                >
+                  Discover
                 </Text>
               </Row>
             </Link>
-            
-            <div style={{ width: '1px', height: '32px', backgroundColor: 'rgba(0,0,0,0.06)', marginTop: "0", marginBottom: "0", marginLeft: "4px", marginRight: "4px" }} />
-            
-            <Row style={{ gap: '8px' }}>
-              <IconButton 
-                icon={<Bell size={18} color={accent.primary} />} 
-                style={{ 
-                  width: '44px', 
-                  height: '44px', 
-                  borderRadius: '16px', 
-                  backgroundColor: 'rgba(255, 255, 255, 0.4)', 
-                  borderWidth: '1px',
-                  borderStyle: 'solid',
-                  borderColor: 'rgba(0, 122, 255, 0.1)',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
+
+            <div
+              style={{
+                width: "1px",
+                height: "32px",
+                backgroundColor: "rgba(0,0,0,0.06)",
+                marginTop: "0",
+                marginBottom: "0",
+                marginLeft: "4px",
+                marginRight: "4px",
+              }}
+            />
+
+            <Row style={{ gap: "8px" }}>
+              <IconButton
+                icon={<Bell size={18} color={accent.primary} />}
+                style={{
+                  width: "44px",
+                  height: "44px",
+                  borderRadius: "16px",
+                  backgroundColor: "rgba(255, 255, 255, 0.4)",
+                  borderWidth: "1px",
+                  borderStyle: "solid",
+                  borderColor: "rgba(0, 122, 255, 0.1)",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.02)",
                   paddingTop: "0",
                   paddingBottom: "0",
                   paddingLeft: "0",
-                  paddingRight: "0"
-                }} 
+                  paddingRight: "0",
+                }}
               />
-              <IconButton 
-                icon={<MessageSquare size={18} color={accent.secondary} />} 
-                style={{ 
-                  width: '44px', 
-                  height: '44px', 
-                  borderRadius: '16px', 
-                  backgroundColor: 'rgba(255, 255, 255, 0.4)', 
-                  borderWidth: '1px',
-                  borderStyle: 'solid',
-                  borderColor: 'rgba(0, 122, 255, 0.1)',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
+              <IconButton
+                icon={<MessageSquare size={18} color={accent.secondary} />}
+                style={{
+                  width: "44px",
+                  height: "44px",
+                  borderRadius: "16px",
+                  backgroundColor: "rgba(255, 255, 255, 0.4)",
+                  borderWidth: "1px",
+                  borderStyle: "solid",
+                  borderColor: "rgba(0, 122, 255, 0.1)",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.02)",
                   paddingTop: "0",
                   paddingBottom: "0",
                   paddingLeft: "0",
-                  paddingRight: "0"
-                }} 
+                  paddingRight: "0",
+                }}
               />
             </Row>
           </Row>
@@ -484,63 +960,134 @@ export default function TourBuilderPage() {
           {/* CENTER: AI INSIGHT PILL (DYNAMIC ISLAND) */}
           <Row horizontal="center" style={{ flex: 2, minWidth: 0 }}>
             <AnimatePresence mode="wait">
-              <motion.div 
-                key={filledNodes.filter(Boolean).length === 0 ? 'empty' : 'building'}
-                initial={{ opacity: 0, y: -4, scale: 0.99 }} 
+              <motion.div
+                key={
+                  filledNodes.filter(Boolean).length === 0
+                    ? "empty"
+                    : "building"
+                }
+                initial={{ opacity: 0, y: -4, scale: 0.99 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 4, scale: 0.99 }}
                 transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '14px', 
-                  padding: '6px 28px 6px 14px', 
-                  backgroundColor: 'rgba(255, 255, 255, 0.45)', 
-                  borderRadius: '100px', 
-                  border: `1px solid rgba(0, 122, 255, 0.15)`, 
-                  width: '100%', 
-                  maxWidth: '580px', 
-                  boxShadow: '0 4px 20px rgba(0, 122, 255, 0.08), inset 0 2px 4px rgba(255,255,255,0.8)', 
-                  overflow: 'hidden',
-                  position: 'relative'
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "14px",
+                  padding: "6px 28px 6px 14px",
+                  backgroundColor: "rgba(255, 255, 255, 0.45)",
+                  borderRadius: "100px",
+                  border: `1px solid rgba(0, 122, 255, 0.15)`,
+                  width: "100%",
+                  maxWidth: "580px",
+                  boxShadow:
+                    "0 4px 20px rgba(0, 122, 255, 0.08), inset 0 2px 4px rgba(255,255,255,0.8)",
+                  overflow: "hidden",
+                  position: "relative",
                 }}
               >
                 {/* Pulsing Backglow */}
                 <motion.div
                   animate={{ opacity: [0.1, 0.2, 0.1] }}
-                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                  style={{ position: 'absolute', inset: 0, background: `radial-gradient(circle at 20% 50%, ${accent.primary}20, transparent 70%)`, pointerEvents: 'none' }}
+                  transition={{
+                    duration: 3,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: `radial-gradient(circle at 20% 50%, ${accent.primary}20, transparent 70%)`,
+                    pointerEvents: "none",
+                  }}
                 />
 
-                <div style={{ width: "38px", height: "38px", flexShrink: 0, position: "relative", display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'white', borderRadius: '50%', padding: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}>
-                   <motion.div
-                      animate={{ rotate: 360, scale: [1, 1.05, 1] }}
-                      transition={{ rotate: { duration: 4, repeat: Infinity, ease: "linear" }, scale: { duration: 2.5, repeat: Infinity, ease: "easeInOut" } }}
-                      style={{ position: 'absolute', inset: -3, borderRadius: '50%', border: `1.5px solid transparent`, borderTopColor: accent.primary, borderRightColor: accent.secondary, opacity: 0.5 }}
-                   />
-                   <ClientOnly><FlavorAura data={radarData} isPulsing={true} size={30} /></ClientOnly>
+                <div
+                  style={{
+                    width: "38px",
+                    height: "38px",
+                    flexShrink: 0,
+                    position: "relative",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: "white",
+                    borderRadius: "50%",
+                    padding: "4px",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+                  }}
+                >
+                  <motion.div
+                    animate={{ rotate: 360, scale: [1, 1.05, 1] }}
+                    transition={{
+                      rotate: { duration: 4, repeat: Infinity, ease: "linear" },
+                      scale: {
+                        duration: 2.5,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      },
+                    }}
+                    style={{
+                      position: "absolute",
+                      inset: -3,
+                      borderRadius: "50%",
+                      border: `1.5px solid transparent`,
+                      borderTopColor: accent.primary,
+                      borderRightColor: accent.secondary,
+                      opacity: 0.5,
+                    }}
+                  />
+                  <ClientOnly>
+                    <FlavorAura data={radarData} isPulsing={true} size={30} />
+                  </ClientOnly>
                 </div>
-                
-                <Column style={{ gap: '1px', minWidth: 0, zIndex: 1 }}>
-                  <Row vertical="center" style={{ gap: '8px' }}>
-                    <motion.div 
-                      animate={{ 
+
+                <Column style={{ gap: "1px", minWidth: 0, zIndex: 1 }}>
+                  <Row vertical="center" style={{ gap: "8px" }}>
+                    <motion.div
+                      animate={{
                         scale: [1, 1.4, 1],
-                        backgroundColor: [accent.primary, accent.secondary, accent.primary]
-                      }} 
-                      transition={{ duration: 2, repeat: Infinity }} 
-                      style={{ width: '5px', height: '5px', borderRadius: '50%' }} 
+                        backgroundColor: [
+                          accent.primary,
+                          accent.secondary,
+                          accent.primary,
+                        ],
+                      }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                      style={{
+                        width: "5px",
+                        height: "5px",
+                        borderRadius: "50%",
+                      }}
                     />
-                    <Text style={{ fontSize: '0.6rem', fontWeight: 900, color: accent.primary, letterSpacing: '1.2px', textTransform: 'uppercase' }}>
+                    <Text
+                      style={{
+                        fontSize: "0.6rem",
+                        fontWeight: 900,
+                        color: accent.primary,
+                        letterSpacing: "1.2px",
+                        textTransform: "uppercase",
+                      }}
+                    >
                       AI Thought Engine
                     </Text>
                   </Row>
-                  <Text style={{ fontSize: '0.85rem', fontWeight: 700, color: text.primary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.2px' }}>
-                    {filledNodes.filter(Boolean).length === 0 
-                      ? "Analyzing your group's collective palate..." 
+                  <Text
+                    style={{
+                      fontSize: "0.85rem",
+                      fontWeight: 700,
+                      color: text.primary,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      letterSpacing: "-0.2px",
+                    }}
+                  >
+                    {filledNodes.filter(Boolean).length === 0
+                      ? "Analyzing your group's collective palate..."
                       : filledNodes.filter(Boolean).length < TOTAL_NODES
-                      ? "DNA Syncing. Optimizing route for maximum group satisfaction."
-                      : "Route DNA Fully Sequenced. Ready to launch."}
+                        ? "DNA Syncing. Optimizing route for maximum group satisfaction."
+                        : "Route DNA Fully Sequenced. Ready to launch."}
                   </Text>
                 </Column>
               </motion.div>
@@ -548,35 +1095,84 @@ export default function TourBuilderPage() {
           </Row>
 
           {/* RIGHT: ELITE PROFILE INFO */}
-          <Row horizontal="end" style={{ flex: 1, alignItems: 'center', gap: '16px' }}>
-            <Column style={{ gap: '2px', alignItems: 'flex-end', hide: 's' }}>
-              <Text style={{ color: text.primary, fontSize: "0.9rem", fontWeight: 900, letterSpacing: '-0.3px' }}>
+          <Row
+            horizontal="end"
+            style={{ flex: 1, alignItems: "center", gap: "16px" }}
+          >
+            <Column style={{ gap: "2px", alignItems: "flex-end", hide: "s" }}>
+              <Text
+                style={{
+                  color: text.primary,
+                  fontSize: "0.9rem",
+                  fontWeight: 900,
+                  letterSpacing: "-0.3px",
+                }}
+              >
                 {MOCK_USER.name}
               </Text>
-              <Row vertical="center" style={{ gap: '6px' }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#00D1B2', boxShadow: '0 0 8px #00D1B2' }} />
-                <Text style={{ color: "rgba(0,0,0,0.45)", fontSize: "0.7rem", fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <Row vertical="center" style={{ gap: "6px" }}>
+                <div
+                  style={{
+                    width: "6px",
+                    height: "6px",
+                    borderRadius: "50%",
+                    backgroundColor: "#00D1B2",
+                    boxShadow: "0 0 8px #00D1B2",
+                  }}
+                />
+                <Text
+                  style={{
+                    color: "rgba(0,0,0,0.45)",
+                    fontSize: "0.7rem",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                  }}
+                >
                   {MOCK_USER.title}
                 </Text>
               </Row>
             </Column>
-            
-            <div style={{ position: 'relative', flexShrink: 0 }}>
+
+            <div style={{ position: "relative", flexShrink: 0 }}>
               <motion.div
                 animate={{ rotate: -360 }}
                 transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-                style={{ position: 'absolute', inset: -4, borderRadius: '50%', border: '1.5px dashed rgba(0, 122, 255, 0.2)' }}
+                style={{
+                  position: "absolute",
+                  inset: -4,
+                  borderRadius: "50%",
+                  border: "1.5px dashed rgba(0, 122, 255, 0.2)",
+                }}
               />
-              <div style={{ 
-                width: '46px', 
-                height: '46px', 
-                borderRadius: '50%', 
-                padding: '2px', 
-                background: `linear-gradient(135deg, ${accent.primary}, ${accent.secondary})`,
-                boxShadow: '0 4px 12px rgba(0, 122, 255, 0.2)'
-              }}>
-                <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', border: '2px solid white' }}>
-                  <img src={MOCK_USER.avatar} alt={MOCK_USER.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <div
+                style={{
+                  width: "46px",
+                  height: "46px",
+                  borderRadius: "50%",
+                  padding: "2px",
+                  background: `linear-gradient(135deg, ${accent.primary}, ${accent.secondary})`,
+                  boxShadow: "0 4px 12px rgba(0, 122, 255, 0.2)",
+                }}
+              >
+                <div
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    borderRadius: "50%",
+                    overflow: "hidden",
+                    border: "2px solid white",
+                  }}
+                >
+                  <img
+                    src={MOCK_USER.avatar}
+                    alt={MOCK_USER.name}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
                 </div>
               </div>
             </div>
@@ -585,84 +1181,192 @@ export default function TourBuilderPage() {
       </div>
 
       {/* 2. CINEMATIC STAGE (NO TAILWIND) */}
-      <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
-        
+      <div
+        style={{
+          position: "relative",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          width: "100%",
+          flexGrow: 1,
+          minHeight: 0,
+          overflow: "hidden",
+        }}
+      >
         {/* Background Glows (Layer 0) */}
-        <motion.div 
-          style={{ 
-            position: 'absolute', 
-            inset: 0, 
-            zIndex: 0, 
-            background: 'radial-gradient(circle at left, rgba(255,192,203,0.5) 0%, transparent 70%)', 
+        <motion.div
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 0,
+            background:
+              "radial-gradient(circle at left, rgba(255,192,203,0.5) 0%, transparent 70%)",
             opacity: leftGlowOpacity,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-start',
-            paddingLeft: '80px'
-          }} 
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-start",
+            paddingLeft: "80px",
+          }}
         >
-          <Column horizontal="center" style={{ gap: '16px' }}>
-            <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'rgba(255, 100, 100, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid rgba(255, 100, 100, 0.2)' }}>
+          <Column horizontal="center" style={{ gap: "16px" }}>
+            <div
+              style={{
+                width: "80px",
+                height: "80px",
+                borderRadius: "50%",
+                backgroundColor: "rgba(255, 100, 100, 0.1)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                border: "2px solid rgba(255, 100, 100, 0.2)",
+              }}
+            >
               <X size={40} color="rgba(255, 100, 100, 0.8)" strokeWidth={3} />
             </div>
-            <Text style={{ fontSize: '1rem', fontWeight: 900, color: "rgba(255, 100, 100, 0.8)", letterSpacing: '4px' }}>SKIP</Text>
+            <Text
+              style={{
+                fontSize: "1rem",
+                fontWeight: 900,
+                color: "rgba(255, 100, 100, 0.8)",
+                letterSpacing: "4px",
+              }}
+            >
+              SKIP
+            </Text>
           </Column>
         </motion.div>
-        <motion.div 
-          style={{ 
-            position: 'absolute', 
-            inset: 0, 
-            zIndex: 0, 
-            background: 'radial-gradient(circle at right, rgba(173,216,230,0.5) 0%, transparent 70%)', 
+        <motion.div
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 0,
+            background:
+              "radial-gradient(circle at right, rgba(173,216,230,0.5) 0%, transparent 70%)",
             opacity: rightGlowOpacity,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            paddingRight: '80px'
-          }} 
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            paddingRight: "80px",
+          }}
         >
-          <Column horizontal="center" style={{ gap: '16px' }}>
-            <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: `${accent.primary}10`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${accent.primary}25` }}>
-              <Star size={40} color={accent.primary} fill={accent.primary} strokeWidth={2.5} />
+          <Column horizontal="center" style={{ gap: "16px" }}>
+            <div
+              style={{
+                width: "80px",
+                height: "80px",
+                borderRadius: "50%",
+                backgroundColor: `${accent.primary}10`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                border: `2px solid ${accent.primary}25`,
+              }}
+            >
+              <Star
+                size={40}
+                color={accent.primary}
+                fill={accent.primary}
+                strokeWidth={2.5}
+              />
             </div>
-            <Text style={{ fontSize: '1rem', fontWeight: 900, color: accent.primary, letterSpacing: '4px' }}>CHOOSE</Text>
+            <Text
+              style={{
+                fontSize: "1rem",
+                fontWeight: 900,
+                color: accent.primary,
+                letterSpacing: "4px",
+              }}
+            >
+              CHOOSE
+            </Text>
           </Column>
         </motion.div>
 
         {/* Foreground Layer (Layer 10) */}
-        <motion.div 
-          drag="x" 
-          style={{ x, zIndex: 10, position: 'relative', width: "760px", height: "480px" }}
+        <motion.div
+          drag="x"
+          style={{
+            x,
+            zIndex: 10,
+            position: "relative",
+            width: "760px",
+            height: "480px",
+          }}
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.8}
           onDragEnd={handleDragEnd}
         >
           <AnimatePresence>
             {deck.length > 0 ? (
-              <div style={{ width: "100%", height: "100%", position: "relative", display: "flex", justifyContent: "center", alignItems: "center" }}>
+              <div
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  position: "relative",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
                 {deck[1] && (
-                  <motion.div 
-                    key={`bg-${deck[1].id}`} 
-                    initial={{ scale: 0.94, opacity: 0 }} 
-                    animate={{ scale: 0.94, y: -20, opacity: 0.15 }} 
-                    style={{ position: "absolute", width: "100%", height: "100%", zIndex: 1, borderRadius: "48px", overflow: "hidden", backgroundColor: 'white', boxShadow: '0 20px 60px rgba(0,0,0,0.1)', border: '1px solid rgba(0,0,0,0.05)' }} 
+                  <motion.div
+                    key={`bg-${deck[1].id}`}
+                    initial={{ scale: 0.94, opacity: 0 }}
+                    animate={{ scale: 0.94, y: -20, opacity: 0.15 }}
+                    style={{
+                      position: "absolute",
+                      width: "100%",
+                      height: "100%",
+                      zIndex: 1,
+                      borderRadius: "48px",
+                      overflow: "hidden",
+                      backgroundColor: "white",
+                      boxShadow: "0 20px 60px rgba(0,0,0,0.1)",
+                      border: "1px solid rgba(0,0,0,0.05)",
+                    }}
                   >
                     <StopCard card={deck[1] as any} />
-                    <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(4px)' }} />
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        backgroundColor: "rgba(255,255,255,0.4)",
+                        backdropFilter: "blur(4px)",
+                      }}
+                    />
                   </motion.div>
                 )}
-                <div style={{ perspective: '2000px', width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                  <motion.div
-                    style={{ width: "100%", height: "100%" }}
-                  >
+                <div
+                  style={{
+                    perspective: "2000px",
+                    width: "100%",
+                    height: "100%",
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  <motion.div style={{ width: "100%", height: "100%" }}>
                     <StopCard card={deck[0] as any} />
                   </motion.div>
                 </div>
               </div>
             ) : (
-              <motion.div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "24px" }}>
+              <motion.div
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "24px",
+                }}
+              >
                 <Activity size={64} color={accent.primary} />
-                <Heading variant="display-strong-s">Exploration Complete</Heading>
+                <Heading variant="display-strong-s">
+                  Exploration Complete
+                </Heading>
               </motion.div>
             )}
           </AnimatePresence>
@@ -670,105 +1374,352 @@ export default function TourBuilderPage() {
       </div>
 
       {/* 3. FUNCTIONAL FOOTER - FLEX SHRINK 0 */}
-      <div style={{ width: '100%', zIndex: 100, flexShrink: 0, paddingTop: '8px', paddingBottom: '8px', paddingLeft: '60px', paddingRight: '60px', backgroundColor: 'white', backdropFilter: 'blur(40px)', borderTopWidth: '1px', borderTopStyle: 'solid', borderTopColor: 'rgba(0,0,0,0.08)', borderRadius: '24px 24px 0 0', boxShadow: '0 -10px 40px rgba(0,0,0,0.04)' }}>
-        <Row fillWidth horizontal="between" vertical="center" style={{ height: '100px', gap: '48px' }}>
-            {/* LEFT: STATUS */}
-            <Row style={{ gap: '20px', alignItems: 'center', width: '380px' }}>
-            <motion.div whileHover={{ scale: 1.05 }} style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingTop: '8px', paddingBottom: '8px', paddingLeft: '20px', paddingRight: '20px', backgroundColor: '#F0F9FF', borderRadius: '16px', border: `1px solid ${accent.primary}20` }}>
-                <Row vertical="center" style={{ gap: '8px' }}>
-                   <Users size={16} color={accent.primary} />
-                   <Text style={{ fontSize: '0.85rem', fontWeight: 900, color: accent.primary }}>1 MEMBER</Text>
-                </Row>
-                <Text style={{ fontSize: '0.65rem', fontWeight: 600, color: 'rgba(0,0,0,0.4)', textAlign: 'center' }}>ACTIVE GROUP</Text>
-              </motion.div>
-              <div style={{ width: '1px', height: '32px', backgroundColor: 'rgba(0,0,0,0.08)' }} />
-              <Column style={{ gap: '4px' }}>
-                <Text style={{ fontSize: '0.85rem', fontWeight: 900, color: text.primary }}>{filledNodes.filter(Boolean).length} FOODS SELECTED</Text>
-                <Text style={{ fontSize: '0.6rem', fontWeight: 600, color: 'rgba(0,0,0,0.4)', textTransform: 'uppercase' }}>Open-ended Exploration</Text>
-              </Column>
-            </Row>
-
-            {/* CENTER: ACTIONS */}
-            <div style={{ display: "flex", alignItems: "center", gap: "16px", paddingTop: "8px", paddingBottom: "8px", paddingLeft: "16px", paddingRight: "16px", backgroundColor: "rgba(0,0,0,0.03)", borderRadius: "100px", border: `2px solid rgba(0,0,0,0.05)` }}>
-              <IconButton icon={<Undo2 size={22} color="white" />} onClick={handleUndo} style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: "#64748B", paddingTop: "0", paddingBottom: "0", paddingLeft: "0", paddingRight: "0" }} />
-              <Button onClick={() => handleManualAction('skip')} style={{ borderRadius: '30px', backgroundColor: '#F3E8FF', color: '#7E22CE', border: 'none', fontWeight: 900, paddingTop: '0', paddingBottom: '0', paddingLeft: '28px', paddingRight: '28px', height: '48px' }}>SKIP</Button>
-              <Button onClick={() => handleManualAction('select')} style={{ borderRadius: '30px', backgroundColor: accent.primary, color: 'white', fontWeight: 900, paddingTop: '0', paddingBottom: '0', paddingLeft: '32px', paddingRight: '32px', height: '48px' }}>CHOOSE</Button>
-              <IconButton 
-                 icon={<Star size={24} color="white" fill={filledNodes.some(n => n !== null) ? "white" : "none"} />} 
-                 onClick={() => {
-                    if (filledNodes.some(n => n !== null)) {
-                      setIsGenerating(true);
-                      setTimeout(() => { setIsGenerating(false); setIsTourReady(true); }, 3000);
-                    }
-                 }}
-                 style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: filledNodes.some(n => n !== null) ? '#10B981' : 'rgba(0,0,0,0.1)' }} 
-              />
-            </div>
-
-            {/* RIGHT: MAP & DNA */}
-            <Row style={{ gap: '24px', alignItems: 'center', width: '380px', justifyContent: 'flex-end' }}>
-              <Column style={{ gap: '8px', width: '180px' }}>
-                <Row horizontal="between" vertical="center" style={{ width: '100%' }}>
-                  <Text style={{ fontSize: '0.65rem', fontWeight: 850 }}>TOUR DNA PROFILE</Text>
-                  <Text style={{ fontSize: '0.6rem', color: accent.secondary, fontWeight: 800 }}>LIVE</Text>
-                </Row>
-                <div style={{ width: '100%', height: '12px', backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: '6px', overflow: 'hidden', display: 'flex' }}>
-                   {tourDNA.map((segment) => (
-                      <motion.div key={segment.label} initial={{ width: 0 }} animate={{ width: `${segment.value}%` }} style={{ height: '100%', backgroundColor: segment.color }} />
-                   ))}
-                </div>
-              </Column>
-              <div style={{ width: '150px', height: '80px', borderRadius: '16px', backgroundColor: '#F8FAFF', border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden', position: 'relative' }}>
-                 <ClientOnly>
-                    <MapWidget 
-                      mapId="tour-curation-footer"
-                      points={filledNodes.filter((n): n is CardData => n !== null).map(n => n.location)}
-                      center={activeCard ? activeCard.location : [10.897, 106.772]} zoom={14} showBanner={false}
-                    />
-                 </ClientOnly>
+      <div
+        style={{
+          width: "100%",
+          zIndex: 100,
+          flexShrink: 0,
+          paddingTop: "8px",
+          paddingBottom: "8px",
+          paddingLeft: "60px",
+          paddingRight: "60px",
+          backgroundColor: "white",
+          backdropFilter: "blur(40px)",
+          borderTopWidth: "1px",
+          borderTopStyle: "solid",
+          borderTopColor: "rgba(0,0,0,0.08)",
+          borderRadius: "24px 24px 0 0",
+          boxShadow: "0 -10px 40px rgba(0,0,0,0.04)",
+        }}
+      >
+        <Row
+          fillWidth
+          horizontal="between"
+          vertical="center"
+          style={{ height: "100px", gap: "48px" }}
+        >
+          {/* LEFT: STATUS */}
+          <Row style={{ gap: "20px", alignItems: "center", width: "380px" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+                padding: "8px 16px",
+                backgroundColor: "#F0F9FF",
+                borderRadius: 16,
+                border: `1px solid ${accent.primary}20`,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: "0.6rem",
+                  fontWeight: 900,
+                  color: accent.primary,
+                  letterSpacing: "1px",
+                  textTransform: "uppercase",
+                }}
+              >
+                Stops
+              </Text>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button
+                  onClick={() => {
+                    const next = Math.max(2, stopCount - 1);
+                    setStopCount(next);
+                    setFilledNodes(Array(next).fill(null));
+                    setDeck(FOOD_CARDS);
+                  }}
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 8,
+                    background: "white",
+                    border: `1px solid ${border.medium}`,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 900,
+                    fontSize: 14,
+                    color: text.primary,
+                  }}
+                >
+                  −
+                </button>
+                <Text
+                  style={{
+                    fontSize: "1.1rem",
+                    fontWeight: 900,
+                    color: accent.primary,
+                    minWidth: 18,
+                    textAlign: "center",
+                  }}
+                >
+                  {stopCount}
+                </Text>
+                <button
+                  onClick={() => {
+                    const next = Math.min(6, stopCount + 1);
+                    setStopCount(next);
+                    setFilledNodes(Array(next).fill(null));
+                    setDeck(FOOD_CARDS);
+                  }}
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 8,
+                    background: "white",
+                    border: `1px solid ${border.medium}`,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 900,
+                    fontSize: 14,
+                    color: text.primary,
+                  }}
+                >
+                  +
+                </button>
               </div>
-            </Row>
+            </div>
+            <div
+              style={{
+                width: "1px",
+                height: "32px",
+                backgroundColor: "rgba(0,0,0,0.08)",
+              }}
+            />
+            <Column style={{ gap: "4px" }}>
+              <Text
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 900,
+                  color: text.primary,
+                }}
+              >
+                {filledNodes.filter(Boolean).length} / {stopCount} STOPS
+              </Text>
+              <Text
+                style={{
+                  fontSize: "0.6rem",
+                  fontWeight: 600,
+                  color: "rgba(0,0,0,0.4)",
+                  textTransform: "uppercase",
+                }}
+              >
+                {filledNodes.filter(Boolean).length >= stopCount
+                  ? "Route Complete — Ready to Launch!"
+                  : `${stopCount - filledNodes.filter(Boolean).length} more to go`}
+              </Text>
+            </Column>
           </Row>
-        </div>
+
+          {/* CENTER: ACTIONS */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "16px",
+              paddingTop: "8px",
+              paddingBottom: "8px",
+              paddingLeft: "16px",
+              paddingRight: "16px",
+              backgroundColor: "rgba(0,0,0,0.03)",
+              borderRadius: "100px",
+              border: `2px solid rgba(0,0,0,0.05)`,
+            }}
+          >
+            <IconButton
+              icon={<Undo2 size={22} color="white" />}
+              onClick={handleUndo}
+              style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "50%",
+                backgroundColor: "#64748B",
+                paddingTop: "0",
+                paddingBottom: "0",
+                paddingLeft: "0",
+                paddingRight: "0",
+              }}
+            />
+            <Button
+              onClick={() => handleManualAction("skip")}
+              style={{
+                borderRadius: "30px",
+                backgroundColor: "#F3E8FF",
+                color: "#7E22CE",
+                border: "none",
+                fontWeight: 900,
+                paddingTop: "0",
+                paddingBottom: "0",
+                paddingLeft: "28px",
+                paddingRight: "28px",
+                height: "48px",
+              }}
+            >
+              SKIP
+            </Button>
+            <Button
+              onClick={() => handleManualAction("select")}
+              style={{
+                borderRadius: "30px",
+                backgroundColor: accent.primary,
+                color: "white",
+                fontWeight: 900,
+                paddingTop: "0",
+                paddingBottom: "0",
+                paddingLeft: "32px",
+                paddingRight: "32px",
+                height: "48px",
+              }}
+            >
+              CHOOSE
+            </Button>
+            <IconButton
+              icon={
+                <Star
+                  size={24}
+                  color="white"
+                  fill={filledNodes.some((n) => n !== null) ? "white" : "none"}
+                />
+              }
+              onClick={() => {
+                if (filledNodes.some((n) => n !== null)) {
+                  setIsGenerating(true);
+                  setTimeout(() => {
+                    setIsGenerating(false);
+                    setIsTourReady(true);
+                  }, 3000);
+                }
+              }}
+              style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "50%",
+                backgroundColor: filledNodes.some((n) => n !== null)
+                  ? "#10B981"
+                  : "rgba(0,0,0,0.1)",
+              }}
+            />
+          </div>
+
+          {/* RIGHT: MAP & DNA */}
+          <Row
+            style={{
+              gap: "24px",
+              alignItems: "center",
+              width: "380px",
+              justifyContent: "flex-end",
+            }}
+          >
+            <Column style={{ gap: "8px", width: "180px" }}>
+              <Row
+                horizontal="between"
+                vertical="center"
+                style={{ width: "100%" }}
+              >
+                <Text style={{ fontSize: "0.65rem", fontWeight: 850 }}>
+                  TOUR DNA PROFILE
+                </Text>
+                <Text
+                  style={{
+                    fontSize: "0.6rem",
+                    color: accent.secondary,
+                    fontWeight: 800,
+                  }}
+                >
+                  LIVE
+                </Text>
+              </Row>
+              <div
+                style={{
+                  width: "100%",
+                  height: "12px",
+                  backgroundColor: "rgba(0,0,0,0.05)",
+                  borderRadius: "6px",
+                  overflow: "hidden",
+                  display: "flex",
+                }}
+              >
+                {tourDNA.map((segment) => (
+                  <motion.div
+                    key={segment.label}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${segment.value}%` }}
+                    style={{ height: "100%", backgroundColor: segment.color }}
+                  />
+                ))}
+              </div>
+            </Column>
+            <div
+              style={{
+                width: "150px",
+                height: "80px",
+                borderRadius: "16px",
+                backgroundColor: "#F8FAFF",
+                border: "1px solid rgba(0,0,0,0.06)",
+                overflow: "hidden",
+                position: "relative",
+              }}
+            >
+              <ClientOnly>
+                <MapWidget
+                  mapId="tour-curation-footer"
+                  points={filledNodes
+                    .filter((n): n is CardData => n !== null)
+                    .map((n) => n.location)}
+                  center={activeCard ? activeCard.location : [10.897, 106.772]}
+                  zoom={14}
+                  showBanner={false}
+                />
+              </ClientOnly>
+            </div>
+          </Row>
+        </Row>
+      </div>
 
       {/* ═══════════ IMMERSIVE GENERATOR LOADING ═══════════ */}
       <AnimatePresence>
         {isGenerating && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0, scale: 1.05, filter: "blur(20px)", transition: { duration: 0.8 } }} 
-            style={{ 
-              position: "fixed", 
-              inset: 0, 
-              zIndex: 999999, 
-              display: "flex", 
-              flexDirection: "column", 
-              alignItems: "center", 
-              justifyContent: "center", 
-              backgroundColor: "rgba(255,255,255,0.7)", 
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{
+              opacity: 0,
+              scale: 1.05,
+              filter: "blur(20px)",
+              transition: { duration: 0.8 },
+            }}
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 999999,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "rgba(255,255,255,0.7)",
               backdropFilter: "blur(80px) saturate(180%)",
-              overflow: "hidden"
+              overflow: "hidden",
             }}
           >
             {/* Drifting Bio-Particles */}
-            {[...Array(20)].map((_, i) => (
+            {PARTICLES.map((p, i) => (
               <motion.div
                 key={i}
-                initial={{ 
-                  x: Math.random() * 100 - 50 + "%", 
-                  y: Math.random() * 100 - 50 + "%",
-                  opacity: 0 
+                initial={{ x: p.x0, y: p.y0, opacity: 0 }}
+                animate={{
+                  x: [null, p.x1],
+                  y: [null, p.y1],
+                  opacity: [0, 0.4, 0],
                 }}
-                animate={{ 
-                  x: [null, Math.random() * 100 - 50 + "%"],
-                  y: [null, Math.random() * 100 - 50 + "%"],
-                  opacity: [0, 0.4, 0]
-                }}
-                transition={{ 
-                  duration: 5 + Math.random() * 10, 
-                  repeat: Infinity, 
-                  ease: "easeInOut" 
+                transition={{
+                  duration: p.dur,
+                  repeat: Infinity,
+                  ease: "easeInOut",
                 }}
                 style={{
                   position: "absolute",
@@ -777,49 +1728,105 @@ export default function TourBuilderPage() {
                   borderRadius: "50%",
                   backgroundColor: accent.primary,
                   boxShadow: `0 0 10px ${accent.primary}`,
-                  zIndex: 0
+                  zIndex: 0,
                 }}
               />
             ))}
 
-            <div style={{ position: 'relative', zIndex: 10 }}>
+            <div style={{ position: "relative", zIndex: 10 }}>
               {/* Scanning Aura */}
               <motion.div
                 animate={{ scale: [1, 2, 1], opacity: [0.1, 0.3, 0.1] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                style={{ position: 'absolute', inset: -40, borderRadius: '50%', background: `radial-gradient(circle, ${accent.primary}40 0%, transparent 70%)`, zIndex: -1 }}
+                transition={{
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+                style={{
+                  position: "absolute",
+                  inset: -40,
+                  borderRadius: "50%",
+                  background: `radial-gradient(circle, ${accent.primary}40 0%, transparent 70%)`,
+                  zIndex: -1,
+                }}
               />
-              
-              <motion.div 
+
+              <motion.div
                 animate={{ y: [0, -10, 0], rotate: [0, 5, -5, 0] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                transition={{
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
               >
-                <Activity size={64} color={accent.primary} style={{ filter: `drop-shadow(0 0 20px ${accent.primary}40)` }} />
+                <Activity
+                  size={64}
+                  color={accent.primary}
+                  style={{
+                    filter: `drop-shadow(0 0 20px ${accent.primary}40)`,
+                  }}
+                />
               </motion.div>
             </div>
 
-            <Column horizontal="center" style={{ gap: '16px', marginTop: '40px', zIndex: 10, width: '100vw' }}>
-               <AnimatePresence mode="wait">
-                  <motion.div
-                    key={loadingMessage}
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    exit={{ y: -20, opacity: 0 }}
-                    transition={{ duration: 0.5 }}
+            <Column
+              horizontal="center"
+              style={{
+                gap: "16px",
+                marginTop: "40px",
+                zIndex: 10,
+                width: "100vw",
+              }}
+            >
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={loadingMessage}
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: -20, opacity: 0 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <Heading
+                    variant="display-strong-s"
+                    style={{
+                      textAlign: "center",
+                      background: `linear-gradient(90deg, ${text.primary}, ${accent.primary}, ${text.primary})`,
+                      backgroundSize: "200% auto",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      animation: "shimmer 3s linear infinite",
+                    }}
                   >
-                    <Heading variant="display-strong-s" style={{ textAlign: 'center', background: `linear-gradient(90deg, ${text.primary}, ${accent.primary}, ${text.primary})`, backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'shimmer 3s linear infinite' }}>
-                      {loadingMessage}
-                    </Heading>
-                  </motion.div>
-               </AnimatePresence>
-               
-               <div style={{ width: '200px', height: '1px', backgroundColor: 'rgba(0,0,0,0.1)', position: 'relative', overflow: 'hidden' }}>
-                 <motion.div
-                   animate={{ left: ['-100%', '100%'] }}
-                   transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                   style={{ position: 'absolute', top: 0, bottom: 0, width: '40%', background: `linear-gradient(90deg, transparent, ${accent.primary}, transparent)` }}
-                 />
-               </div>
+                    {loadingMessage}
+                  </Heading>
+                </motion.div>
+              </AnimatePresence>
+
+              <div
+                style={{
+                  width: "200px",
+                  height: "1px",
+                  backgroundColor: "rgba(0,0,0,0.1)",
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
+                <motion.div
+                  animate={{ left: ["-100%", "100%"] }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    bottom: 0,
+                    width: "40%",
+                    background: `linear-gradient(90deg, transparent, ${accent.primary}, transparent)`,
+                  }}
+                />
+              </div>
             </Column>
           </motion.div>
         )}
@@ -828,7 +1835,15 @@ export default function TourBuilderPage() {
   );
 }
 
-function DraggableCard({ card, onDragEnd, x }: { card: CardData; onDragEnd: (e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => void; x: any; }) {
+function DraggableCard({
+  card,
+  onDragEnd,
+  x,
+}: {
+  card: CardData;
+  onDragEnd: (e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => void;
+  x: any;
+}) {
   const y = useMotionValue(0);
   const rotate = useTransform(x, [-400, 400], [-8, 8]);
   const rotateX = useTransform(y, [-300, 300], [10, -10]);
@@ -836,10 +1851,33 @@ function DraggableCard({ card, onDragEnd, x }: { card: CardData; onDragEnd: (e: 
   const scale = useTransform(y, [0, 300], [1, 0.85]);
 
   return (
-    <div style={{ perspective: '2000px', width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+    <div
+      style={{
+        perspective: "2000px",
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
       <motion.div
-        drag dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }} dragElastic={0.6} onDragEnd={onDragEnd}
-        style={{ x, y, rotate, rotateX, rotateY, scale, width: "100%", height: "100%", position: "relative", transformStyle: "preserve-3d" }}
+        drag
+        dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+        dragElastic={0.6}
+        onDragEnd={onDragEnd}
+        style={{
+          x,
+          y,
+          rotate,
+          rotateX,
+          rotateY,
+          scale,
+          width: "100%",
+          height: "100%",
+          position: "relative",
+          transformStyle: "preserve-3d",
+        }}
       >
         <StopCard card={card as any} />
       </motion.div>

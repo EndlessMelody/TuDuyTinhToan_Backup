@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { AnimatePresence } from "framer-motion";
-import { Users } from "lucide-react";
+import { Users, ArrowRight } from "lucide-react";
 import type { LobbyData, LobbySectionProps } from "./types";
 import { MOCK_LOBBIES } from "./data";
 import LobbyCard from "./LobbyCard";
@@ -42,9 +43,12 @@ export default function LobbySection({ lobbies }: LobbySectionProps) {
               </p>
             </div>
           </div>
-          <span className="text-[13px] font-semibold text-[#007AFF] bg-[#EAF2FF] px-3 py-1.5 rounded-full">
-            {data.length} Active
-          </span>
+          <Link
+            href="/group-rooms"
+            className="flex items-center gap-1.5 text-[13px] font-semibold text-[#007AFF] bg-[#EAF2FF] px-3 py-1.5 rounded-full hover:bg-[#D6E6FF] transition-colors"
+          >
+            View All <ArrowRight size={14} />
+          </Link>
         </div>
 
         {/* Cards Row */}

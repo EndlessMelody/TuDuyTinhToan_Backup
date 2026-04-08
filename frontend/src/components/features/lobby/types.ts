@@ -16,6 +16,17 @@ export interface LobbyMember {
 /** The readiness status of a lobby session. */
 export type LobbyStatus = "waiting" | "full" | "in-progress";
 
+/** Category of the lobby experience. */
+export type LobbyCategory =
+  | "Food Challenge"
+  | "Coffee Tour"
+  | "Street Food"
+  | "Hidden Gems"
+  | "Night Market"
+  | "Brunch"
+  | "Ramen Hunt"
+  | "Dessert Crawl";
+
 /** Represents a group lobby session. */
 export interface LobbyData {
   /** Lobby title / challenge name */
@@ -32,6 +43,16 @@ export interface LobbyData {
   accent: string;
   /** Current participants */
   members: LobbyMember[];
+  /** Category tag */
+  category?: LobbyCategory;
+  /** Short description */
+  description?: string;
+  /** Tags for filtering */
+  tags?: string[];
+  /** Host info */
+  host?: { name: string; avatar: string };
+  /** Current status */
+  status?: LobbyStatus;
 }
 
 /** Props for a single lobby card component. */

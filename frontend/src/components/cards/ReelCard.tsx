@@ -49,7 +49,10 @@ export function ReelCard({
       className="group"
     >
       {/* Image Area */}
-      <div className="overflow-hidden relative" style={{ width: "100%", height: "320px" }}>
+      <div
+        className="overflow-hidden relative"
+        style={{ width: "100%", height: "320px" }}
+      >
         <img
           src={img}
           alt={title}
@@ -62,15 +65,18 @@ export function ReelCard({
           }}
         />
         {/* Gradient for badge legibility */}
-        <div style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: "40%",
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, transparent 100%)",
-          zIndex: 5,
-        }} />
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: "40%",
+            background:
+              "linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, transparent 100%)",
+            zIndex: 5,
+          }}
+        />
 
         {/* Views badge — white glass, top right */}
         <Row
@@ -118,12 +124,15 @@ export function ReelCard({
             zIndex: 5,
           }}
         >
-          <div
+          <motion.div
+            animate={{ scale: [1, 1.1, 1] }}
+            transition={{ repeat: Infinity, duration: 2.4, ease: "easeInOut" }}
+            whileHover={{ scale: 1.2 }}
             style={{
               width: "44px",
               height: "44px",
               borderRadius: "50%",
-              backgroundColor: "rgba(255,255,255,0.85)",
+              backgroundColor: "rgba(255,255,255,0.90)",
               backdropFilter: "blur(12px)",
               borderTopWidth: "1px",
               borderBottomWidth: "1px",
@@ -134,13 +143,11 @@ export function ReelCard({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              transition: "background-color 0.2s, transform 0.2s",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+              boxShadow: "0 4px 20px rgba(0,122,255,0.25)",
             }}
-            className="group-hover:scale-110"
           >
             <Play size={18} color="#007AFF" fill="#007AFF" />
-          </div>
+          </motion.div>
         </Column>
       </div>
 

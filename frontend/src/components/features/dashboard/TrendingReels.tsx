@@ -1,22 +1,22 @@
 import React from "react";
-import { motion } from "framer-motion";
-import {
-  Row,
-  Column,
-  Heading,
-  Text,
-} from "@/components/OnceUI";
+import { motion, AnimatePresence } from "framer-motion";
+import { Row, Column, Heading, Text } from "@/components/OnceUI";
 import { Flame } from "lucide-react";
 import { ReelCard } from "@/components/cards/ReelCard";
 import { StaggerContainer, StaggerItem } from "@/components/StaggerContainer";
 import { MOCK_REELS } from "@/constants/mock-data";
 import { ReelData } from "@/types/dashboard";
+import { SkeletonReelCard } from "@/components/Skeletons";
 
 interface TrendingReelsProps {
   onReelClick: (reel: ReelData) => void;
+  isLoading?: boolean;
 }
 
-export const TrendingReels: React.FC<TrendingReelsProps> = ({ onReelClick }) => {
+export const TrendingReels: React.FC<TrendingReelsProps> = ({
+  onReelClick,
+  isLoading = false,
+}) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -62,35 +62,56 @@ export const TrendingReels: React.FC<TrendingReelsProps> = ({ onReelClick }) => 
             gap: "16px",
             overflowX: "auto",
             paddingBottom: "4px",
-            scrollBehavior: "smooth",
           }}
         >
-          <StaggerContainer
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              gap: "16px",
-              paddingBottom: "4px",
-            }}
-          >
-            {MOCK_REELS.map((reel, idx) => (
-              <StaggerItem key={idx}>
-                <div
-                  onClick={() => onReelClick(reel)}
-                  style={{ cursor: "pointer" }}
+          <AnimatePresence mode="wait">
+            {isLoading ? (
+              <motion.div
+                key="skeleton"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                style={{ display: "flex", gap: "16px" }}
+              >
+                {[...Array(5)].map((_, i) => (
+                  <SkeletonReelCard key={i} />
+                ))}
+              </motion.div>
+            ) : (
+              <motion.div
+                key="content"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                <StaggerContainer
+                  style={{
+                    display: "flex",
+                    flexDirection: "row",
+                    gap: "16px",
+                    paddingBottom: "4px",
+                  }}
                 >
-                  <ReelCard
-                    title={reel.title}
-                    user={reel.user}
-                    views={reel.views}
-                    avatar={reel.userAvatar}
-                    img={reel.img}
-                    delay={0}
-                  />
-                </div>
-              </StaggerItem>
-            ))}
-          </StaggerContainer>
+                  {MOCK_REELS.map((reel, idx) => (
+                    <StaggerItem key={idx}>
+                      <div
+                        onClick={() => onReelClick(reel)}
+                        style={{ cursor: "pointer" }}
+                      >
+                        <ReelCard
+                          title={reel.title}
+                          user={reel.user}
+                          views={reel.views}
+                          avatar={reel.userAvatar}
+                          img={reel.img}
+                          delay={0}
+                        />
+                      </div>
+                    </StaggerItem>
+                  ))}
+                </StaggerContainer>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </Row>
       </Column>
     </motion.div>

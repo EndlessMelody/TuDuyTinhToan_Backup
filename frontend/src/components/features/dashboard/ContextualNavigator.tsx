@@ -1,11 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import {
-  Row,
-  Column,
-  Heading,
-  Text,
-} from "@/components/OnceUI";
+import { Row, Column, Heading, Text } from "@/components/OnceUI";
 import { Sparkles } from "lucide-react";
 import { ContextCard } from "@/components/cards/ContextCard";
 import { getDynamicContext } from "@/utils/dashboard-utils";
@@ -106,49 +101,58 @@ export const ContextualNavigator = () => {
             gap: "16px",
             overflowX: "auto",
             paddingBottom: "4px",
-            scrollBehavior: "smooth",
           }}
         >
-          <ContextCard
-            title="Phở Bò 36 Lý Quốc Sư"
-            subtitle="Open until 2AM • 0.8km away"
-            match={94}
-            accent={ctx.accent}
-            img="https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400&h=250&fit=crop"
-            delay={0}
-          />
-          <ContextCard
-            title="Bánh Tráng Trộn Cô Ba"
-            subtitle="Trending tonight • 1.2km away"
-            match={87}
-            accent={ctx.accent}
-            img="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=250&fit=crop"
-            delay={0.05}
-          />
-          <ContextCard
-            title="Cơm Tấm Sườn Bì Chả"
-            subtitle="Crowded now • 0.5km away"
-            match={91}
-            accent={ctx.accent}
-            img="https://images.unsplash.com/photo-1512058564366-18510be2db19?w=400&h=250&fit=crop"
-            delay={0.1}
-          />
-          <ContextCard
-            title="Kem Bơ Thanh Long"
-            subtitle="Just opened • 2.1km away"
-            match={78}
-            accent={ctx.accent}
-            img="https://images.unsplash.com/photo-1590301157890-4810ed352733?w=400&h=250&fit=crop"
-            delay={0.15}
-          />
-          <ContextCard
-            title="Bún Riêu Cua Đồng"
-            subtitle="Top rated • 1.5km away"
-            match={85}
-            accent={ctx.accent}
-            img="https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&h=250&fit=crop"
-            delay={0.2}
-          />
+          <div style={{ flexShrink: 0 }}>
+            <ContextCard
+              title="Phở Bò 36 Lý Quốc Sư"
+              subtitle="Open until 2AM • 0.8km away"
+              match={94}
+              accent={ctx.accent}
+              img="https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400&h=250&fit=crop"
+              delay={0}
+            />
+          </div>
+          <div style={{ flexShrink: 0 }}>
+            <ContextCard
+              title="Bánh Tráng Trộn Cô Ba"
+              subtitle="Trending tonight • 1.2km away"
+              match={87}
+              accent={ctx.accent}
+              img="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=250&fit=crop"
+              delay={0.05}
+            />
+          </div>
+          <div style={{ flexShrink: 0 }}>
+            <ContextCard
+              title="Cơm Tấm Sườn Bì Chả"
+              subtitle="Crowded now • 0.5km away"
+              match={91}
+              accent={ctx.accent}
+              img="https://images.unsplash.com/photo-1512058564366-18510be2db19?w=400&h=250&fit=crop"
+              delay={0.1}
+            />
+          </div>
+          <div style={{ flexShrink: 0 }}>
+            <ContextCard
+              title="Kem Bơ Thanh Long"
+              subtitle="Just opened • 2.1km away"
+              match={78}
+              accent={ctx.accent}
+              img="https://images.unsplash.com/photo-1590301157890-4810ed352733?w=400&h=250&fit=crop"
+              delay={0.15}
+            />
+          </div>
+          <div style={{ flexShrink: 0 }}>
+            <ContextCard
+              title="Bún Riêu Cua Đồng"
+              subtitle="Top rated • 1.5km away"
+              match={85}
+              accent={ctx.accent}
+              img="https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&h=250&fit=crop"
+              delay={0.2}
+            />
+          </div>
         </Row>
       </Column>
     </motion.div>

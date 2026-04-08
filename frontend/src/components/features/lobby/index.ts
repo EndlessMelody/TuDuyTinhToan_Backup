@@ -21,6 +21,7 @@ export type {
   LobbyData,
   LobbyMember,
   LobbyStatus,
+  LobbyCategory,
   LobbyCardProps,
   LobbyModalProps,
   LobbySectionProps,

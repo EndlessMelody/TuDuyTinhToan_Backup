@@ -1,23 +1,22 @@
 import React from "react";
-import { motion } from "framer-motion";
-import {
-  Row,
-  Column,
-  Heading,
-  IconButton,
-  Button,
-} from "@/components/OnceUI";
+import { motion, AnimatePresence } from "framer-motion";
+import { Row, Column, Heading, IconButton, Button } from "@/components/OnceUI";
 import { MessageCircle, SlidersHorizontal } from "lucide-react";
 import { PostCard } from "@/components/cards/PostCard";
 import { StaggerContainer, StaggerItem } from "@/components/StaggerContainer";
 import { MOCK_POSTS } from "@/constants/mock-data";
 import { PostData } from "@/types/dashboard";
+import { SkeletonFeedCard } from "@/components/Skeletons";
 
 interface FoodieFeedProps {
   onPostClick: (post: PostData) => void;
+  isLoading?: boolean;
 }
 
-export const FoodieFeed: React.FC<FoodieFeedProps> = ({ onPostClick }) => {
+export const FoodieFeed: React.FC<FoodieFeedProps> = ({
+  onPostClick,
+  isLoading = false,
+}) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -71,25 +70,46 @@ export const FoodieFeed: React.FC<FoodieFeedProps> = ({ onPostClick }) => {
             overflowX: "auto",
             gap: "16px",
             paddingBottom: "8px",
-            scrollBehavior: "smooth",
           }}
         >
-          <StaggerContainer
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              gap: "16px",
-              paddingBottom: "8px",
-            }}
-          >
-            {MOCK_POSTS.map((post, idx) => (
-              <StaggerItem key={idx}>
-                <div onClick={() => onPostClick(post)}>
-                  <PostCard {...post} delay={0} />
-                </div>
-              </StaggerItem>
-            ))}
-          </StaggerContainer>
+          <AnimatePresence mode="wait">
+            {isLoading ? (
+              <motion.div
+                key="skeleton"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                style={{ display: "flex", gap: "16px" }}
+              >
+                {[...Array(4)].map((_, i) => (
+                  <SkeletonFeedCard key={i} />
+                ))}
+              </motion.div>
+            ) : (
+              <motion.div
+                key="content"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                <StaggerContainer
+                  style={{
+                    display: "flex",
+                    flexDirection: "row",
+                    gap: "16px",
+                    paddingBottom: "8px",
+                  }}
+                >
+                  {MOCK_POSTS.map((post, idx) => (
+                    <StaggerItem key={idx}>
+                      <div onClick={() => onPostClick(post)} style={{}}>
+                        <PostCard {...post} delay={0} />
+                      </div>
+                    </StaggerItem>
+                  ))}
+                </StaggerContainer>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </Row>
       </Column>
     </motion.div>

@@ -1,11 +1,6 @@
 import React, { useRef } from "react";
 import { motion } from "framer-motion";
-import {
-  Row,
-  Column,
-  Heading,
-  IconButton,
-} from "@/components/OnceUI";
+import { Row, Column, Heading, IconButton } from "@/components/OnceUI";
 import { Bookmark, ChevronLeft, ChevronRight } from "lucide-react";
 import { VaultCard } from "@/components/cards/VaultCard";
 
@@ -78,49 +73,58 @@ export const TasteVault = () => {
             overflowX: "auto",
             gap: "16px",
             paddingBottom: "8px",
-            scrollBehavior: "smooth",
           }}
         >
-          <VaultCard
-            title="Banh Mi Pho 古"
-            xp="10XP"
-            img="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=520&h=360&fit=crop"
-            tags="Vietnamese • Street Food"
-            rating={4.8}
-            delay={0.05}
-          />
-          <VaultCard
-            title="Neon Diner"
-            xp="15XP"
-            img="https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=520&h=360&fit=crop"
-            tags="American • Retro"
-            rating={4.2}
-            delay={0.1}
-          />
-          <VaultCard
-            title="Matcha Room"
-            xp="30XP"
-            img="https://images.unsplash.com/photo-1582787895088-2ff176b668d2?w=520&h=360&fit=crop"
-            tags="Japanese • Cafe"
-            rating={4.6}
-            delay={0.15}
-          />
-          <VaultCard
-            title="Sky Bar"
-            xp="10XP"
-            img="https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=520&h=360&fit=crop"
-            tags="Cocktails • View"
-            rating={4.4}
-            delay={0.2}
-          />
-          <VaultCard
-            title="Phở Sáng"
-            xp="20XP"
-            img="https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=520&h=360&fit=crop"
-            tags="Vietnamese • Breakfast"
-            rating={4.9}
-            delay={0.25}
-          />
+          <div style={{ flexShrink: 0 }}>
+            <VaultCard
+              title="Banh Mi Pho 古"
+              xp="10XP"
+              img="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=520&h=360&fit=crop"
+              tags="Vietnamese • Street Food"
+              rating={4.8}
+              delay={0.05}
+            />
+          </div>
+          <div style={{ flexShrink: 0 }}>
+            <VaultCard
+              title="Neon Diner"
+              xp="15XP"
+              img="https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=520&h=360&fit=crop"
+              tags="American • Retro"
+              rating={4.2}
+              delay={0.1}
+            />
+          </div>
+          <div style={{ flexShrink: 0 }}>
+            <VaultCard
+              title="Matcha Room"
+              xp="30XP"
+              img="https://images.unsplash.com/photo-1582787895088-2ff176b668d2?w=520&h=360&fit=crop"
+              tags="Japanese • Cafe"
+              rating={4.6}
+              delay={0.15}
+            />
+          </div>
+          <div style={{ flexShrink: 0 }}>
+            <VaultCard
+              title="Sky Bar"
+              xp="10XP"
+              img="https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=520&h=360&fit=crop"
+              tags="Cocktails • View"
+              rating={4.4}
+              delay={0.2}
+            />
+          </div>
+          <div style={{ flexShrink: 0 }}>
+            <VaultCard
+              title="Phở Sáng"
+              xp="20XP"
+              img="https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=520&h=360&fit=crop"
+              tags="Vietnamese • Breakfast"
+              rating={4.9}
+              delay={0.25}
+            />
+          </div>
         </Row>
       </Column>
     </motion.div>

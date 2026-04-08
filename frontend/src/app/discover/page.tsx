@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Column, Text } from "@/components/OnceUI";
-import { motion, useScroll, AnimatePresence } from "framer-motion";
+import { Column } from "@/components/OnceUI";
+import { motion, useScroll } from "framer-motion";
 
 // Modular Components
 import { DashboardHeader } from "@/components/features/dashboard/DashboardHeader";
@@ -39,7 +39,7 @@ export default function DiscoverPage() {
   const { scrollY } = useScroll({ container: scrollRef });
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 1500);
+    const timer = setTimeout(() => setIsLoading(false), 800);
     return () => clearTimeout(timer);
   }, []);
 
@@ -69,64 +69,14 @@ export default function DiscoverPage() {
 
   return (
     <React.Fragment>
-      <AnimatePresence>
-        {isLoading && (
-          <motion.div
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0, filter: "blur(20px)", transition: { duration: 0.8, ease: "easeInOut" } }}
-            style={{
-              position: "fixed",
-              inset: 0,
-              zIndex: 999999,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              overflow: "hidden",
-            }}
-          >
-            <motion.div
-              animate={{ scale: [1, 1.2, 1], rotate: [0, 90, 0] }}
-              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-              style={{
-                position: "absolute",
-                inset: "-50%",
-                background:
-                  "radial-gradient(circle at 30% 30%, #007AFF15 0%, transparent 40%), radial-gradient(circle at 70% 70%, #5856D615 0%, transparent 40%), radial-gradient(circle at 50% 50%, #F2F2F7 0%, #E5E5EA 100%)",
-                filter: "blur(80px)",
-                zIndex: 0,
-              }}
-            />
-            <Column horizontal="center" style={{ gap: "32px", zIndex: 10, position: "relative", width: "100vw" }}>
-              <motion.div
-                animate={{ scale: [1, 1.05, 1] }}
-                transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                style={{
-                  width: "80px",
-                  height: "80px",
-                  borderRadius: "50%",
-                  backgroundColor: "white",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: "0 20px 40px rgba(0,0,0,0.08)",
-                }}
-              >
-                <div style={{ width: "40px", height: "40px", borderRadius: "50%", border: "3px solid rgba(0,122,255,0.1)", borderTopColor: "#007AFF", animation: "spin 1s cubic-bezier(0.55,0.055,0.675,0.19) infinite" }} />
-              </motion.div>
-              <Text align="center" style={{ color: "#1C1C1E", fontWeight: 800, fontSize: "1rem" }}>
-                Preparing your TasteMap...
-              </Text>
-            </Column>
-            <style jsx global>{`
-              @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-            `}</style>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <Column
         fillHeight
-        style={{ flex: 1, minWidth: 0, position: "relative", backgroundColor: "#F2F2F7" }}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          position: "relative",
+          backgroundColor: "#F2F2F7",
+        }}
       >
         <DashboardHeader
           scrollY={scrollY}
@@ -153,36 +103,79 @@ export default function DiscoverPage() {
             position: "relative",
           }}
         >
-          <motion.div variants={containerVariants} initial="hidden" animate="show">
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+          >
             <Column
               fillWidth
-              style={{ gap: "32px", paddingTop: "32px", paddingBottom: "12px", paddingLeft: "32px", paddingRight: "32px" }}
+              style={{
+                gap: "32px",
+                paddingTop: "32px",
+                paddingBottom: "12px",
+                paddingLeft: "32px",
+                paddingRight: "32px",
+              }}
             >
-              <motion.div variants={itemVariants}><HeroSection /></motion.div>
-              <motion.div variants={itemVariants}><AIPicksSection /></motion.div>
               <motion.div variants={itemVariants}>
-                <TrendingReels onReelClick={(reel) => setSelectedReel(reel)} />
+                <HeroSection />
               </motion.div>
-              <motion.div variants={itemVariants}><ContextualNavigator /></motion.div>
-              <motion.div variants={itemVariants}><LobbySection /></motion.div>
-              <motion.div variants={itemVariants}><TasteVault /></motion.div>
               <motion.div variants={itemVariants}>
-                <FoodieFeed onPostClick={(post) => setSelectedPost(post)} />
+                <AIPicksSection isLoading={isLoading} />
               </motion.div>
-              <motion.div variants={itemVariants}><TasteMapProBanner /></motion.div>
+              <motion.div variants={itemVariants}>
+                <TrendingReels
+                  onReelClick={(reel) => setSelectedReel(reel)}
+                  isLoading={isLoading}
+                />
+              </motion.div>
+              <motion.div variants={itemVariants}>
+                <ContextualNavigator />
+              </motion.div>
+              <motion.div variants={itemVariants}>
+                <LobbySection />
+              </motion.div>
+              <motion.div variants={itemVariants}>
+                <TasteVault />
+              </motion.div>
+              <motion.div variants={itemVariants}>
+                <FoodieFeed
+                  onPostClick={(post) => setSelectedPost(post)}
+                  isLoading={isLoading}
+                />
+              </motion.div>
+              <motion.div variants={itemVariants}>
+                <TasteMapProBanner />
+              </motion.div>
             </Column>
           </motion.div>
         </Column>
       </Column>
 
       {selectedReel && (
-        <ReelModal isOpen={!!selectedReel} data={selectedReel} onClose={() => setSelectedReel(null)} />
+        <ReelModal
+          isOpen={!!selectedReel}
+          data={selectedReel}
+          onClose={() => setSelectedReel(null)}
+        />
       )}
       {selectedPost && (
-        <PostModal isOpen={!!selectedPost} data={selectedPost} onClose={() => setSelectedPost(null)} />
+        <PostModal
+          isOpen={!!selectedPost}
+          data={selectedPost}
+          onClose={() => setSelectedPost(null)}
+        />
       )}
-      <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} initialTab={activeSettingsTab} />
-      <CreateRoomModal isOpen={isCreateRoomOpen} onClose={() => setIsCreateRoomOpen(false)} />
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        initialTab={activeSettingsTab}
+      />
+      <CreateRoomModal
+        isOpen={isCreateRoomOpen}
+        onClose={() => setIsCreateRoomOpen(false)}
+      />
     </React.Fragment>
   );
 }

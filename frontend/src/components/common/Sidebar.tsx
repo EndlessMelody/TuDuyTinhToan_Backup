@@ -1,6 +1,7 @@
-"use client";
+﻿"use client";
 
 import React from "react";
+import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import {
   Column,
@@ -13,7 +14,9 @@ import {
 import {
   Compass,
   Hand,
-  MapPin,
+  Trophy,
+  Map,
+  Sparkles,
   Users,
   Mic,
   PanelLeftClose,
@@ -22,9 +25,10 @@ import {
 } from "lucide-react";
 import { MOCK_USER } from "@/constants/mock-data";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
 
-// ─── Design tokens (light theme) ───
-const C = {
+// ─── Design tokens ───
+const LIGHT_C = {
   bg: "#FFFFFF",
   border: "rgba(0, 0, 0, 0.06)",
   sectionLabel: "rgba(0, 0, 0, 0.3)",
@@ -40,7 +44,32 @@ const C = {
   widgetBorder: "rgba(79, 142, 247, 0.15)",
   progressBg: "rgba(0, 0, 0, 0.06)",
   progressFill: "#4F8EF7",
-} as const;
+  divider: "rgba(0,0,0,0.06)",
+};
+
+const DARK_C = {
+  bg: "#1C1C1E",
+  border: "rgba(255, 255, 255, 0.08)",
+  sectionLabel: "rgba(255, 255, 255, 0.3)",
+  itemDefault: "rgba(255, 255, 255, 0.5)",
+  itemActive: "#6BA3FF",
+  itemHover: "rgba(255, 255, 255, 0.06)",
+  itemActiveBg: "rgba(107, 163, 255, 0.12)",
+  indicator: "#6BA3FF",
+  logo: "#6BA3FF",
+  profileName: "rgba(255, 255, 255, 0.9)",
+  profileSub: "rgba(255, 255, 255, 0.4)",
+  widgetBg: "rgba(107, 163, 255, 0.08)",
+  widgetBorder: "rgba(107, 163, 255, 0.2)",
+  progressBg: "rgba(255, 255, 255, 0.08)",
+  progressFill: "#6BA3FF",
+  divider: "rgba(255,255,255,0.08)",
+};
+
+function useThemeColors() {
+  const { resolvedTheme } = useTheme();
+  return resolvedTheme === "dark" ? DARK_C : LIGHT_C;
+}
 
 // ─── Tooltip for collapsed state ───
 const Tooltip: React.FC<{ label: string; children: React.ReactNode }> = ({
@@ -48,15 +77,25 @@ const Tooltip: React.FC<{ label: string; children: React.ReactNode }> = ({
   children,
 }) => {
   const [visible, setVisible] = React.useState(false);
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const C = useThemeColors();
   return (
     <div
       style={{ position: "relative", width: "100%" }}
-      onMouseEnter={() => setVisible(true)}
-      onMouseLeave={() => setVisible(false)}
+      onMouseEnter={() => {
+        timerRef.current = setTimeout(() => setVisible(true), 300);
+      }}
+      onMouseLeave={() => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        setVisible(false);
+      }}
     >
       {children}
       {visible && (
-        <div
+        <motion.div
+          initial={{ opacity: 0, x: -6 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.15 }}
           style={{
             position: "absolute",
             left: "calc(100% + 10px)",
@@ -79,7 +118,7 @@ const Tooltip: React.FC<{ label: string; children: React.ReactNode }> = ({
           >
             {label}
           </Text>
-        </div>
+        </motion.div>
       )}
     </div>
   );
@@ -104,6 +143,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
   onClick,
 }) => {
   const [isHovered, setIsHovered] = React.useState(false);
+  const C = useThemeColors();
 
   const item = (
     <Row
@@ -133,7 +173,8 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
     >
       {/* Active left indicator */}
       {active && (
-        <div
+        <motion.div
+          layoutId="sidebar-active-indicator"
           style={{
             position: "absolute",
             left: 0,
@@ -143,6 +184,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
             backgroundColor: C.indicator,
             borderRadius: "0 3px 3px 0",
           }}
+          transition={{ type: "spring", stiffness: 500, damping: 35 }}
         />
       )}
 
@@ -204,21 +246,24 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
 };
 
 // ─── Section Label ───
-const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
-  <Text
-    variant="body-default-xs"
-    style={{
-      color: C.sectionLabel,
-      textTransform: "uppercase",
-      letterSpacing: "1.5px",
-      fontWeight: 600,
-      padding: "0 12px",
-      marginBottom: "2px",
-    }}
-  >
-    {label}
-  </Text>
-);
+const SectionLabel: React.FC<{ label: string }> = ({ label }) => {
+  const C = useThemeColors();
+  return (
+    <Text
+      variant="body-default-xs"
+      style={{
+        color: C.sectionLabel,
+        textTransform: "uppercase",
+        letterSpacing: "1.5px",
+        fontWeight: 600,
+        padding: "0 12px",
+        marginBottom: "2px",
+      }}
+    >
+      {label}
+    </Text>
+  );
+};
 
 // ─── Main Sidebar ───
 interface SidebarProps {
@@ -226,7 +271,6 @@ interface SidebarProps {
   onToggle: () => void;
   isFullScreen?: boolean;
   currentPath: string;
-  onComingSoon: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -234,9 +278,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggle,
   isFullScreen = false,
   currentPath,
-  onComingSoon,
 }) => {
   const router = useRouter();
+  const C = useThemeColors();
   const sidebarWidth = isFullScreen ? 0 : isOpen ? 240 : 72;
 
   return (
@@ -277,22 +321,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }}
       >
         {isOpen && (
-          <Heading
-            variant="heading-strong-l"
-            onClick={() => router.push("/")}
-            style={{
-              color: C.logo,
-              fontWeight: 900,
-              letterSpacing: "-0.5px",
-              cursor: "pointer",
-              lineHeight: 1,
-              userSelect: "none",
-              paddingLeft: "4px",
-              paddingRight: "12px",
-            }}
+          <motion.div
+            whileHover={{ scale: 1.06 }}
+            transition={{ type: "spring", stiffness: 400, damping: 12 }}
+            style={{ display: "inline-flex" }}
           >
-            TasteMap.
-          </Heading>
+            <Heading
+              variant="heading-strong-l"
+              onClick={() => router.push("/")}
+              style={{
+                color: C.logo,
+                fontWeight: 900,
+                letterSpacing: "-0.5px",
+                cursor: "pointer",
+                lineHeight: 1,
+                userSelect: "none",
+                paddingLeft: "4px",
+                paddingRight: "12px",
+              }}
+            >
+              TasteMap.
+            </Heading>
+          </motion.div>
         )}
         <IconButton
           icon={
@@ -315,7 +365,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div
         style={{
           height: "1px",
-          backgroundColor: "rgba(0,0,0,0.06)",
+          backgroundColor: C.divider,
           flexShrink: 0,
         }}
       />
@@ -339,11 +389,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => router.push("/tour-builder")}
         />
         <SidebarItem
-          icon={<MapPin size={17} />}
-          label="Hot Routes"
+          icon={<Trophy size={17} />}
+          label="Challenges"
+          active={currentPath === "/challenges"}
           collapsed={!isOpen}
-          badge="Soon"
-          onClick={onComingSoon}
+          onClick={() => router.push("/challenges")}
+        />
+        <SidebarItem
+          icon={<Map size={17} />}
+          label="Explore"
+          active={currentPath === "/explore"}
+          collapsed={!isOpen}
+          onClick={() => router.push("/explore")}
+        />
+        <SidebarItem
+          icon={<Sparkles size={17} />}
+          label="AI Planner"
+          active={currentPath === "/ai-planner"}
+          collapsed={!isOpen}
+          badge="AI"
+          onClick={() => router.push("/ai-planner")}
         />
       </Column>
 
@@ -360,9 +425,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <SidebarItem
           icon={<Mic size={17} />}
           label="Group Rooms"
+          active={currentPath === "/group-rooms"}
           collapsed={!isOpen}
-          badge="Soon"
-          onClick={onComingSoon}
+          onClick={() => router.push("/group-rooms")}
         />
       </Column>
 
@@ -450,6 +515,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
 function SidebarProfileFooter({ isOpen }: { isOpen: boolean }) {
   const { isLoggedIn, user, logout } = useAuth();
   const router = useRouter();
+  const C = useThemeColors();
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div
+        style={{
+          height: "58px",
+          flexShrink: 0,
+          borderRadius: "10px",
+          backgroundColor: "rgba(0,0,0,0.02)",
+        }}
+      />
+    );
+  }
 
   if (!isLoggedIn) {
     return (

@@ -47,11 +47,14 @@ export function VaultCard({
       className="group"
     >
       {/* Image Area */}
-      <div className="overflow-hidden relative" style={{ width: "100%", height: "150px" }}>
+      <div
+        className="overflow-hidden relative"
+        style={{ width: "100%", height: "150px" }}
+      >
         <img
           src={img}
           alt={title}
-          className="transition-transform duration-[700ms] ease-out group-hover:scale-[1.03]"
+          className="transition-transform duration-700 ease-out group-hover:scale-[1.03]"
           style={{
             width: "100%",
             height: "100%",
@@ -60,23 +63,38 @@ export function VaultCard({
           }}
         />
         {/* Gradient for text/badge legibility */}
-        <div style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: "50%",
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, transparent 100%)",
-          zIndex: 2,
-        }} />
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: "50%",
+            background:
+              "linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, transparent 100%)",
+            zIndex: 2,
+          }}
+        />
 
         {/* XP badge — white glass, top left */}
-        <Row
+        <motion.div
+          initial={{ boxShadow: "0 0 0px rgba(251,191,36,0)" }}
+          animate={{
+            boxShadow: [
+              "0 0 0px rgba(251,191,36,0)",
+              "0 0 14px rgba(251,191,36,0.55)",
+              "0 0 0px rgba(251,191,36,0)",
+            ],
+          }}
+          transition={{ delay: 0.6, duration: 1.6, ease: "easeInOut" }}
           style={{
             position: "absolute",
             top: "10px",
             left: "10px",
             zIndex: 3,
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
             backgroundColor: "rgba(255,255,255,0.85)",
             backdropFilter: "blur(8px)",
             paddingTop: "4px",
@@ -84,8 +102,6 @@ export function VaultCard({
             paddingLeft: "10px",
             paddingRight: "10px",
             borderRadius: "8px",
-            gap: "4px",
-            alignItems: "center",
             borderWidth: "1px",
             borderStyle: "solid",
             borderColor: "rgba(255,255,255,0.5)",
@@ -97,7 +113,7 @@ export function VaultCard({
           >
             {xp}
           </Text>
-        </Row>
+        </motion.div>
 
         {/* Rating badge — white glass, top right */}
         <Row
@@ -130,17 +146,21 @@ export function VaultCard({
       </div>
 
       {/* Text Area — white bottom */}
-      <Column style={{ paddingTop: "14px", paddingBottom: "14px", paddingLeft: "16px", paddingRight: "16px", gap: "4px" }}>
+      <Column
+        style={{
+          paddingTop: "14px",
+          paddingBottom: "14px",
+          paddingLeft: "16px",
+          paddingRight: "16px",
+          gap: "4px",
+        }}
+      >
         <Text
           style={{ color: "#1C1C1E", fontWeight: 700, fontSize: "0.95rem" }}
         >
           {title}
         </Text>
-        <Text
-          style={{ color: "#8E8E93", fontSize: "0.75rem" }}
-        >
-          {tags}
-        </Text>
+        <Text style={{ color: "#8E8E93", fontSize: "0.75rem" }}>{tags}</Text>
       </Column>
     </motion.div>
   );
