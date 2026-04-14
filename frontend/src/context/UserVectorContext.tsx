@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { apiPost } from "@/lib/api";
 
 interface RadarPoint {
   subject: string;
@@ -12,7 +13,7 @@ interface RadarPoint {
 interface UserVectorContextType {
   radarData: RadarPoint[];
   mergedRadarData: (RadarPoint & { prevA?: number })[];
-  updateVector: (traits: string[], direction: 'select' | 'skip') => void;
+  updateVector: (venueId: number, traits: string[], direction: 'select' | 'skip') => void;
   isPulsing: boolean;
 }
 
@@ -74,11 +75,45 @@ export const UserVectorProvider: ({ children }: {
   const [isPulsing, setIsPulsing] = useState(false);
   
   const lastUpdateRef = useRef<number>(Date.now());
+  const swipeQueueRef = useRef<{place_id: number, direction: "RIGHT" | "LEFT", client_timestamp: number}[]>([]);
+  const batchTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const updateVector = useCallback((traits: string[], direction: 'select' | 'skip') => {
+  const flushSwipeQueue = useCallback(async () => {
+    if (swipeQueueRef.current.length === 0) return;
+    const actions = [...swipeQueueRef.current];
+    swipeQueueRef.current = []; 
+    
+    // We use a fallback ID for absolute guests
+    const userId = user?.id || "guest-id"; 
+
+    try {
+      await apiPost<any>("/api/v1/interactions/swipe-batch", {
+        user_id: String(userId),
+        category: "place",
+        actions: actions
+      });
+    } catch (e) {
+      console.error("Failed to send swipe batch", e);
+    }
+  }, [user]);
+
+  const updateVector = useCallback((venueId: number, traits: string[], direction: 'select' | 'skip') => {
     const now = Date.now();
     const timeDelta = now - lastUpdateRef.current;
     lastUpdateRef.current = now;
+
+    swipeQueueRef.current.push({
+      place_id: venueId,
+      direction: direction === 'select' ? "RIGHT" : "LEFT",
+      client_timestamp: now
+    });
+
+    if (batchTimerRef.current) clearTimeout(batchTimerRef.current);
+    if (swipeQueueRef.current.length >= 5) {
+      flushSwipeQueue();
+    } else {
+      batchTimerRef.current = setTimeout(flushSwipeQueue, 3000);
+    }
 
     // ─── Rule: Exponential Decay for Rapid Swiping ───
     let alpha = direction === 'select' ? 0.15 : -0.05;
@@ -107,7 +142,7 @@ export const UserVectorProvider: ({ children }: {
     setTimeout(() => setIsPulsing(false), 1000);
     // Fade out previous data after delta display
     setTimeout(() => setPreviousRadarData(null), 2500);
-  }, [radarData]);
+  }, [radarData, flushSwipeQueue]);
 
   const mergedRadarData = radarData.map((point, index) => ({
     ...point,

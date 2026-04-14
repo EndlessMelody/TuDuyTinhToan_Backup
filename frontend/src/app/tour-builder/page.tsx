@@ -236,7 +236,7 @@ export default function TourBuilderPage() {
     const card = activeCard;
 
     if (direction === "select" && nextEmptyIndex !== -1) {
-      updateVector(card.tags || [], "select");
+      updateVector(card.venue_id, card.tags || [], "select");
       setDiscardDir("right");
       addSelectedNode(card, nextEmptyIndex);
       setTimeout(() => {
@@ -244,7 +244,7 @@ export default function TourBuilderPage() {
         setDiscardDir(null);
       }, 300);
     } else if (direction === "skip") {
-      updateVector(card.tags || [], "skip");
+      updateVector(card.venue_id, card.tags || [], "skip");
       setDiscardDir("left");
       setTimeout(() => {
         popDeckQueue();
