@@ -1,12 +1,21 @@
+"use client";
+
 import React from "react";
 import { motion } from "framer-motion";
-import { Row, Column, Heading, Text } from "@/components/OnceUI";
+import { useRecommendations } from "@/hooks/useRecommendations";
+import {
+  Row,
+  Column,
+  Heading,
+  Text,
+} from "@/components/OnceUI";
 import { Sparkles } from "lucide-react";
 import { ContextCard } from "@/components/cards/ContextCard";
 import { getDynamicContext } from "@/utils/dashboard-utils";
 
 export const ContextualNavigator = () => {
   const ctx = getDynamicContext();
+  const { picks, loading, error } = useRecommendations(5);
 
   return (
     <motion.div
@@ -75,7 +84,7 @@ export const ContextualNavigator = () => {
             </Row>
           </Row>
           <Row
-            onClick={() => {}}
+            onClick={() => { }}
             style={{
               alignItems: "center",
               gap: "6px",
@@ -103,56 +112,25 @@ export const ContextualNavigator = () => {
             paddingBottom: "4px",
           }}
         >
-          <div style={{ flexShrink: 0 }}>
-            <ContextCard
-              title="Phở Bò 36 Lý Quốc Sư"
-              subtitle="Open until 2AM • 0.8km away"
-              match={94}
-              accent={ctx.accent}
-              img="https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400&h=250&fit=crop"
-              delay={0}
-            />
-          </div>
-          <div style={{ flexShrink: 0 }}>
-            <ContextCard
-              title="Bánh Tráng Trộn Cô Ba"
-              subtitle="Trending tonight • 1.2km away"
-              match={87}
-              accent={ctx.accent}
-              img="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=250&fit=crop"
-              delay={0.05}
-            />
-          </div>
-          <div style={{ flexShrink: 0 }}>
-            <ContextCard
-              title="Cơm Tấm Sườn Bì Chả"
-              subtitle="Crowded now • 0.5km away"
-              match={91}
-              accent={ctx.accent}
-              img="https://images.unsplash.com/photo-1512058564366-18510be2db19?w=400&h=250&fit=crop"
-              delay={0.1}
-            />
-          </div>
-          <div style={{ flexShrink: 0 }}>
-            <ContextCard
-              title="Kem Bơ Thanh Long"
-              subtitle="Just opened • 2.1km away"
-              match={78}
-              accent={ctx.accent}
-              img="https://images.unsplash.com/photo-1590301157890-4810ed352733?w=400&h=250&fit=crop"
-              delay={0.15}
-            />
-          </div>
-          <div style={{ flexShrink: 0 }}>
-            <ContextCard
-              title="Bún Riêu Cua Đồng"
-              subtitle="Top rated • 1.5km away"
-              match={85}
-              accent={ctx.accent}
-              img="https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&h=250&fit=crop"
-              delay={0.2}
-            />
-          </div>
+          {loading ? (
+            <Text style={{ color: ctx.accent, padding: "20px" }}>Loading recommendations...</Text>
+          ) : error ? (
+            <Text style={{ color: "red", padding: "20px" }}>{error}</Text>
+          ) : picks.length > 0 ? (
+            picks.map((pick, i) => (
+              <ContextCard
+                key={pick.place_id}
+                title={pick.name}
+                subtitle={`${pick.price_range || "$$"} • Top Pick`}
+                match={Math.round(pick.match_score)}
+                accent={ctx.accent}
+                img={pick.image_url || "https://images.unsplash.com/photo-1542181961-9590d0c79b27?w=400&h=250&fit=crop"}
+                delay={i * 0.05}
+              />
+            ))
+          ) : (
+            <Text style={{ color: ctx.accent, padding: "20px" }}>No recommendations found</Text>
+          )}
         </Row>
       </Column>
     </motion.div>

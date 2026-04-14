@@ -19,8 +19,10 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import BottomSheet from "@/components/BottomSheet";
+import { apiGet } from "@/lib/api";
 
 export interface PostData {
+  id: number;
   name: string;
   avatar: string;
   time: string;
@@ -43,6 +45,35 @@ interface PostModalProps {
 export default function PostModal({ isOpen, data, onClose }: PostModalProps) {
   const [isLiked, setIsLiked] = React.useState(false);
   const [isSaved, setIsSaved] = React.useState(false);
+  const [commentsList, setCommentsList] = React.useState<any[]>([]);
+  const [loadingComments, setLoadingComments] = React.useState(false);
+
+  React.useEffect(() => {
+    if (isOpen && data.id) {
+      setLoadingComments(true);
+      apiGet(`/api/v1/posts/${data.id}/comments`)
+        .then((res: any) => {
+          if (res && res.items) {
+             setCommentsList(res.items);
+          }
+        })
+        .catch(console.error)
+        .finally(() => setLoadingComments(false));
+    } else {
+      setCommentsList([]);
+    }
+  }, [isOpen, data.id]);
+
+  const adaptTime = (dateStr: string) => {
+    if (!dateStr) return "Just now";
+    const now = new Date();
+    const created = new Date(dateStr);
+    const diffMs = now.getTime() - created.getTime();
+    const diffH = Math.floor(diffMs / 3600000);
+    if (diffH < 1) return `${Math.floor(diffMs / 60000)}m`;
+    if (diffH < 24) return `${diffH}h`;
+    return `${Math.floor(diffH / 24)}d`;
+  };
 
   return (
     <AnimatePresence>
@@ -214,69 +245,60 @@ export default function PostModal({ isOpen, data, onClose }: PostModalProps) {
                   }}
                 />
 
-                {/* Mock Comments */}
+                {/* Real Comments */}
                 <Column style={{ gap: "16px" }}>
-                  {[
-                    {
-                      src: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=64&h=64&fit=crop",
-                      name: "Đức Anh",
-                      text: "Quán này ngon lắm, mình cũng hay ghé! 🔥",
-                      time: "2h",
-                    },
-                    {
-                      src: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=64&h=64&fit=crop",
-                      name: "Bảo Trân",
-                      text: "Save lại để cuối tuần rủ bạn bè đi 😍",
-                      time: "5h",
-                    },
-                    {
-                      src: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=64&h=64&fit=crop",
-                      name: "Anh Khoa",
-                      text: "Giá bao nhiêu vậy bạn?",
-                      time: "1d",
-                    },
-                  ].map((c) => (
-                    <Row
-                      key={c.name}
-                      style={{ gap: "12px", alignItems: "flex-start" }}
-                    >
-                      <Avatar src={c.src} size="s" />
-                      <Column style={{ gap: "4px" }}>
-                        <Text
-                          style={{
-                            color: "#1C1C1E",
-                            fontSize: "0.8rem",
-                            lineHeight: 1.6,
-                          }}
+                  {loadingComments ? (
+                    <Text style={{ color: "#AEAEB2", fontSize: "0.85rem" }}>Đang tải bình luận...</Text>
+                  ) : commentsList.length === 0 ? (
+                    <Text style={{ color: "#AEAEB2", fontSize: "0.85rem" }}>Chưa có bình luận nào.</Text>
+                  ) : (
+                    commentsList.map((c) => {
+                      const name = c.user?.display_name || c.user?.username || `User ${c.user?.id || ''}`;
+                      const avatarSrc = c.user?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&size=128`;
+                      return (
+                        <Row
+                          key={c.id}
+                          style={{ gap: "12px", alignItems: "flex-start" }}
                         >
-                          <span style={{ fontWeight: 700, marginRight: "6px" }}>
-                            {c.name}
-                          </span>
-                          {c.text}
-                        </Text>
-                        <Row style={{ gap: "12px", alignItems: "center" }}>
-                          <Text style={{ color: "#AEAEB2", fontSize: "0.7rem" }}>
-                            {c.time}
-                          </Text>
-                          <Text
-                            style={{
-                              color: "#AEAEB2",
-                              fontSize: "0.7rem",
-                              fontWeight: 600,
-                              cursor: "pointer",
-                            }}
-                          >
-                            Reply
-                          </Text>
+                          <Avatar src={avatarSrc} size="s" />
+                          <Column style={{ gap: "4px" }}>
+                            <Text
+                              style={{
+                                color: "#1C1C1E",
+                                fontSize: "0.8rem",
+                                lineHeight: 1.6,
+                              }}
+                            >
+                              <span style={{ fontWeight: 700, marginRight: "6px" }}>
+                                {name}
+                              </span>
+                              {c.content}
+                            </Text>
+                            <Row style={{ gap: "12px", alignItems: "center" }}>
+                              <Text style={{ color: "#AEAEB2", fontSize: "0.7rem" }}>
+                                {adaptTime(c.created_at)}
+                              </Text>
+                              <Text
+                                style={{
+                                  color: "#AEAEB2",
+                                  fontSize: "0.7rem",
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Reply
+                              </Text>
+                            </Row>
+                          </Column>
+                          <Heart
+                            size={12}
+                            color="#AEAEB2"
+                            style={{ marginLeft: "auto", cursor: "pointer", marginTop: "4px" }}
+                          />
                         </Row>
-                      </Column>
-                      <Heart
-                        size={12}
-                        color="#AEAEB2"
-                        style={{ marginLeft: "auto", cursor: "pointer", marginTop: "4px" }}
-                      />
-                    </Row>
-                  ))}
+                      );
+                    })
+                  )}
                 </Column>
               </Column>
 
@@ -301,13 +323,13 @@ export default function PostModal({ isOpen, data, onClose }: PostModalProps) {
                         fill={isLiked ? "var(--brand-solid-strong)" : "none"}
                       />
                       <Text variant="label-default-l" weight="strong" onBackground="neutral-strong">
-                        {isLiked ? data.likes + 1 : data.likes}
+                        {isLiked ? (data.likes || 0) + 1 : (data.likes || 0)}
                       </Text>
                     </Row>
                     <Row gap="8" vertical="center" style={{ cursor: "pointer" }}>
                       <MessageCircle size={24} color="var(--neutral-alpha-medium)" />
                       <Text variant="label-default-l" weight="strong" onBackground="neutral-strong">
-                        {data.comments}
+                        {data.comments || 0}
                       </Text>
                     </Row>
                   </Row>

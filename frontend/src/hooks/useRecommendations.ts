@@ -1,0 +1,70 @@
+/**
+ * useRecommendations — Fetches AI-powered recommendations from the backend.
+ * Maps to: POST /api/v1/recommendations
+ */
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { apiPost, ApiError } from "@/lib/api";
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+export interface Recommendation {
+  place_id: number;
+  name: string;
+  match_score: number;     // 0-100 float
+  lat: number;
+  lng: number;
+  vector: number[];
+  image_url?: string | null;
+  price_range?: string | null;
+}
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
+interface UseRecommendationsResult {
+  picks: Recommendation[];
+  loading: boolean;
+  error: string | null;
+  refetch: () => void;
+}
+
+// Neutral start vector (all 0.5) — used before user has swiped anything
+const NEUTRAL_VECTOR = Array(15).fill(0.5);
+
+export function useRecommendations(
+  topN: number = 4,
+  userVector: number[] = NEUTRAL_VECTOR,
+  domain: string = "place"
+): UseRecommendationsResult {
+  const [picks, setPicks] = useState<Recommendation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPicks = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data: any = await apiPost("/api/v1/recommendations", {
+        user_vector: userVector,
+        top_n: topN,
+        category: domain,
+      });
+      setPicks(Array.isArray(data?.recommendations) ? data.recommendations : []);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(`Lỗi ${err.status}: ${err.message}`);
+      } else {
+        setError("Không thể lấy gợi ý AI");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [topN, domain, JSON.stringify(userVector)]);
+
+  useEffect(() => {
+    fetchPicks();
+  }, [fetchPicks]);
+
+  return { picks, loading, error, refetch: fetchPicks };
+}

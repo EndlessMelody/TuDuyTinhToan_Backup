@@ -135,7 +135,9 @@ def main():
     log_step("2.1. Tiến hành ghi danh (Register)")
     reg_res = test_endpoint("User Ghi Danh", "POST", "/users/", payload={
         "username": f"real_user_{timestamp}",
-        "email": f"user_{timestamp}@example.com" # Fix lỗi email
+        "email": f"user_{timestamp}@example.com",
+        "password": "strongpassword123", # Nên kẹp thêm password cho chắc ăn đúng schema
+        "device_id": unique_device       # <--- CHÌA KHÓA CHUYỂN SINH NẰM Ở ĐÂY
     })
     
     user_id = None

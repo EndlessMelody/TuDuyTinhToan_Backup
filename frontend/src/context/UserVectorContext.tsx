@@ -1,7 +1,8 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, useRef } from "react";
-import { MOCK_USER } from "@/constants/mock-data";
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { apiPost } from "@/lib/api";
 
 interface RadarPoint {
   subject: string;
@@ -12,7 +13,7 @@ interface RadarPoint {
 interface UserVectorContextType {
   radarData: RadarPoint[];
   mergedRadarData: (RadarPoint & { prevA?: number })[];
-  updateVector: (traits: string[], direction: 'select' | 'skip') => void;
+  updateVector: (venueId: number, traits: string[], direction: 'select' | 'skip') => void;
   isPulsing: boolean;
 }
 
@@ -46,16 +47,73 @@ const TRAIT_MAP: Record<string, string> = {
 export const UserVectorProvider: ({ children }: {
     children: React.ReactNode;
 }) => React.JSX.Element = ({ children }) => {
-  const [radarData, setRadarData] = useState<RadarPoint[]>(MOCK_USER.radarData);
+  const { user } = useAuth();
+  
+  const [radarData, setRadarData] = useState<RadarPoint[]>([
+    { subject: "Street Food", A: 100, fullMark: 150 },
+    { subject: "Spicy", A: 71, fullMark: 150 },
+    { subject: "Sweet", A: 90, fullMark: 150 },
+    { subject: "Luxury", A: 56, fullMark: 150 },
+    { subject: "Quiet", A: 85, fullMark: 150 },
+    { subject: "Group", A: 120, fullMark: 150 },
+  ]);
+
+  useEffect(() => {
+    if (user?.food_vector && user.food_vector.length >= 6) {
+      setRadarData([
+        { subject: "Street Food", A: Math.round(user.food_vector[0] * 150) || 100, fullMark: 150 },
+        { subject: "Spicy", A: Math.round(user.food_vector[1] * 150) || 71, fullMark: 150 },
+        { subject: "Sweet", A: Math.round(user.food_vector[2] * 150) || 90, fullMark: 150 },
+        { subject: "Luxury", A: Math.round(user.food_vector[3] * 150) || 56, fullMark: 150 },
+        { subject: "Quiet", A: Math.round(user.food_vector[4] * 150) || 85, fullMark: 150 },
+        { subject: "Group", A: Math.round(user.food_vector[5] * 150) || 120, fullMark: 150 },
+      ]);
+    }
+  }, [user]);
+
   const [previousRadarData, setPreviousRadarData] = useState<RadarPoint[] | null>(null);
   const [isPulsing, setIsPulsing] = useState(false);
   
   const lastUpdateRef = useRef<number>(Date.now());
+  const swipeQueueRef = useRef<{place_id: number, direction: "RIGHT" | "LEFT", client_timestamp: number}[]>([]);
+  const batchTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const updateVector = useCallback((traits: string[], direction: 'select' | 'skip') => {
+  const flushSwipeQueue = useCallback(async () => {
+    if (swipeQueueRef.current.length === 0) return;
+    const actions = [...swipeQueueRef.current];
+    swipeQueueRef.current = []; 
+    
+    // We use a fallback ID for absolute guests
+    const userId = user?.id || "guest-id"; 
+
+    try {
+      await apiPost<any>("/api/v1/interactions/swipe-batch", {
+        user_id: String(userId),
+        category: "place",
+        actions: actions
+      });
+    } catch (e) {
+      console.error("Failed to send swipe batch", e);
+    }
+  }, [user]);
+
+  const updateVector = useCallback((venueId: number, traits: string[], direction: 'select' | 'skip') => {
     const now = Date.now();
     const timeDelta = now - lastUpdateRef.current;
     lastUpdateRef.current = now;
+
+    swipeQueueRef.current.push({
+      place_id: venueId,
+      direction: direction === 'select' ? "RIGHT" : "LEFT",
+      client_timestamp: now
+    });
+
+    if (batchTimerRef.current) clearTimeout(batchTimerRef.current);
+    if (swipeQueueRef.current.length >= 5) {
+      flushSwipeQueue();
+    } else {
+      batchTimerRef.current = setTimeout(flushSwipeQueue, 3000);
+    }
 
     // ─── Rule: Exponential Decay for Rapid Swiping ───
     let alpha = direction === 'select' ? 0.15 : -0.05;
@@ -84,7 +142,7 @@ export const UserVectorProvider: ({ children }: {
     setTimeout(() => setIsPulsing(false), 1000);
     // Fade out previous data after delta display
     setTimeout(() => setPreviousRadarData(null), 2500);
-  }, [radarData]);
+  }, [radarData, flushSwipeQueue]);
 
   const mergedRadarData = radarData.map((point, index) => ({
     ...point,

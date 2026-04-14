@@ -63,9 +63,11 @@ import { FloatingInsight, FlavorAura } from "@/components/FloatingInsight";
 import { RouteChip as RouteChipComponent } from "./components/RouteChip";
 import { StatusBadge as StatusBadgeComponent } from "./components/StatusBadge";
 import { StopCard } from "./components/StopCard";
-import { TourSkeleton } from "./components/TourSkeleton";
+import { TourSkeleton, EmptyState } from "./components/TourSkeleton";
 import ClientOnly from "@/components/common/ClientOnly";
-import { MOCK_USER } from "@/constants/mock-data";
+import { useAuth } from "@/hooks/useAuth";
+import { apiGet } from "@/lib/api";
+import { toast } from "sonner";
 
 const MapWidget = dynamic(() => import("@/components/MapWidget"), {
   ssr: false,
@@ -94,129 +96,77 @@ const MapWidget = dynamic(() => import("@/components/MapWidget"), {
   ),
 });
 
-// ═══════════ CARD DATA ═══════════ //
-interface CardData {
-  id: number;
-  title: string;
-  subtitle: string;
-  tags: string[];
-  match: number;
-  distance: string;
-  price: string;
-  img: string;
-  color: string;
-  location: [number, number];
-}
-
-const FOOD_CARDS: CardData[] = [
-  {
-    id: 1,
-    title: "Bánh Mì Cô Thúy",
-    subtitle: "Street Food • Dĩ An",
-    tags: ["Street Food", "Budget", "Spicy"],
-    match: 98,
-    distance: "0.8km",
-    price: "25k",
-    img: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&h=900&fit=crop",
-    color: "#FF6B35",
-    location: [10.897, 106.772],
-  },
-  {
-    id: 2,
-    title: "Neon Ramen House",
-    subtitle: "Japanese • District 1",
-    tags: ["Spicy", "Group", "Nightlife"],
-    match: 94,
-    distance: "2.1km",
-    price: "120k",
-    img: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=600&h=900&fit=crop",
-    color: "#E63946",
-    location: [10.905, 106.773],
-  },
-  {
-    id: 3,
-    title: "Matcha Garden",
-    subtitle: "Cafe • Thủ Đức",
-    tags: ["Quiet", "Sweet", "Aesthetic"],
-    match: 91,
-    distance: "1.5km",
-    price: "65k",
-    img: "https://images.unsplash.com/photo-1582787895088-2ff176b668d2?w=600&h=900&fit=crop",
-    color: "#2A9D8F",
-    location: [10.898, 106.769],
-  },
-  {
-    id: 4,
-    title: "Sky Lounge",
-    subtitle: "Cocktails • Rooftop",
-    tags: ["Luxury", "Group", "Nightlife"],
-    match: 87,
-    distance: "3.2km",
-    price: "200k",
-    img: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=600&h=900&fit=crop",
-    color: "#7B2FF7",
-    location: [10.902, 106.778],
-  },
-  {
-    id: 5,
-    title: "Phở Sáng Sóm",
-    subtitle: "Vietnamese • Bình Dương",
-    tags: ["Street Food", "Quiet", "Breakfast"],
-    match: 96,
-    distance: "0.5km",
-    price: "45k",
-    img: "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=600&h=900&fit=crop",
-    color: "#F4A261",
-    location: [10.895, 106.771],
-  },
-  {
-    id: 6,
-    title: "BBQ Midnight",
-    subtitle: "Grill • Late Night",
-    tags: ["Group", "Spicy", "Nightlife"],
-    match: 89,
-    distance: "1.8km",
-    price: "150k",
-    img: "https://images.unsplash.com/photo-1544025162-d76694265947?w=600&h=900&fit=crop",
-    color: "#E76F51",
-    location: [10.899, 106.775],
-  },
-];
-
 const TOTAL_NODES = 4;
 
-const LOADING_MESSAGES = [
-  "Brewing the perfect evening vibe...",
-  "Optimizing your flavor discovery path...",
-  "Consulting the taste stars for you...",
-  "Syncing your cravings with the city...",
-  "Almost there... making it extra delicious...",
-];
-
-// Pre-computed outside render — satisfies React Compiler purity rules
-const PARTICLES = Array.from({ length: 20 }, () => ({
-  x0: Math.random() * 100 - 50 + "%",
-  y0: Math.random() * 100 - 50 + "%",
-  x1: Math.random() * 100 - 50 + "%",
-  y1: Math.random() * 100 - 50 + "%",
-  dur: 5 + Math.random() * 10,
-}));
+// ═══════════ CARD DATA ═══════════ //
+import { useTourBuilderStore, TourNode } from "@/store/useTourBuilderStore";
+// Note: Initial deck queue is populated in the store (Phase 1)
 
 export default function TourBuilderPage() {
   const pathname = usePathname();
-  const [deck, setDeck] = useState<CardData[]>(FOOD_CARDS);
-  const [filledNodes, setFilledNodes] = useState<(CardData | null)[]>(
-    Array(TOTAL_NODES).fill(null),
-  );
+  
+  const {
+    deckQueue: deck,
+    selectedNodes: filledNodes,
+    lastDiscarded,
+    addSelectedNode,
+    setDeckQueue,
+    popDeckQueue,
+    setLastDiscarded,
+    undoDiscard,
+    status,
+    setStatus
+  } = useTourBuilderStore();
+
   const [isTourReady, setIsTourReady] = useState(false);
   const [discardDir, setDiscardDir] = useState<"left" | "right" | null>(null);
-  const [lastDiscarded, setLastDiscarded] = useState<CardData | null>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const { user } = useAuth();
   const { radarData, isPulsing, updateVector } = useUserVector();
   const [isGenerating, setIsGenerating] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]);
   const [stopCount, setStopCount] = useState(TOTAL_NODES);
+
+  // Fetch Venues Logic
+  useEffect(() => {
+    async function fetchVenues() {
+      // Prevent running if we already have cards or we're not idle
+      if (deck.length > 0 || status !== 'idle') return;
+
+      try {
+        setStatus('loading');
+        // We use GET /api/v1/locations/ as our base for Phase 2 implementation.
+        // It brings back LocationResponse[] which satisfies our TourNode requirements.
+        const res = await apiGet<{ items: any[] }>("/api/v1/locations/?limit=15&offset=0");
+        
+        const mappedNodes: TourNode[] = res.items.map((loc, i) => ({
+          id: String(loc.id),
+          venue_id: loc.id,
+          title: loc.name,
+          subtitle: `${loc.category || "Place"} • ${loc.city || "HCM City"}`,
+          tags: loc.characteristics ? Object.keys(loc.characteristics).slice(0, 3) : ["Trending"],
+          match: Math.floor(80 + Math.random() * 19), 
+          distance: `${(Math.random() * 5 + 0.5).toFixed(1)}km`,
+          price: loc.price_range || "$$",
+          img: loc.image_url || "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=600&h=900&fit=crop",
+          color: i % 2 === 0 ? "#FF6B35" : "#2A9D8F", 
+          location: [loc.lat, loc.lng],
+          time_spent: 45,
+          order_index: i
+        }));
+
+        setDeckQueue(mappedNodes);
+        setStatus('idle');
+      } catch (error: any) {
+        setStatus('error');
+        toast.error("Failed to fetch venues: " + (error.message || "Unknown error"));
+      }
+    }
+
+    fetchVenues();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!isGenerating) return;
@@ -234,13 +184,12 @@ export default function TourBuilderPage() {
 
   // Dynamic Tour DNA calculation
   const getTourDNA = useCallback(() => {
-    const selectedFoods = filledNodes.filter((n): n is CardData => n !== null);
-    if (selectedFoods.length === 0)
-      return [{ label: "Empty", value: 100, color: "rgba(0,0,0,0.05)" }];
-
+    const selectedFoods = filledNodes.filter((n) => n !== null) as NonNullable<typeof filledNodes[0]>[];
+    if (selectedFoods.length === 0) return [{ label: "Empty", value: 100, color: 'rgba(0,0,0,0.05)' }];
+    
     const tagCounts: Record<string, number> = {};
-    selectedFoods.forEach((food) => {
-      food.tags.forEach((tag) => {
+    selectedFoods.forEach(food => {
+      food.tags?.forEach(tag => {
         tagCounts[tag] = (tagCounts[tag] || 0) + 1;
       });
     });
@@ -278,39 +227,32 @@ export default function TourBuilderPage() {
 
   const handleUndo = useCallback(() => {
     if (!lastDiscarded) return;
-    setDeck((prev) => [lastDiscarded, ...prev]);
-    setLastDiscarded(null);
-  }, [lastDiscarded]);
+    undoDiscard();
+  }, [lastDiscarded, undoDiscard]);
 
   const handleManualAction = useCallback(
     (direction: "select" | "skip") => {
       if (!activeCard) return;
       const card = activeCard;
 
-      if (direction === "select" && nextEmptyIndex !== -1) {
-        updateVector(card.tags, "select");
-        setDiscardDir("right");
-        setFilledNodes((prev) => {
-          const next = [...prev];
-          next[nextEmptyIndex] = card;
-          return next;
-        });
-        setTimeout(() => {
-          setDeck((prev) => prev.slice(1));
-          setDiscardDir(null);
-        }, 300);
-      } else if (direction === "skip") {
-        updateVector(card.tags, "skip");
-        setDiscardDir("left");
-        setTimeout(() => {
-          setDeck((prev) => prev.slice(1));
-          setDiscardDir(null);
-          setLastDiscarded(card);
-        }, 300);
-      }
-    },
-    [activeCard, nextEmptyIndex, updateVector],
-  );
+    if (direction === "select" && nextEmptyIndex !== -1) {
+      updateVector(card.venue_id, card.tags || [], "select");
+      setDiscardDir("right");
+      addSelectedNode(card, nextEmptyIndex);
+      setTimeout(() => {
+        popDeckQueue();
+        setDiscardDir(null);
+      }, 300);
+    } else if (direction === "skip") {
+      updateVector(card.venue_id, card.tags || [], "skip");
+      setDiscardDir("left");
+      setTimeout(() => {
+        popDeckQueue();
+        setDiscardDir(null);
+        setLastDiscarded(card);
+      }, 300);
+    }
+  }, [activeCard, nextEmptyIndex, updateVector, addSelectedNode, popDeckQueue, setLastDiscarded]);
 
   // ─── Drag Logic ─── //
   const handleDragEnd = useCallback(
@@ -365,70 +307,14 @@ export default function TourBuilderPage() {
     const totalXP = stops.reduce((sum, s) => sum + s.match, 0);
 
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-          backgroundColor: surface.page,
-          overflow: "hidden",
-        }}
-      >
-        {/* ── Top Action Bar ── */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "14px 28px",
-            backgroundColor: "rgba(255,255,255,0.9)",
-            backdropFilter: "blur(24px)",
-            borderBottom: `1px solid ${border.subtle}`,
-            flexShrink: 0,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <button
-              onClick={() => {
-                setIsTourReady(false);
-                setFilledNodes(Array(TOTAL_NODES).fill(null));
-                setDeck(FOOD_CARDS);
-              }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "8px 16px",
-                borderRadius: 12,
-                background: "none",
-                border: `1px solid ${border.medium}`,
-                cursor: "pointer",
-                fontSize: 13,
-                fontWeight: 700,
-                color: text.secondary,
-              }}
-            >
-              <RotateCcw size={14} /> Rebuild
-            </button>
-            <div>
-              <h2
-                style={{
-                  margin: 0,
-                  fontSize: 18,
-                  fontWeight: 900,
-                  color: text.primary,
-                  letterSpacing: "-0.5px",
-                }}
-              >
-                Your Tour is Ready
-              </h2>
-              <p style={{ margin: 0, fontSize: 12, color: text.tertiary }}>
-                {stops.length} stops · curated by Taste Vector
-              </p>
-            </div>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ width: "100%", height: "100%", position: "relative", backgroundColor: surface.page }}>
+        <ClientOnly>
+          <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
+            <MapWidget 
+              mapId="tour-final-background"
+              points={filledNodes.filter((n) => n !== null).map(n => n!.location as [number, number])}
+              center={[10.897, 106.772]} zoom={13}
+            />
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <button
@@ -1095,41 +981,15 @@ export default function TourBuilderPage() {
           </Row>
 
           {/* RIGHT: ELITE PROFILE INFO */}
-          <Row
-            horizontal="end"
-            style={{ flex: 1, alignItems: "center", gap: "16px" }}
-          >
-            <Column style={{ gap: "2px", alignItems: "flex-end", hide: "s" }}>
-              <Text
-                style={{
-                  color: text.primary,
-                  fontSize: "0.9rem",
-                  fontWeight: 900,
-                  letterSpacing: "-0.3px",
-                }}
-              >
-                {MOCK_USER.name}
+          <Row horizontal="end" style={{ flex: 1, alignItems: 'center', gap: '16px' }}>
+            <Column style={{ gap: '2px', alignItems: 'flex-end', hide: 's' }}>
+              <Text style={{ color: text.primary, fontSize: "0.9rem", fontWeight: 900, letterSpacing: '-0.3px' }}>
+                {user?.display_name || user?.username || "Explorer"}
               </Text>
-              <Row vertical="center" style={{ gap: "6px" }}>
-                <div
-                  style={{
-                    width: "6px",
-                    height: "6px",
-                    borderRadius: "50%",
-                    backgroundColor: "#00D1B2",
-                    boxShadow: "0 0 8px #00D1B2",
-                  }}
-                />
-                <Text
-                  style={{
-                    color: "rgba(0,0,0,0.45)",
-                    fontSize: "0.7rem",
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                  }}
-                >
-                  {MOCK_USER.title}
+              <Row vertical="center" style={{ gap: '6px' }}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#00D1B2', boxShadow: '0 0 8px #00D1B2' }} />
+                <Text style={{ color: "rgba(0,0,0,0.45)", fontSize: "0.7rem", fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  {user?.title || "Taste Explorer"}
                 </Text>
               </Row>
             </Column>
@@ -1138,41 +998,18 @@ export default function TourBuilderPage() {
               <motion.div
                 animate={{ rotate: -360 }}
                 transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-                style={{
-                  position: "absolute",
-                  inset: -4,
-                  borderRadius: "50%",
-                  border: "1.5px dashed rgba(0, 122, 255, 0.2)",
-                }}
+                style={{ position: 'absolute', inset: -4, borderRadius: '50%', border: '1px dashed rgba(0, 122, 255, 0.2)' }}
               />
-              <div
-                style={{
-                  width: "46px",
-                  height: "46px",
-                  borderRadius: "50%",
-                  padding: "2px",
-                  background: `linear-gradient(135deg, ${accent.primary}, ${accent.secondary})`,
-                  boxShadow: "0 4px 12px rgba(0, 122, 255, 0.2)",
-                }}
-              >
-                <div
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    borderRadius: "50%",
-                    overflow: "hidden",
-                    border: "2px solid white",
-                  }}
-                >
-                  <img
-                    src={MOCK_USER.avatar}
-                    alt={MOCK_USER.name}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
-                  />
+              <div style={{ 
+                width: '46px', 
+                height: '46px', 
+                borderRadius: '50%', 
+                padding: '2px', 
+                background: `linear-gradient(135deg, ${accent.primary}, ${accent.secondary})`,
+                boxShadow: '0 4px 12px rgba(0, 122, 255, 0.2)'
+              }}>
+                <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', border: '2px solid white' }}>
+                  <img src={user?.avatar_url || ""} alt={user?.display_name || "User Avatar"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
               </div>
             </div>
@@ -1297,17 +1134,12 @@ export default function TourBuilderPage() {
           onDragEnd={handleDragEnd}
         >
           <AnimatePresence>
-            {deck.length > 0 ? (
-              <div
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  position: "relative",
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
+            {status === 'loading' ? (
+              <motion.div key="skeleton" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ width: "100%", height: "100%", position: "absolute", top: 0, left: 0 }}>
+                <TourSkeleton />
+              </motion.div>
+            ) : deck.length > 0 ? (
+              <div key="cards" style={{ width: "100%", height: "100%", position: "relative", display: "flex", justifyContent: "center", alignItems: "center" }}>
                 {deck[1] && (
                   <motion.div
                     key={`bg-${deck[1].id}`}
@@ -1352,21 +1184,8 @@ export default function TourBuilderPage() {
                 </div>
               </div>
             ) : (
-              <motion.div
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "24px",
-                }}
-              >
-                <Activity size={64} color={accent.primary} />
-                <Heading variant="display-strong-s">
-                  Exploration Complete
-                </Heading>
+              <motion.div key="empty" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                <EmptyState filledCount={filledNodes.filter(Boolean).length} totalCount={TOTAL_NODES} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -1374,114 +1193,62 @@ export default function TourBuilderPage() {
       </div>
 
       {/* 3. FUNCTIONAL FOOTER - FLEX SHRINK 0 */}
-      <div
-        style={{
-          width: "100%",
-          zIndex: 100,
-          flexShrink: 0,
-          paddingTop: "8px",
-          paddingBottom: "8px",
-          paddingLeft: "60px",
-          paddingRight: "60px",
-          backgroundColor: "white",
-          backdropFilter: "blur(40px)",
-          borderTopWidth: "1px",
-          borderTopStyle: "solid",
-          borderTopColor: "rgba(0,0,0,0.08)",
-          borderRadius: "24px 24px 0 0",
-          boxShadow: "0 -10px 40px rgba(0,0,0,0.04)",
-        }}
-      >
-        <Row
-          fillWidth
-          horizontal="between"
-          vertical="center"
-          style={{ height: "100px", gap: "48px" }}
-        >
-          {/* LEFT: STATUS */}
-          <Row style={{ gap: "20px", alignItems: "center", width: "380px" }}>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 4,
-                padding: "8px 16px",
-                backgroundColor: "#F0F9FF",
-                borderRadius: 16,
-                border: `1px solid ${accent.primary}20`,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: "0.6rem",
-                  fontWeight: 900,
-                  color: accent.primary,
-                  letterSpacing: "1px",
-                  textTransform: "uppercase",
-                }}
-              >
-                Stops
-              </Text>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <button
-                  onClick={() => {
-                    const next = Math.max(2, stopCount - 1);
-                    setStopCount(next);
-                    setFilledNodes(Array(next).fill(null));
-                    setDeck(FOOD_CARDS);
-                  }}
-                  style={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: 8,
-                    background: "white",
-                    border: `1px solid ${border.medium}`,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: 900,
-                    fontSize: 14,
-                    color: text.primary,
-                  }}
-                >
-                  −
-                </button>
-                <Text
-                  style={{
-                    fontSize: "1.1rem",
-                    fontWeight: 900,
-                    color: accent.primary,
-                    minWidth: 18,
-                    textAlign: "center",
-                  }}
-                >
-                  {stopCount}
-                </Text>
-                <button
-                  onClick={() => {
-                    const next = Math.min(6, stopCount + 1);
-                    setStopCount(next);
-                    setFilledNodes(Array(next).fill(null));
-                    setDeck(FOOD_CARDS);
-                  }}
-                  style={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: 8,
-                    background: "white",
-                    border: `1px solid ${border.medium}`,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: 900,
-                    fontSize: 14,
-                    color: text.primary,
-                  }}
-                >
-                  +
-                </button>
+      <div style={{ width: '100%', zIndex: 100, flexShrink: 0, paddingTop: '8px', paddingBottom: '8px', paddingLeft: '60px', paddingRight: '60px', backgroundColor: 'white', backdropFilter: 'blur(40px)', borderTopWidth: '1px', borderTopStyle: 'solid', borderTopColor: 'rgba(0,0,0,0.08)', borderRadius: '24px 24px 0 0', boxShadow: '0 -10px 40px rgba(0,0,0,0.04)' }}>
+        <Row fillWidth horizontal="between" vertical="center" style={{ height: '100px', gap: '48px' }}>
+            {/* LEFT: STATUS */}
+            <Row style={{ gap: '20px', alignItems: 'center', width: '380px' }}>
+            <motion.div whileHover={{ scale: 1.05 }} style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingTop: '8px', paddingBottom: '8px', paddingLeft: '20px', paddingRight: '20px', backgroundColor: '#F0F9FF', borderRadius: '16px', border: `1px solid ${accent.primary}20` }}>
+                <Row vertical="center" style={{ gap: '8px' }}>
+                   <Users size={16} color={accent.primary} />
+                   <Text style={{ fontSize: '0.85rem', fontWeight: 900, color: accent.primary }}>1 MEMBER</Text>
+                </Row>
+                <Text style={{ fontSize: '0.65rem', fontWeight: 600, color: 'rgba(0,0,0,0.4)', textAlign: 'center' }}>ACTIVE GROUP</Text>
+              </motion.div>
+              <div style={{ width: '1px', height: '32px', backgroundColor: 'rgba(0,0,0,0.08)' }} />
+              <Column style={{ gap: '4px' }}>
+                <Text style={{ fontSize: '0.85rem', fontWeight: 900, color: text.primary }}>{filledNodes.filter(Boolean).length} FOODS SELECTED</Text>
+                <Text style={{ fontSize: '0.6rem', fontWeight: 600, color: 'rgba(0,0,0,0.4)', textTransform: 'uppercase' }}>Open-ended Exploration</Text>
+              </Column>
+            </Row>
+
+            {/* CENTER: ACTIONS */}
+            <div style={{ display: "flex", alignItems: "center", gap: "16px", paddingTop: "8px", paddingBottom: "8px", paddingLeft: "16px", paddingRight: "16px", backgroundColor: "rgba(0,0,0,0.03)", borderRadius: "100px", border: `2px solid rgba(0,0,0,0.05)` }}>
+              <IconButton icon={<Undo2 size={22} color="white" />} onClick={handleUndo} style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: "#64748B", paddingTop: "0", paddingBottom: "0", paddingLeft: "0", paddingRight: "0" }} />
+              <Button onClick={() => handleManualAction('skip')} style={{ borderRadius: '30px', backgroundColor: '#F3E8FF', color: '#7E22CE', border: 'none', fontWeight: 900, paddingTop: '0', paddingBottom: '0', paddingLeft: '28px', paddingRight: '28px', height: '48px' }}>SKIP</Button>
+              <Button onClick={() => handleManualAction('select')} style={{ borderRadius: '30px', backgroundColor: accent.primary, color: 'white', fontWeight: 900, paddingTop: '0', paddingBottom: '0', paddingLeft: '32px', paddingRight: '32px', height: '48px' }}>CHOOSE</Button>
+              <IconButton 
+                 icon={<Star size={24} color="white" fill={filledNodes.some(n => n !== null) ? "white" : "none"} />} 
+                 onClick={() => {
+                    if (filledNodes.some(n => n !== null)) {
+                      setIsGenerating(true);
+                      setTimeout(() => { setIsGenerating(false); setIsTourReady(true); }, 3000);
+                    }
+                 }}
+                 style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: filledNodes.some(n => n !== null) ? '#10B981' : 'rgba(0,0,0,0.1)' }} 
+              />
+            </div>
+
+            {/* RIGHT: MAP & DNA */}
+            <Row style={{ gap: '24px', alignItems: 'center', width: '380px', justifyContent: 'flex-end' }}>
+              <Column style={{ gap: '8px', width: '180px' }}>
+                <Row horizontal="between" vertical="center" style={{ width: '100%' }}>
+                  <Text style={{ fontSize: '0.65rem', fontWeight: 850 }}>TOUR DNA PROFILE</Text>
+                  <Text style={{ fontSize: '0.6rem', color: accent.secondary, fontWeight: 800 }}>LIVE</Text>
+                </Row>
+                <div style={{ width: '100%', height: '12px', backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: '6px', overflow: 'hidden', display: 'flex' }}>
+                   {tourDNA.map((segment) => (
+                      <motion.div key={segment.label} initial={{ width: 0 }} animate={{ width: `${segment.value}%` }} style={{ height: '100%', backgroundColor: segment.color }} />
+                   ))}
+                </div>
+              </Column>
+              <div style={{ width: '150px', height: '80px', borderRadius: '16px', backgroundColor: '#F8FAFF', border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden', position: 'relative' }}>
+                 <ClientOnly>
+                    <MapWidget 
+                      mapId="tour-curation-footer"
+                      points={filledNodes.filter((n) => n !== null).map(n => n!.location as [number, number])}
+                      center={activeCard ? activeCard.location : [10.897, 106.772]} zoom={14} showBanner={false}
+                    />
+                 </ClientOnly>
               </div>
             </div>
             <div
@@ -1835,15 +1602,7 @@ export default function TourBuilderPage() {
   );
 }
 
-function DraggableCard({
-  card,
-  onDragEnd,
-  x,
-}: {
-  card: CardData;
-  onDragEnd: (e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => void;
-  x: any;
-}) {
+function DraggableCard({ card, onDragEnd, x }: { card: TourNode; onDragEnd: (e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => void; x: any; }) {
   const y = useMotionValue(0);
   const rotate = useTransform(x, [-400, 400], [-8, 8]);
   const rotateX = useTransform(y, [-300, 300], [10, -10]);

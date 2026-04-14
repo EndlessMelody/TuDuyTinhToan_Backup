@@ -24,8 +24,7 @@ import {
   BadgeCheck,
 } from "lucide-react";
 import { MOCK_USER } from "@/constants/mock-data";
-import { useAuth } from "@/context/AuthContext";
-import { useTheme } from "@/context/ThemeContext";
+import { useAuth } from "@/hooks/useAuth";
 
 // ─── Design tokens ───
 const LIGHT_C = {
@@ -280,7 +279,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentPath,
 }) => {
   const router = useRouter();
-  const C = useThemeColors();
+  const { user } = useAuth();
   const sidebarWidth = isFullScreen ? 0 : isOpen ? 240 : 72;
 
   return (
@@ -321,10 +320,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }}
       >
         {isOpen && (
-          <motion.div
-            whileHover={{ scale: 1.06 }}
-            transition={{ type: "spring", stiffness: 400, damping: 12 }}
-            style={{ display: "inline-flex" }}
+          <Heading
+            variant="heading-strong-l"
+            onClick={() => router.push(user ? "/discover" : "/")}
+            style={{
+              color: C.logo,
+              fontWeight: 900,
+              letterSpacing: "-0.5px",
+              cursor: "pointer",
+              lineHeight: 1,
+              userSelect: "none",
+              paddingLeft: "4px",
+              paddingRight: "12px",
+            }}
           >
             <Heading
               variant="heading-strong-l"
@@ -513,7 +521,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
 // ─── Profile footer: auth-aware ───
 function SidebarProfileFooter({ isOpen }: { isOpen: boolean }) {
-  const { isLoggedIn, user, logout } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const router = useRouter();
   const C = useThemeColors();
   const [mounted, setMounted] = React.useState(false);
@@ -534,7 +542,69 @@ function SidebarProfileFooter({ isOpen }: { isOpen: boolean }) {
     );
   }
 
-  if (!isLoggedIn) {
+  // ── Loading: show skeleton, never flash "Sign In" ──
+  if (loading) {
+    return (
+      <>
+        <style>{`
+          @keyframes tm-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.45; }
+          }
+        `}</style>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            padding: isOpen ? "10px 12px" : "10px 0",
+            borderRadius: "10px",
+            border: "1px solid rgba(0,0,0,0.06)",
+            justifyContent: isOpen ? "flex-start" : "center",
+            flexShrink: 0,
+          }}
+        >
+          {/* Avatar circle skeleton */}
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: "50%",
+              backgroundColor: "#F2F2F7",
+              animation: "tm-pulse 1.4s ease-in-out infinite",
+              flexShrink: 0,
+            }}
+          />
+          {isOpen && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1 }}>
+              {/* Name line skeleton */}
+              <div
+                style={{
+                  height: "10px",
+                  width: "70%",
+                  borderRadius: "5px",
+                  backgroundColor: "#F2F2F7",
+                  animation: "tm-pulse 1.4s ease-in-out infinite",
+                }}
+              />
+              {/* Level line skeleton */}
+              <div
+                style={{
+                  height: "8px",
+                  width: "40%",
+                  borderRadius: "4px",
+                  backgroundColor: "#F2F2F7",
+                  animation: "tm-pulse 1.4s ease-in-out infinite 0.2s",
+                }}
+              />
+            </div>
+          )}
+        </div>
+      </>
+    );
+  }
+
+  if (!user) {
     return (
       <button
         onClick={() => router.push("/login")}
@@ -627,7 +697,7 @@ function SidebarProfileFooter({ isOpen }: { isOpen: boolean }) {
     >
       <div style={{ position: "relative", flexShrink: 0 }}>
         <Avatar
-          src={user?.avatar ?? MOCK_USER.avatar}
+          src={user?.avatar_url || MOCK_USER.avatar}
           size="s"
           style={{
             border: "2px solid rgba(79,142,247,0.25)",
@@ -661,7 +731,7 @@ function SidebarProfileFooter({ isOpen }: { isOpen: boolean }) {
                   textOverflow: "ellipsis",
                 }}
               >
-                {user?.name ?? MOCK_USER.name}
+                {user?.display_name || user?.username || MOCK_USER.name}
               </Text>
               <BadgeCheck size={12} color="#4F8EF7" />
             </Row>
@@ -672,7 +742,7 @@ function SidebarProfileFooter({ isOpen }: { isOpen: boolean }) {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              logout();
+              signOut();
               router.push("/");
             }}
             title="Sign out"

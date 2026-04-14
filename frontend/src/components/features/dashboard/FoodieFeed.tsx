@@ -4,7 +4,7 @@ import { Row, Column, Heading, IconButton, Button } from "@/components/OnceUI";
 import { MessageCircle, SlidersHorizontal } from "lucide-react";
 import { PostCard } from "@/components/cards/PostCard";
 import { StaggerContainer, StaggerItem } from "@/components/StaggerContainer";
-import { MOCK_POSTS } from "@/constants/mock-data";
+import { usePosts } from "@/hooks/usePosts";
 import { PostData } from "@/types/dashboard";
 import { SkeletonFeedCard } from "@/components/Skeletons";
 
@@ -13,10 +13,64 @@ interface FoodieFeedProps {
   isLoading?: boolean;
 }
 
-export const FoodieFeed: React.FC<FoodieFeedProps> = ({
-  onPostClick,
-  isLoading = false,
-}) => {
+export const FoodieFeed: React.FC<FoodieFeedProps> = ({ onPostClick }) => {
+  const { posts, loading, error } = usePosts(8);
+
+  const renderContent = () => {
+    if (loading) {
+      return [1, 2, 3].map((i) => (
+        <div
+          key={i}
+          style={{
+            minWidth: 260,
+            height: 320,
+            borderRadius: 20,
+            flexShrink: 0,
+            background:
+              "linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)",
+            backgroundSize: "200% 100%",
+            animation: "shimmer 1.4s infinite",
+          }}
+        />
+      ));
+    }
+
+    if (error) {
+      return (
+        <p style={{ color: "#8E8E93", fontSize: "0.85rem", padding: "8px 0" }}>
+          Lỗi tải bài đăng: {error}
+        </p>
+      );
+    }
+
+    if (posts.length === 0) {
+      return (
+        <p style={{ color: "#8E8E93", fontSize: "0.85rem", padding: "8px 0" }}>
+          Chưa có bài đăng nào. Hãy đăng bài đầu tiên!
+        </p>
+      );
+    }
+
+    return (
+      <StaggerContainer
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          gap: "16px",
+          paddingBottom: "8px",
+        }}
+      >
+        {posts.map((post, idx) => (
+          <StaggerItem key={idx}>
+            <div onClick={() => onPostClick(post)}>
+              <PostCard {...post} delay={0} />
+            </div>
+          </StaggerItem>
+        ))}
+      </StaggerContainer>
+    );
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -72,45 +126,9 @@ export const FoodieFeed: React.FC<FoodieFeedProps> = ({
             paddingBottom: "8px",
           }}
         >
-          <AnimatePresence mode="wait">
-            {isLoading ? (
-              <motion.div
-                key="skeleton"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                style={{ display: "flex", gap: "16px" }}
-              >
-                {[...Array(4)].map((_, i) => (
-                  <SkeletonFeedCard key={i} />
-                ))}
-              </motion.div>
-            ) : (
-              <motion.div
-                key="content"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-              >
-                <StaggerContainer
-                  style={{
-                    display: "flex",
-                    flexDirection: "row",
-                    gap: "16px",
-                    paddingBottom: "8px",
-                  }}
-                >
-                  {MOCK_POSTS.map((post, idx) => (
-                    <StaggerItem key={idx}>
-                      <div onClick={() => onPostClick(post)} style={{}}>
-                        <PostCard {...post} delay={0} />
-                      </div>
-                    </StaggerItem>
-                  ))}
-                </StaggerContainer>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {renderContent()}
         </Row>
+        <style>{`@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>
       </Column>
     </motion.div>
   );

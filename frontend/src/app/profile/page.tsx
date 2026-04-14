@@ -41,57 +41,10 @@ import {
   PolarAngleAxis,
   ResponsiveContainer,
 } from "recharts";
-import ClientOnly from "@/components/common/ClientOnly";
-import { MOCK_USER } from "@/constants/mock-data";
-
-// ─── Count-up animation hook ───
-function useCountUp(target: number, duration = 1000, delay = 200) {
-  const [count, setCount] = React.useState(0);
-  React.useEffect(() => {
-    const t = setTimeout(() => {
-      const start = performance.now();
-      const step = (now: number) => {
-        const p = Math.min((now - start) / duration, 1);
-        setCount(Math.round((1 - Math.pow(1 - p, 3)) * target));
-        if (p < 1) requestAnimationFrame(step);
-      };
-      requestAnimationFrame(step);
-    }, delay);
-    return () => clearTimeout(t);
-  }, [target, duration, delay]);
-  return count;
-}
-
-const StatItem: React.FC<{ value: number; label: string; delay?: number }> = ({
-  value,
-  label,
-  delay = 200,
-}) => {
-  const count = useCountUp(value, 1000, delay);
-  const display =
-    value >= 1000
-      ? count < 1000
-        ? count.toString()
-        : `${(count / 1000).toFixed(1)}K`
-      : count.toString();
-  return (
-    <Column style={{ alignItems: "center", gap: "4px", minWidth: "88px" }}>
-      <Text
-        style={{
-          color: "#1C1C1E",
-          fontSize: "1.6rem",
-          fontWeight: 800,
-          lineHeight: 1,
-        }}
-      >
-        {display}
-      </Text>
-      <Text style={{ color: "#8E8E93", fontSize: "0.78rem", fontWeight: 600 }}>
-        {label}
-      </Text>
-    </Column>
-  );
-};
+import ClientOnly from '@/components/common/ClientOnly';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
+import { useUserVector } from '@/context/UserVectorContext';
 
 // ═══════════ PROFILE PAGE ═══════════ //
 
@@ -103,20 +56,139 @@ export default function ProfilePage() {
     if (scrollRef.current) setShowSticky(scrollRef.current.scrollTop > 360);
   }, []);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("Posts");
+  const [activeTab, setActiveTab] = useState('Posts');
+  const { user, loading, refetch } = useAuth();
+  const { radarData } = useUserVector();
 
   // Form state
-  const [formName, setFormName] = useState(MOCK_USER.name);
-  const [formUsername, setFormUsername] = useState(
-    MOCK_USER.username.replace("@", ""),
-  );
-  const [formBio, setFormBio] = useState(MOCK_USER.bio);
-  const [formEmail, setFormEmail] = useState("ramona.f@email.com");
-  const [formPhone, setFormPhone] = useState("+84 901 234 567");
+  const [formName, setFormName] = useState('');
+  const [formUsername, setFormUsername] = useState('');
+  const [formBio, setFormBio] = useState('');
+  const [formEmail, setFormEmail] = useState('guest@email.com');
+  const [formPhone, setFormPhone] = useState('+84 901 234 567');
 
-  const handleSave = () => {
-    setIsEditModalOpen(false);
-    toast.success("Profile updated successfully! ✨");
+  // File upload state
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [saveLoading, setSaveLoading] = useState(false);
+
+  // Refs for hidden inputs
+  const avatarInputRef = React.useRef<HTMLInputElement>(null);
+  const coverInputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (user) {
+      setFormName(user.display_name || user.username || "");
+      setFormUsername(user.username || "");
+      setFormBio(user.bio || "");
+      setFormEmail(user.email || "");
+      setFormPhone(user.phone || "");
+      
+      // Cleanup Object URLs on unmount/user change if modal was closed dirty
+      return () => {
+         if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+         if (coverPreview) URL.revokeObjectURL(coverPreview);
+      };
+    }
+  }, [user]);
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Avatar must be JPEG, PNG, or WEBP (No GIFs).');
+      if (avatarInputRef.current) avatarInputRef.current.value = '';
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Avatar size must be less than 2MB.');
+      if (avatarInputRef.current) avatarInputRef.current.value = '';
+      return;
+    }
+
+    setAvatarFile(file);
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
+
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Cover must be JPEG, PNG, WEBP, or GIF.');
+      if (coverInputRef.current) coverInputRef.current.value = '';
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Cover size must be less than 5MB.');
+      if (coverInputRef.current) coverInputRef.current.value = '';
+      return;
+    }
+
+    setCoverFile(file);
+    if (coverPreview) URL.revokeObjectURL(coverPreview);
+    setCoverPreview(URL.createObjectURL(file));
+  };
+
+  const handleSave = async () => {
+    setSaveLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No session found");
+
+      const formData = new FormData();
+      formData.append("display_name", formName);
+      formData.append("username", formUsername);
+      formData.append("bio", formBio);
+      formData.append("phone", formPhone);
+      // NOTE: emails aren't naturally edited in simple patches unless your backend explicitly supports it
+
+      if (avatarFile) formData.append("avatar_file", avatarFile);
+      if (coverFile) formData.append("cover_file", coverFile);
+
+      const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:8000";
+      
+      const res = await fetch(`${API_URL}/api/v1/users/me`, {
+        method: "PATCH",
+        headers: {
+          "Authorization": `Bearer ${session.access_token}`
+        },
+        body: formData
+      });
+
+      if (!res.ok) {
+        let errMessage = "Unknown error";
+        try {
+           const errJson = await res.json();
+           errMessage = errJson.detail || errMessage;
+        } catch {}
+        throw new Error(errMessage);
+      }
+
+      await refetch();
+      
+      toast.success('Profile updated successfully! ✨');
+      setIsEditModalOpen(false);
+
+      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+      if (coverPreview) URL.revokeObjectURL(coverPreview);
+      setAvatarFile(null);
+      setCoverFile(null);
+      setAvatarPreview(null);
+      setCoverPreview(null);
+    } catch (e: any) {
+      toast.error(`Update failed: ${e.message}`);
+    } finally {
+      setSaveLoading(false);
+    }
   };
 
   const handleComingSoon = () =>
@@ -251,30 +323,9 @@ export default function ProfilePage() {
       </div>
 
       {/* ═══ COVER PHOTO ═══ */}
-      <div
-        style={{
-          position: "relative",
-          width: "100%",
-          height: "320px",
-          flexShrink: 0,
-        }}
-      >
-        <img
-          src={MOCK_USER.cover}
-          alt="Cover"
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background:
-              "linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.6) 100%)",
-          }}
-        />
+      <div style={{ position: 'relative', width: '100%', height: '320px', flexShrink: 0 }}>
+        <img src={user?.cover_url || "https://images.unsplash.com/photo-1543353071-087092ec393a?auto=format&fit=crop&q=80"} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.6) 100%)' }} />
 
         {/* Back Button */}
         <Link
@@ -380,77 +431,36 @@ export default function ProfilePage() {
         }}
       >
         {/* Avatar Area */}
-        <Row fillWidth style={{ marginBottom: "32px" }}>
-          <div style={{ position: "relative" }}>
-            <Avatar
-              src={MOCK_USER.avatar}
-              size="xl"
-              style={{
-                width: "160px",
-                height: "160px",
-                borderRadius: "50%",
-                borderTopWidth: "6px",
-                borderBottomWidth: "6px",
-                borderLeftWidth: "6px",
-                borderRightWidth: "6px",
-                borderStyle: "solid",
-                borderColor: "#FFFFFF",
-                boxShadow: "0 12px 32px rgba(0,0,0,0.1)",
-              }}
-            />
+        <Row fillWidth style={{ marginBottom: '32px' }}>
+          <div style={{ position: 'relative' }}>
+            <Avatar src={user?.avatar_url || ""} size="xl" style={{
+              width: '160px', height: '160px', borderRadius: '50%',
+              borderTopWidth: '6px', borderBottomWidth: '6px', borderLeftWidth: '6px', borderRightWidth: '6px',
+              borderStyle: 'solid', borderColor: '#FFFFFF',
+              boxShadow: '0 12px 32px rgba(0,0,0,0.1)',
+            }} />
             {/* Level Badge */}
-            <div
-              style={{
-                position: "absolute",
-                bottom: "8px",
-                right: "8px",
-                backgroundColor: "#007AFF",
-                borderRadius: "14px",
-                paddingTop: "6px",
-                paddingBottom: "6px",
-                paddingLeft: "12px",
-                paddingRight: "12px",
-                borderTopWidth: "4px",
-                borderBottomWidth: "4px",
-                borderLeftWidth: "4px",
-                borderRightWidth: "4px",
-                borderStyle: "solid",
-                borderColor: "#FFFFFF",
-                boxShadow: "0 4px 12px rgba(0,122,255,0.3)",
-              }}
-            >
-              <Text
-                style={{ color: "white", fontSize: "0.75rem", fontWeight: 800 }}
-              >
-                LV {MOCK_USER.level}
-              </Text>
+            <div style={{
+              position: 'absolute', bottom: '8px', right: '8px',
+              backgroundColor: '#007AFF', borderRadius: '14px',
+              paddingTop: '6px', paddingBottom: '6px', paddingLeft: '12px', paddingRight: '12px',
+              borderTopWidth: '4px', borderBottomWidth: '4px', borderLeftWidth: '4px', borderRightWidth: '4px',
+              borderStyle: 'solid', borderColor: '#FFFFFF',
+              boxShadow: '0 4px 12px rgba(0,122,255,0.3)',
+            }}>
+              <Text style={{ color: 'white', fontSize: '0.75rem', fontWeight: 800 }}>LV {user?.level || 1}</Text>
             </div>
           </div>
         </Row>
 
         {/* Name + Info */}
-        <Column style={{ gap: "10px", marginBottom: "32px" }}>
-          <Heading
-            variant="display-strong-s"
-            style={{ color: "#1C1C1E", fontSize: "2.5rem" }}
-          >
-            {MOCK_USER.name}
-          </Heading>
-
-          <Row style={{ gap: "12px", alignItems: "center" }}>
-            <Text
-              style={{ color: "#007AFF", fontWeight: 600, fontSize: "1rem" }}
-            >
-              {MOCK_USER.username} • {MOCK_USER.title}
-            </Text>
-            <div
-              style={{
-                backgroundColor: "#EAF2FF",
-                height: "14px",
-                width: "2px",
-              }}
-            />
-            <Row style={{ gap: "8px", alignItems: "center" }}>
+        <Column style={{ gap: '10px', marginBottom: '32px' }}>
+          <Heading variant="display-strong-s" style={{ color: '#1C1C1E', fontSize: '2.5rem' }}>{user?.display_name || user?.username || "Guest"}</Heading>
+          
+          <Row style={{ gap: '12px', alignItems: 'center' }}>
+            <Text style={{ color: '#007AFF', fontWeight: 600, fontSize: '1rem' }}>@{user?.username || "guest"} • {user?.title || "Taste Explorer"}</Text>
+            <div style={{ backgroundColor: '#EAF2FF', height: '14px', width: '2px' }} />
+            <Row style={{ gap: '8px', alignItems: 'center' }}>
               <TrendingUp size={14} color="#007AFF" />
               <Text
                 style={{
@@ -464,75 +474,32 @@ export default function ProfilePage() {
             </Row>
           </Row>
 
-          <Text
-            style={{
-              color: "#636366",
-              fontSize: "1rem",
-              lineHeight: 1.6,
-              maxWidth: "720px",
-            }}
-          >
-            {MOCK_USER.bio}
-          </Text>
+          <Text style={{ color: '#636366', fontSize: '1rem', lineHeight: 1.6, maxWidth: '720px' }}>{user?.bio || "Enjoying the food exploration journey!"}</Text>
 
           {/* Level Progress Bar */}
-          <Column style={{ gap: "8px", maxWidth: "320px", marginTop: "8px" }}>
-            <Row style={{ justifyContent: "space-between" }}>
-              <Text
-                style={{
-                  color: "#8E8E93",
-                  fontSize: "0.75rem",
-                  fontWeight: 600,
-                }}
-              >
-                Level {MOCK_USER.level} Progress
-              </Text>
-              <Text
-                style={{
-                  color: "#1C1C1E",
-                  fontSize: "0.75rem",
-                  fontWeight: 700,
-                }}
-              >
-                {MOCK_USER.xp} / {MOCK_USER.nextLevelXp} XP
-              </Text>
-            </Row>
-            <div
-              style={{
-                width: "100%",
-                height: "6px",
-                backgroundColor: "#EAF2FF",
-                borderRadius: "3px",
-                overflow: "hidden",
-              }}
-            >
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{
-                  width: `${(MOCK_USER.xp / MOCK_USER.nextLevelXp) * 100}%`,
-                }}
-                transition={{ duration: 1, delay: 0.5 }}
-                style={{
-                  height: "100%",
-                  backgroundColor: "#007AFF",
-                  borderRadius: "3px",
-                }}
-              />
-            </div>
+          <Column style={{ gap: '8px', maxWidth: '320px', marginTop: '8px' }}>
+             <Row style={{ justifyContent: 'space-between' }}>
+                <Text style={{ color: '#8E8E93', fontSize: '0.75rem', fontWeight: 600 }}>Level {user?.level || 1} Progress</Text>
+                <Text style={{ color: '#1C1C1E', fontSize: '0.75rem', fontWeight: 700 }}>{user?.xp || 0} / {((user?.level || 1) * 1000)} XP</Text>
+             </Row>
+             <div style={{ width: '100%', height: '6px', backgroundColor: '#EAF2FF', borderRadius: '3px', overflow: 'hidden' }}>
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${((user?.xp || 0) / ((user?.level || 1) * 1000)) * 100}%` }}
+                  transition={{ duration: 1, delay: 0.5 }}
+                  style={{ height: '100%', backgroundColor: '#007AFF', borderRadius: '3px' }} 
+                />
+             </div>
           </Column>
 
           <Row style={{ gap: "24px", marginTop: "16px" }}>
             <Row style={{ gap: "8px", alignItems: "center" }}>
               <MapPin size={16} color="#8E8E93" />
-              <Text style={{ color: "#8E8E93", fontSize: "0.9rem" }}>
-                {MOCK_USER.location}
-              </Text>
+              <Text style={{ color: '#8E8E93', fontSize: '0.9rem' }}>{user?.location || "Khám phá"}</Text>
             </Row>
             <Row style={{ gap: "8px", alignItems: "center" }}>
               <Calendar size={16} color="#8E8E93" />
-              <Text style={{ color: "#8E8E93", fontSize: "0.9rem" }}>
-                Joined {MOCK_USER.joined}
-              </Text>
+              <Text style={{ color: '#8E8E93', fontSize: '0.9rem' }}>Joined {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'March 2025'}</Text>
             </Row>
           </Row>
         </Column>
@@ -667,18 +634,8 @@ export default function ProfilePage() {
               }}
             >
               <ClientOnly>
-                <ResponsiveContainer
-                  width="100%"
-                  height={280}
-                  minWidth={100}
-                  debounce={50}
-                >
-                  <RadarChart
-                    cx="50%"
-                    cy="50%"
-                    outerRadius="70%"
-                    data={MOCK_USER.radarData}
-                  >
+                <ResponsiveContainer width="100%" height={280} minWidth={100} debounce={50}>
+                  <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
                     <PolarGrid stroke="rgba(0,122,255,0.1)" />
                     <PolarAngleAxis
                       dataKey="subject"
@@ -899,241 +856,42 @@ export default function ProfilePage() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
             >
-              {activeTab === "Posts" && (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(3, 1fr)",
-                    gap: "16px",
-                  }}
-                >
-                  {MOCK_USER.posts.map((post) => (
-                    <motion.div
-                      key={post.id}
-                      whileHover={{ scale: 1.02 }}
-                      style={{
-                        aspectRatio: "1/1",
-                        borderRadius: "24px",
-                        overflow: "hidden",
-                        position: "relative",
-                        cursor: "pointer",
-                        backgroundColor: "#EAF2FF",
-                      }}
-                    >
-                      <img
-                        src={post.img}
-                        alt="Post"
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                        }}
-                      />
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          backgroundColor: "rgba(0,0,0,0.2)",
-                          opacity: 0,
-                          transition: "opacity 0.2s",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "24px",
-                        }}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.opacity = "1")
-                        }
-                        onMouseLeave={(e) =>
-                          (e.currentTarget.style.opacity = "0")
-                        }
-                      >
-                        <Row style={{ gap: "8px", alignItems: "center" }}>
-                          <Heart size={20} color="white" fill="white" />
-                          <Text style={{ color: "white", fontWeight: 700 }}>
-                            {post.likes}
-                          </Text>
-                        </Row>
-                        <Row style={{ gap: "8px", alignItems: "center" }}>
-                          <MessageCircle size={20} color="white" fill="white" />
-                          <Text style={{ color: "white", fontWeight: 700 }}>
-                            {post.comments}
-                          </Text>
-                        </Row>
-                      </div>
-                    </motion.div>
-                  ))}
+              {activeTab === 'Posts' && (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
+                  <Text style={{ color: '#8E8E93' }}>No posts yet.</Text>
                 </div>
               )}
 
-              {activeTab === "Achievements" && (
-                <Column style={{ gap: "32px" }}>
-                  <Row style={{ gap: "16px", flexWrap: "wrap" }}>
-                    {MOCK_USER.badges.map((badge) => (
-                      <Row
-                        key={badge.label}
-                        style={{
-                          gap: "16px",
-                          alignItems: "center",
-                          paddingTop: "18px",
-                          paddingBottom: "18px",
-                          paddingLeft: "32px",
-                          paddingRight: "32px",
-                          backgroundColor: "#EAF2FF",
-                          borderTopWidth: "1px",
-                          borderBottomWidth: "1px",
-                          borderLeftWidth: "1px",
-                          borderRightWidth: "1px",
-                          borderStyle: "solid",
-                          borderColor: "rgba(0,122,255,0.08)",
-                          borderRadius: "24px",
-                        }}
-                      >
-                        <span style={{ fontSize: "1.5rem" }}>{badge.icon}</span>
+              {activeTab === 'Achievements' && (
+                <Column style={{ gap: '32px' }}>
+                  <Row style={{ gap: '16px', flexWrap: 'wrap' }}>
+                    {(user?.badges || []).map((badge: any) => (
+                      <Row key={badge.label} style={{
+                        gap: '16px', alignItems: 'center',
+                        paddingTop: '18px', paddingBottom: '18px', paddingLeft: '32px', paddingRight: '32px',
+                        backgroundColor: '#EAF2FF',
+                        borderTopWidth: '1px', borderBottomWidth: '1px', borderLeftWidth: '1px', borderRightWidth: '1px',
+                        borderStyle: 'solid', borderColor: 'rgba(0,122,255,0.08)',
+                        borderRadius: '24px',
+                      }}>
+                        <span style={{ fontSize: '1.5rem' }}>{badge.icon}</span>
                         <Column>
-                          <Text
-                            style={{
-                              color: "#007AFF",
-                              fontWeight: 700,
-                              fontSize: "0.95rem",
-                            }}
-                          >
-                            {badge.label}
-                          </Text>
-                          <Text
-                            style={{
-                              color: "rgba(0,122,255,0.6)",
-                              fontSize: "0.75rem",
-                              fontWeight: 600,
-                            }}
-                          >
-                            Unlocked Mar 2025
-                          </Text>
+                           <Text style={{ color: '#007AFF', fontWeight: 700, fontSize: '0.95rem' }}>{badge.label}</Text>
+                           <Text style={{ color: 'rgba(0,122,255,0.6)', fontSize: '0.75rem', fontWeight: 600 }}>Unlocked recently</Text>
                         </Column>
                       </Row>
                     ))}
+                    {!user?.badges?.length && (
+                      <Text style={{ color: '#8E8E93', paddingTop: '16px', paddingBottom: '16px' }}>No achievements unlocked yet.</Text>
+                    )}
                   </Row>
                 </Column>
               )}
 
-              {activeTab === "Reviews" && (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(2, 1fr)",
-                    gap: "20px",
-                  }}
-                >
-                  {MOCK_USER.topSpots.map((spot) => (
-                    <Column
-                      key={spot.name}
-                      style={{
-                        paddingTop: "24px",
-                        paddingBottom: "24px",
-                        paddingLeft: "24px",
-                        paddingRight: "24px",
-                        backgroundColor: "#FFFFFF",
-                        borderRadius: "24px",
-                        gap: "16px",
-                        borderTopWidth: "1px",
-                        borderBottomWidth: "1px",
-                        borderLeftWidth: "1px",
-                        borderRightWidth: "1px",
-                        borderStyle: "solid",
-                        borderColor: "#EAF2FF",
-                        boxShadow: "0 8px 24px rgba(0,122,255,0.04)",
-                        transition: "transform 0.2s",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <Row style={{ gap: "16px", alignItems: "center" }}>
-                        <img
-                          src={spot.img}
-                          alt={spot.name}
-                          style={{
-                            width: "64px",
-                            height: "64px",
-                            borderRadius: "14px",
-                            objectFit: "cover",
-                            flexShrink: 0,
-                          }}
-                        />
-                        <Column
-                          style={{
-                            flexGrow: 1,
-                            flexShrink: 1,
-                            flexBasis: "0%",
-                            gap: "4px",
-                          }}
-                        >
-                          <Heading
-                            variant="heading-strong-s"
-                            style={{ fontSize: "1rem", color: "#1C1C1E" }}
-                          >
-                            {spot.name}
-                          </Heading>
-                          <Row style={{ gap: "4px" }}>
-                            {[1, 2, 3, 4, 5].map((i) => (
-                              <Star
-                                key={i}
-                                size={12}
-                                color={i <= 4 ? "#FBBF24" : "#E5E5EA"}
-                                fill={i <= 4 ? "#FBBF24" : "#E5E5EA"}
-                              />
-                            ))}
-                          </Row>
-                        </Column>
-                        <Text
-                          style={{
-                            color: "#8E8E93",
-                            fontSize: "0.75rem",
-                            fontWeight: 600,
-                          }}
-                        >
-                          2d ago
-                        </Text>
-                      </Row>
-                      <Column style={{ gap: "12px" }}>
-                        <div
-                          style={{
-                            paddingTop: "4px",
-                            paddingBottom: "4px",
-                            paddingLeft: "10px",
-                            paddingRight: "10px",
-                            backgroundColor: "#EAF2FF",
-                            borderRadius: "8px",
-                            alignSelf: "flex-start",
-                          }}
-                        >
-                          <Text
-                            style={{
-                              color: "#007AFF",
-                              fontSize: "0.7rem",
-                              fontWeight: 700,
-                              textTransform: "uppercase",
-                            }}
-                          >
-                            {spot.category}
-                          </Text>
-                        </div>
-                        <Text
-                          style={{
-                            color: "#636366",
-                            fontSize: "0.9rem",
-                            lineHeight: 1.6,
-                            fontWeight: 500,
-                          }}
-                        >
-                          "The best {spot.category} in the area. Spicy level is
-                          perfect for my Taste DNA!"
-                        </Text>
-                      </Column>
-                    </Column>
-                  ))}
-                </div>
+              {activeTab === 'Reviews' && (
+                 <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
+                    <Text style={{ color: '#8E8E93' }}>No reviews yet.</Text>
+                 </div>
               )}
 
               {activeTab === "Visited" && (
@@ -1300,35 +1058,11 @@ export default function ProfilePage() {
                   }}
                 >
                   {/* Cover Photo */}
-                  <div
-                    style={{
-                      position: "relative",
-                      height: "140px",
-                      borderRadius: "18px",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <img
-                      src={MOCK_USER.cover}
-                      alt="Cover"
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                      }}
-                    />
+                  <div style={{ position: 'relative', height: '140px', borderRadius: '18px', overflow: 'hidden' }}>
+                    <img src={coverPreview || user?.cover_url || "https://images.unsplash.com/photo-1543353071-087092ec393a?auto=format&fit=crop&q=80"} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.1)' }} />
                     <div
-                      style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        background: "rgba(0,0,0,0.1)",
-                      }}
-                    />
-                    <div
-                      onClick={handleComingSoon}
+                      onClick={() => coverInputRef.current?.click()}
                       style={{
                         position: "absolute",
                         bottom: "12px",
@@ -1356,32 +1090,16 @@ export default function ProfilePage() {
                   </div>
 
                   {/* Avatar */}
-                  <Row
-                    style={{
-                      marginTop: "-54px",
-                      marginLeft: "24px",
-                      zIndex: 2,
-                    }}
-                  >
-                    <div style={{ position: "relative" }}>
-                      <Avatar
-                        src={MOCK_USER.avatar}
-                        size="xl"
-                        style={{
-                          width: "100px",
-                          height: "100px",
-                          borderRadius: "50%",
-                          borderTopWidth: "4px",
-                          borderBottomWidth: "4px",
-                          borderLeftWidth: "4px",
-                          borderRightWidth: "4px",
-                          borderStyle: "solid",
-                          borderColor: "#FFFFFF",
-                          boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
-                        }}
-                      />
+                  <Row style={{ marginTop: '-54px', marginLeft: '24px', zIndex: 2 }}>
+                    <div style={{ position: 'relative' }}>
+                      <Avatar src={avatarPreview || user?.avatar_url || ""} size="xl" style={{
+                        width: '100px', height: '100px', borderRadius: '50%',
+                        borderTopWidth: '4px', borderBottomWidth: '4px', borderLeftWidth: '4px', borderRightWidth: '4px',
+                        borderStyle: 'solid', borderColor: '#FFFFFF',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
+                      }} />
                       <div
-                        onClick={handleComingSoon}
+                        onClick={() => avatarInputRef.current?.click()}
                         style={{
                           position: "absolute",
                           bottom: "2px",
@@ -1699,6 +1417,11 @@ export default function ProfilePage() {
                       />
                     </Column>
                   </Column>
+
+                  {/* Hidden File Inputs */}
+                  <input type="file" ref={avatarInputRef} style={{ display: 'none' }} onChange={handleAvatarChange} accept="image/jpeg, image/png, image/webp" />
+                  <input type="file" ref={coverInputRef} style={{ display: 'none' }} onChange={handleCoverChange} accept="image/jpeg, image/png, image/webp, image/gif" />
+
                 </Column>
               </div>
 
@@ -1748,24 +1471,20 @@ export default function ProfilePage() {
                   size="m"
                   onClick={handleSave}
                   style={{
-                    backgroundColor: "#007AFF",
-                    color: "#FFFFFF",
-                    borderRadius: "16px",
-                    fontWeight: 700,
-                    paddingTop: "12px",
-                    paddingBottom: "12px",
-                    paddingLeft: "32px",
-                    paddingRight: "32px",
-                    cursor: "pointer",
-                    borderTopWidth: "0px",
-                    borderBottomWidth: "0px",
-                    borderLeftWidth: "0px",
-                    borderRightWidth: "0px",
-                    borderStyle: "none",
-                    boxShadow: "0 8px 24px rgba(0,122,255,0.3)",
+                    backgroundColor: saveLoading ? '#B0CBFA' : '#007AFF', color: '#FFFFFF',
+                    borderRadius: '16px', fontWeight: 700,
+                    paddingTop: '12px',
+                    paddingBottom: '12px',
+                    paddingLeft: '32px',
+                    paddingRight: '32px',
+                    cursor: saveLoading ? 'not-allowed' : 'pointer',
+                    borderTopWidth: '0px', borderBottomWidth: '0px', borderLeftWidth: '0px', borderRightWidth: '0px',
+                    borderStyle: 'none',
+                    boxShadow: saveLoading ? 'none' : '0 8px 24px rgba(0,122,255,0.3)',
                   }}
+                  disabled={saveLoading}
                 >
-                  <Save size={16} style={{ marginRight: "8px" }} /> Save Changes
+                  <Save size={16} style={{ marginRight: '8px' }} /> {saveLoading ? "Saving..." : "Save Changes"}
                 </Button>
               </Row>
             </motion.div>

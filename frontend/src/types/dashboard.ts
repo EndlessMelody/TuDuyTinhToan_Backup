@@ -1,12 +1,17 @@
 export interface ReelData {
+  id: number;
   title: string;
   user: string;
   views: string;
   userAvatar: string;
   img: string;
+  videoUrl?: string;
+  likes?: number;
+  comments?: number;
 }
 
 export interface PostData {
+  id: number;
   name: string;
   avatar: string;
   time: string;

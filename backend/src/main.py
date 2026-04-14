@@ -31,6 +31,11 @@ async def lifespan(app: FastAPI):
     except Exception:
         app.state.redis = InMemoryRedis()
         print("⚠️  Redis không khả dụng — dùng bộ nhớ tạm (InMemoryRedis) để test.")
+
+    # Khởi động cronjob dọn dẹp interaction (3:00 AM hàng ngày)
+    from src.tasks.interaction_cleanup import schedule_cleanup
+    schedule_cleanup(app)
+
     yield
     await app.state.redis.close()
 
@@ -47,13 +52,19 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Cho phép tất cả các domain gọi đến API (dùng cho test)
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# Serve uploaded media files at /static/uploads/
+import os
+from fastapi.staticfiles import StaticFiles
+os.makedirs("static/uploads", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/health")
 async def health_check():

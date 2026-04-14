@@ -7,20 +7,20 @@ from typing import Optional
 
 router = APIRouter()
 
-@router.get("/cards", response_model=FeedResponse)
+@router.get(
+    "/cards",
+    response_model=FeedResponse,
+    summary="Lấy thẻ swipe (Tinder-style)",
+    description="Trả kèm photos và reviews_preview để hỗ trợ Flip Card UI mà không cần gọi thêm API."
+)
+
 async def get_cards(
-    user_id: Optional[str] = None,
-    type: str = "place",
-    limit: int = 10,
+    user_id: Optional[str] = Query(None),
+    category: str = Query("place", description="'food' hoặc 'place'"),
+    lat: Optional[float] = Query(None, description="Tọa độ user — backend tính distance_km ở tầng DB"),
+    lng: Optional[float] = Query(None),
+    limit: int = Query(10, ge=1, le=50),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Lấy danh sách thẻ để Frontend render (Batch Fetching).
-    - user_id: ID người dùng (dùng để lọc thẻ đã xem/ưu tiên vector sau này)
-    - type: "food" hoặc "place"
-    - limit: số lượng thẻ muốn lấy (mặc định 10)
-    
-    Response KHÔNG chứa vector — Frontend chỉ cần thông tin hiển thị.
-    """
-    cards = await get_feed_cards(db=db, user_id=user_id, feed_type=type, limit=limit)
+    cards = await get_feed_cards(db=db, user_id=user_id, category=category, limit=limit, lat=lat, lng=lng)
     return {"cards": cards}

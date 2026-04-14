@@ -257,13 +257,13 @@ export function PostCard({
                   fill={isLiked ? "#ED1B24" : "none"}
                 />
                 <Text variant="label-default-m" weight="strong" style={{ color: "var(--neutral-strong)" }}>
-                  {isLiked ? likes + 1 : likes}
+                  {isLiked ? (likes || 0) + 1 : (likes || 0)}
                 </Text>
               </Row>
               <Row gap="8" vertical="center" style={{ cursor: "pointer" }}>
                 <MessageCircle size={20} color="#8E8E93" />
                 <Text variant="label-default-m" weight="strong" style={{ color: "var(--neutral-strong)" }}>
-                  {comments}
+                  {comments || 0}
                 </Text>
               </Row>
             </Row>

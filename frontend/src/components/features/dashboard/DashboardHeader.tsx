@@ -27,8 +27,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { MOCK_USER } from "@/constants/mock-data";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 
 interface DashboardHeaderProps {
   scrollY: MotionValue<number>;
@@ -44,13 +43,11 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   onNotifClick,
 }) => {
   const router = useRouter();
-  const { isLoggedIn, user, logout } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
-
-  // Transforms for Dynamic Island effect
   const headerWidth = useTransform(scrollY, [0, 80], ["100%", "80%"]);
   const headerRadius = useTransform(scrollY, [0, 80], ["0px", "32px"]);
   const headerTop = useTransform(scrollY, [0, 80], ["0px", "12px"]);
@@ -149,10 +146,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           }}
         >
           <MapPin size={16} color="#ED1B24" />
-          <Text
-            style={{ color: "#1C1C1E", fontWeight: 600, fontSize: "0.82rem" }}
-          >
-            {user?.location ?? MOCK_USER.location}
+          <Text style={{ color: "#1C1C1E", fontWeight: 600, fontSize: "0.82rem" }}>
+            {user?.location || "Khám phá"}
           </Text>
           <span
             style={{ color: "#C7C7CC", fontSize: "0.7rem", marginLeft: "2px" }}
@@ -350,7 +345,28 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
         {/* Profile */}
         <div ref={profileMenuRef} style={{ position: "relative" }}>
-          {!isLoggedIn ? (
+          {/* Keyframes for skeleton pulse */}
+          <style>{`
+            @keyframes tm-pulse {
+              0%, 100% { opacity: 1; }
+              50% { opacity: 0.45; }
+            }
+          `}</style>
+
+          {loading ? (
+            /* ── Loading: circular skeleton ── */
+            <div
+              style={{
+                marginLeft: "12px",
+                width: 32,
+                height: 32,
+                borderRadius: "50%",
+                backgroundColor: "#F2F2F7",
+                animation: "tm-pulse 1.4s ease-in-out infinite",
+                flexShrink: 0,
+              }}
+            />
+          ) : !user ? (
             /* ── Guest: Sign In button ── */
             <button
               onClick={() => router.push("/login")}
@@ -397,7 +413,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               }}
               onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
             >
-              <Avatar src={user!.avatar} size="m" />
+              <Avatar src={user?.avatar_url || undefined} size="m" />
               <motion.div
                 style={{
                   opacity: profileTextOpacity,
@@ -415,10 +431,10 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     fontSize: "0.85rem",
                   }}
                 >
-                  {user!.name}
+                  {user?.display_name || user?.username || 'User'}
                 </Text>
                 <Text style={{ color: "#AEAEB2", fontSize: "0.7rem" }}>
-                  Level {user!.level}
+                  Level {user?.level ?? 1}
                 </Text>
               </motion.div>
             </motion.div>
@@ -501,7 +517,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   label="Đăng xuất"
                   onClick={() => {
                     setIsProfileMenuOpen(false);
-                    logout();
+                    signOut();
                     router.push("/");
                   }}
                   style={{ color: "#ED1B24" }}

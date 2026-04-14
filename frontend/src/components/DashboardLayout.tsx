@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppStatusBar } from "./common/AppStatusBar";
-import { MOCK_USER } from "@/constants/mock-data";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Radar,
   RadarChart,
@@ -33,8 +33,6 @@ import {
 } from "recharts";
 import ClientOnly from "./common/ClientOnly";
 import { UserVectorProvider, useUserVector } from "@/context/UserVectorContext";
-
-const radarDataSample = MOCK_USER.radarData;
 
 import { Sidebar } from "./common/Sidebar";
 import { ChatProvider, useChat } from "@/context/ChatContext";
@@ -144,7 +142,7 @@ export default function DashboardLayout({
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const { radarData, mergedRadarData, isPulsing } = useUserVector();
-  const { isLoggedIn, isInitializing } = useAuth();
+  const { user } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isRightExpanded, setIsRightExpanded] = useState(false);
   const router = useRouter();

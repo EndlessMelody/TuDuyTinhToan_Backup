@@ -2,7 +2,7 @@
 
 import React from "react";
 import { LoginBranding } from "@/components/features/auth/LoginBranding";
-import { LoginForm }     from "@/components/features/auth/LoginForm";
+import { LoginForm } from "@/components/features/auth/LoginForm";
 
 export default function LoginPage() {
   return (

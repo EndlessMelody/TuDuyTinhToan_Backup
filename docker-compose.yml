@@ -1,22 +1,8 @@
-services:
-  db:
-    image: pgvector/pgvector:pg16
-    container_name: tdtt_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
-      POSTGRES_DB: ${POSTGRES_DB:-tdtt_db}
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-tdtt_db}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+# docker-compose.yml — TasteMap local dev services
+# NOTE: PostgreSQL đã được migrate sang Supabase (managed cloud).
+#       File này chỉ còn Redis cho local development.
 
+services:
   redis:
     image: redis:7-alpine
     container_name: tdtt_redis
@@ -28,7 +14,3 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-volumes:
-  pgdata:
-    driver: local
