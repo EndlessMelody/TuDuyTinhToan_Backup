@@ -1,28 +1,37 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, ArrowRight, ChevronLeft } from "lucide-react";
-import { MOCK_USER } from "@/constants/mock-data";
 import { useAuth } from "@/context/AuthContext";
 
 type View = "login" | "signup";
-type LoadingType = null | "google" | "email" | "mock";
+type LoadingType = null | "google" | "email";
 
 export function LoginForm() {
   const router = useRouter();
   const auth = useAuth();
   const [view, setView] = useState<View>("login");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState<LoadingType>(null);
   const [error, setError] = useState("");
 
+  // Sync auth context error with local state
+  useEffect(() => {
+    if (auth.error) {
+      setError(String(auth.error));
+    }
+  }, [auth.error]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    auth.clearError();
+
     if (!email) {
       setError("Please enter your email.");
       return;
@@ -31,24 +40,37 @@ export function LoginForm() {
       setError("Please enter your password.");
       return;
     }
+
     setLoading("email");
-    await auth.login("email");
-    setLoading(null);
-    router.push("/discover");
+
+    try {
+      if (view === "login") {
+        await auth.login({ email, password });
+      } else {
+        // Sign up
+        if (!name) {
+          setError("Please enter your name.");
+          setLoading(null);
+          return;
+        }
+        // Generate username from email (before @)
+        const username = email.split("@")[0];
+        await auth.register({ username, email, password, name });
+      }
+      router.push("/discover");
+    } catch {
+      // Error is already set in auth context
+    } finally {
+      setLoading(null);
+    }
   };
 
   const handleGoogleLogin = async () => {
     setLoading("google");
-    await auth.login("google");
+    // Google OAuth not implemented yet
+    await new Promise((r) => setTimeout(r, 1000));
+    setError("Google login coming soon!");
     setLoading(null);
-    router.push("/discover");
-  };
-
-  const handleMockLogin = async () => {
-    setLoading("mock");
-    await auth.login("email");
-    setLoading(null);
-    router.push("/discover");
   };
 
   return (
@@ -127,100 +149,6 @@ export function LoginForm() {
               : "Start mapping your food journey today"}
           </p>
         </motion.div>
-
-        {/* Mock user quick-login */}
-        <motion.button
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15, duration: 0.45 }}
-          onClick={handleMockLogin}
-          disabled={loading !== null}
-          style={{
-            width: "100%",
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "14px 16px",
-            borderRadius: 14,
-            backgroundColor: "rgba(0,0,0,0.02)",
-            border: "1.5px solid rgba(0,122,255,0.2)",
-            cursor: loading !== null ? "not-allowed" : "pointer",
-            textAlign: "left",
-            marginBottom: 16,
-            transition: "border-color 0.15s, background 0.15s",
-            opacity: loading !== null ? 0.7 : 1,
-          }}
-          onMouseEnter={(e) => {
-            if (loading === null) {
-              (e.currentTarget as HTMLElement).style.borderColor =
-                "rgba(0,122,255,0.5)";
-              (e.currentTarget as HTMLElement).style.backgroundColor =
-                "rgba(0,122,255,0.03)";
-            }
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.borderColor =
-              "rgba(0,122,255,0.2)";
-            (e.currentTarget as HTMLElement).style.backgroundColor =
-              "rgba(0,0,0,0.02)";
-          }}
-        >
-          <div style={{ position: "relative", flexShrink: 0 }}>
-            <img
-              src={MOCK_USER.avatar}
-              alt=""
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                border: "2px solid rgba(0,122,255,0.2)",
-                display: "block",
-              }}
-            />
-            <div
-              style={{
-                position: "absolute",
-                bottom: 0,
-                right: 0,
-                width: 10,
-                height: 10,
-                borderRadius: "50%",
-                backgroundColor: "#34C759",
-                border: "2px solid white",
-              }}
-            />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 7,
-                marginBottom: 2,
-              }}
-            >
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#1C1C1E" }}>
-                {MOCK_USER.name}
-              </span>
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: "#007AFF",
-                  backgroundColor: "rgba(0,122,255,0.08)",
-                  padding: "2px 7px",
-                  borderRadius: 6,
-                }}
-              >
-                MOCK
-              </span>
-            </div>
-            <span style={{ fontSize: 12, color: "rgba(0,0,0,0.4)" }}>
-              Continue as this demo user
-            </span>
-          </div>
-          <ArrowRight size={15} color="rgba(0,0,0,0.3)" />
-        </motion.button>
 
         {/* Google button */}
         <motion.button
@@ -364,6 +292,8 @@ export function LoginForm() {
               <input
                 type="text"
                 placeholder="Your name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 style={{
                   width: "100%",
                   boxSizing: "border-box",
@@ -511,7 +441,9 @@ export function LoginForm() {
                 border: "1px solid rgba(255,59,48,0.15)",
               }}
             >
-              <span style={{ fontSize: 13, color: "#D70015" }}>{error}</span>
+              <span style={{ fontSize: 13, color: "#D70015" }}>
+                {String(error)}
+              </span>
             </div>
           )}
 
@@ -620,9 +552,9 @@ export function LoginForm() {
             lineHeight: 1.6,
           }}
         >
-          Authentication is mocked — any credentials work.
+          Secure authentication powered by JWT.
           <br />
-          Real auth coming in the next release.
+          Your data is encrypted and protected.
         </p>
       </div>
 

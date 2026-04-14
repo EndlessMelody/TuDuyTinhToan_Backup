@@ -4,18 +4,25 @@ import React, {
   createContext,
   useContext,
   useState,
+  useEffect,
   useSyncExternalStore,
 } from "react";
-import { MOCK_USER } from "@/constants/mock-data";
-
-export type AuthUser = typeof MOCK_USER;
+import {
+  authApi,
+  type UserData,
+  type LoginRequest,
+  type RegisterRequest,
+} from "@/lib/api";
 
 interface AuthContextValue {
   isInitializing: boolean;
   isLoggedIn: boolean;
-  user: AuthUser | null;
-  login: (method: "google" | "email") => Promise<void>;
+  user: UserData | null;
+  login: (credentials: LoginRequest) => Promise<void>;
+  register: (data: RegisterRequest) => Promise<void>;
   logout: () => void;
+  error: string | null;
+  clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -23,51 +30,84 @@ const AuthContext = createContext<AuthContextValue>({
   isLoggedIn: false,
   user: null,
   login: async () => {},
+  register: async () => {},
   logout: () => {},
+  error: null,
+  clearError: () => {},
 });
 
-const STORAGE_KEY = "tastemap_auth";
-
-function readPersistedAuth(): AuthUser | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return localStorage.getItem(STORAGE_KEY) === "true" ? MOCK_USER : null;
-  } catch {
-    return null;
-  }
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // Read localStorage synchronously on first client render (safe: guarded by typeof window check)
-  const [user, setUser] = useState<AuthUser | null>(readPersistedAuth);
+  const [user, setUser] = useState<UserData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Check for existing auth on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      if (authApi.isAuthenticated()) {
+        try {
+          const userData = await authApi.getCurrentUser();
+          setUser(userData);
+        } catch {
+          // Token invalid, clear it
+          authApi.logout();
+        }
+      }
+    };
+    checkAuth();
+  }, []);
 
   // isInitializing: true on the server / during SSR, false once hydrated on the client.
-  // useSyncExternalStore is the React-safe way to detect client vs server without
-  // calling setState inside an effect (which the React Compiler flags as a cascade).
   const isInitializing = useSyncExternalStore(
     () => () => {},
     () => false, // client snapshot: already initialised
     () => true, // server snapshot: not yet initialised
   );
 
-  const login = async (method: "google" | "email") => {
-    await new Promise((r) => setTimeout(r, method === "google" ? 800 : 1200));
-    setUser(MOCK_USER);
+  const clearError = () => setError(null);
+
+  const login = async (credentials: LoginRequest) => {
+    setError(null);
     try {
-      localStorage.setItem(STORAGE_KEY, "true");
-    } catch {}
+      const response = await authApi.login(credentials);
+      setUser(response.user);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Login failed";
+      setError(message);
+      throw err;
+    }
+  };
+
+  const register = async (data: RegisterRequest) => {
+    setError(null);
+    try {
+      const response = await authApi.register(data);
+      setUser(response.user);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Registration failed";
+      setError(message);
+      throw err;
+    }
   };
 
   const logout = () => {
+    authApi.logout();
     setUser(null);
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {}
+    setError(null);
   };
 
   return (
     <AuthContext.Provider
-      value={{ isInitializing, isLoggedIn: !!user, user, login, logout }}
+      value={{
+        isInitializing,
+        isLoggedIn: !!user,
+        user,
+        login,
+        register,
+        logout,
+        error,
+        clearError,
+      }}
     >
       {children}
     </AuthContext.Provider>

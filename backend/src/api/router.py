@@ -4,8 +4,10 @@ from src.recommendations.router import router as recommendations_router
 from src.sessions.router import router as sessions_router
 from src.feed.router import router as feed_router
 from src.interactions.router import router as interactions_router
+from src.api.auth_router import router as auth_router
 
 api_router = APIRouter()
+api_router.include_router(auth_router, prefix="/auth", tags=["authentication"])
 api_router.include_router(users_router, prefix="/users", tags=["users"])
 api_router.include_router(recommendations_router, prefix="/recommendations", tags=["recommendations"])
 api_router.include_router(sessions_router, prefix="/users", tags=["sessions"])

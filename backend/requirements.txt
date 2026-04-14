@@ -11,3 +11,6 @@ alembic
 greenlet
 httpx
 numpy
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
