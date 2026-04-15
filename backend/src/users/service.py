@@ -5,7 +5,7 @@ import json
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func
+from sqlalchemy import func, or_
 import redis.asyncio as aioredis
 from typing import Optional, List
 
@@ -231,3 +231,38 @@ class UserService:
         except Exception as e:
             await self.db.rollback()
             raise HTTPException(status_code=400, detail=f"Không thể tạo người dùng JIT: {str(e)}")
+
+    async def search_users(self, current_user_id: int, q: str, limit: int = 10) -> list:
+        q = q.strip()
+        if not q:
+            return []
+        pattern = f"%{q}%"
+        result = await self.db.execute(
+            select(User)
+            .where(
+                User.id != current_user_id,
+                or_(User.username.ilike(pattern), User.display_name.ilike(pattern)),
+            )
+            .limit(limit)
+        )
+        users = result.scalars().all()
+
+        items = []
+        for u in users:
+            fs_res = await self.db.execute(
+                select(Friendship).where(
+                    or_(
+                        (Friendship.user_id == current_user_id) & (Friendship.friend_id == u.id),
+                        (Friendship.user_id == u.id) & (Friendship.friend_id == current_user_id),
+                    )
+                )
+            )
+            fs = fs_res.scalars().first()
+            items.append({
+                "id": u.id,
+                "username": u.username,
+                "display_name": u.display_name,
+                "avatar_url": u.avatar_url,
+                "friendship_status": fs.status if fs else None,
+            })
+        return items

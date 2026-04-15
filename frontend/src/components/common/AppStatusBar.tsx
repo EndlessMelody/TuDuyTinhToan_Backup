@@ -4,7 +4,7 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { Row, Text } from "@/components/OnceUI";
 import { Cpu, Globe, Users, Cloud, Clock, LogIn, LogOut } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/context/AuthContext";
 
 /**
  * AppStatusBar - A fixed, center-aligned status bar for the Super App dashboard.
@@ -12,7 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
  */
 export const AppStatusBar = () => {
   const [time, setTime] = React.useState<string>("");
-  const { user, signOut } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
 
   React.useEffect(() => {
@@ -179,7 +179,7 @@ export const AppStatusBar = () => {
               </Text>
               <button
                 onClick={() => {
-                  signOut();
+                  logout();
                   router.push("/");
                 }}
                 title="Sign out"

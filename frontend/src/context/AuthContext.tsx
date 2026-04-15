@@ -7,20 +7,32 @@ import React, {
   useEffect,
   useSyncExternalStore,
 } from "react";
-import {
-  authApi,
-  type UserData,
-  type LoginRequest,
-  type RegisterRequest,
-} from "@/lib/api";
+import { supabase } from "@/lib/supabase";
+import { apiPost } from "@/lib/api";
+
+export interface UserData {
+  id: number;
+  username: string;
+  email: string;
+  display_name?: string;
+  avatar_url?: string;
+  cover_url?: string;
+  bio?: string;
+  location?: string;
+  title?: string;
+  xp: number;
+  level: number;
+}
 
 interface AuthContextValue {
   isInitializing: boolean;
   isLoggedIn: boolean;
   user: UserData | null;
-  login: (credentials: LoginRequest) => Promise<void>;
-  register: (data: RegisterRequest) => Promise<void>;
-  logout: () => void;
+  login: (credentials: {
+    emailOrUsername: string;
+    password: string;
+  }) => Promise<void>;
+  logout: () => Promise<void>;
   error: string | null;
   clearError: () => void;
 }
@@ -30,68 +42,123 @@ const AuthContext = createContext<AuthContextValue>({
   isLoggedIn: false,
   user: null,
   login: async () => {},
-  register: async () => {},
-  logout: () => {},
+  logout: async () => {},
   error: null,
   clearError: () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserData | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Check for existing auth on mount
-  useEffect(() => {
-    const checkAuth = async () => {
-      if (authApi.isAuthenticated()) {
-        try {
-          const userData = await authApi.getCurrentUser();
-          setUser(userData);
-        } catch {
-          // Token invalid, clear it
-          authApi.logout();
-        }
-      }
-    };
-    checkAuth();
-  }, []);
-
-  // isInitializing: true on the server / during SSR, false once hydrated on the client.
-  const isInitializing = useSyncExternalStore(
+  // isHydrated: false on server (SSR), true on client after hydration
+  const isHydrated = useSyncExternalStore(
     () => () => {},
-    () => false, // client snapshot: already initialised
-    () => true, // server snapshot: not yet initialised
+    () => true, // client snapshot
+    () => false, // server snapshot
   );
+
+  // isInitializing: true while SSR or while checking auth state
+  const isInitializing = !isHydrated || !authChecked;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    // onAuthStateChange handles all session states:
+    // - INITIAL_SESSION: fires on mount with the restored session (or null).
+    //   This replaces the old getSession() call and correctly handles expired
+    //   tokens by auto-refreshing before firing, preventing false logouts.
+    // - SIGNED_IN: new explicit login or post-OAuth redirect
+    // - SIGNED_OUT: logout
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
+      try {
+        if (event === "INITIAL_SESSION" || event === "SIGNED_IN") {
+          if (session) {
+            try {
+              const userData = await apiPost<UserData>("/api/v1/auth/sync");
+              if (isMounted) setUser(userData);
+            } catch {
+              // Backend unreachable — keep user logged in via Supabase session
+              if (isMounted && session.user) {
+                const meta = session.user.user_metadata ?? {};
+                setUser({
+                  id: 0,
+                  username:
+                    meta.username ??
+                    session.user.email?.split("@")[0] ??
+                    "user",
+                  email: session.user.email ?? "",
+                  display_name: meta.display_name ?? meta.username ?? undefined,
+                  avatar_url: meta.avatar_url ?? undefined,
+                  xp: 0,
+                  level: 1,
+                });
+              }
+            }
+          }
+          if (isMounted) setAuthChecked(true);
+        } else if (event === "SIGNED_OUT") {
+          if (isMounted) {
+            setUser(null);
+            setAuthChecked(true);
+          }
+        }
+      } catch (err) {
+        console.warn("[AuthContext] Unexpected error in auth handler:", err);
+        if (isMounted) setAuthChecked(true);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const clearError = () => setError(null);
 
-  const login = async (credentials: LoginRequest) => {
+  const login = async ({
+    emailOrUsername,
+    password,
+  }: {
+    emailOrUsername: string;
+    password: string;
+  }) => {
     setError(null);
-    try {
-      const response = await authApi.login(credentials);
-      setUser(response.user);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Login failed";
-      setError(message);
-      throw err;
+    let email = emailOrUsername.trim();
+
+    // Resolve username → email if input has no '@'
+    if (!email.includes("@")) {
+      try {
+        const { email: resolved } = await apiPost<{ email: string }>(
+          "/api/v1/auth/resolve-email",
+          { username: email },
+        );
+        email = resolved;
+      } catch {
+        const msg = "No account found with that username.";
+        setError(msg);
+        throw new Error(msg);
+      }
     }
+
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (authError) {
+      setError(authError.message);
+      throw authError;
+    }
+    // User will be set by the SIGNED_IN onAuthStateChange event
   };
 
-  const register = async (data: RegisterRequest) => {
-    setError(null);
-    try {
-      const response = await authApi.register(data);
-      setUser(response.user);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Registration failed";
-      setError(message);
-      throw err;
-    }
-  };
-
-  const logout = () => {
-    authApi.logout();
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
     setError(null);
   };
@@ -103,7 +170,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoggedIn: !!user,
         user,
         login,
-        register,
         logout,
         error,
         clearError,

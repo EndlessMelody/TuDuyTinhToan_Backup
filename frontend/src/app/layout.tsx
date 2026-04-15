@@ -19,7 +19,6 @@ export const metadata: Metadata = {
 };
 
 import DashboardLayout from "@/components/DashboardLayout";
-import { AuthProvider } from "@/hooks/useAuth";
 
 export default function RootLayout({
   children,
@@ -32,25 +31,21 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col m-0 p-0 overflow-hidden">
-        <AuthProvider>
-          <DashboardLayout>
-            {children}
-          </DashboardLayout>
-          <Toaster
+        <DashboardLayout>{children}</DashboardLayout>
+        <Toaster
             theme="dark"
             position="bottom-center"
             toastOptions={{
               style: {
-                background: '#1A1A1A',
-                border: '1px solid rgba(255,255,255,0.08)',
-                color: 'white',
-                fontSize: '0.85rem',
-                borderRadius: '12px',
-                backdropFilter: 'blur(12px)',
+                background: "#1A1A1A",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: "white",
+                fontSize: "0.85rem",
+                borderRadius: "12px",
+                backdropFilter: "blur(12px)",
               },
             }}
           />
-        </AuthProvider>
       </body>
     </html>
   );

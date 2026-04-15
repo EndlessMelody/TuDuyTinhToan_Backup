@@ -6,13 +6,14 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { apiPost, ApiError } from "@/lib/api";
+import { normalizeMediaUrl } from "@/lib/media";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface Recommendation {
   place_id: number;
   name: string;
-  match_score: number;     // 0-100 float
+  match_score: number; // 0-100 float
   lat: number;
   lng: number;
   vector: number[];
@@ -35,7 +36,7 @@ const NEUTRAL_VECTOR = Array(15).fill(0.5);
 export function useRecommendations(
   topN: number = 4,
   userVector: number[] = NEUTRAL_VECTOR,
-  domain: string = "place"
+  domain: string = "place",
 ): UseRecommendationsResult {
   const [picks, setPicks] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,7 +51,13 @@ export function useRecommendations(
         top_n: topN,
         category: domain,
       });
-      setPicks(Array.isArray(data?.recommendations) ? data.recommendations : []);
+      const normalized = Array.isArray(data?.recommendations)
+        ? data.recommendations.map((item: Recommendation) => ({
+            ...item,
+            image_url: normalizeMediaUrl(item.image_url),
+          }))
+        : [];
+      setPicks(normalized);
     } catch (err) {
       if (err instanceof ApiError) {
         setError(`Lỗi ${err.status}: ${err.message}`);

@@ -171,7 +171,7 @@ export const FriendRow: React.FC<FriendRowProps> = ({
         }}
       >
         <div style={{ position: "relative", flexShrink: 0 }}>
-          <Avatar src={friend.avatar} size="l" />
+          <Avatar src={friend.avatar} name={friend.name} size="l" />
           {friend.isOnline && (
             <div
               style={{
@@ -323,6 +323,7 @@ export const FriendRow: React.FC<FriendRowProps> = ({
           <div style={{ position: "relative", flexShrink: 0 }}>
             <Avatar
               src={friend.avatar}
+              name={friend.name}
               size="l"
               style={{
                 border: "3px solid white",

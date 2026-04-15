@@ -87,6 +87,19 @@ async def update_me(
 
 
 @router.get(
+    "/search",
+    summary="Search users by username or display name"
+)
+async def search_users(
+    q: str = "",
+    limit: int = 10,
+    user_id: int = Depends(get_current_user_id),
+    service: UserService = Depends(get_user_service),
+):
+    return await service.search_users(user_id, q, limit)
+
+
+@router.get(
     "/{user_id}",
     response_model=UserProfile,
     summary="Lấy public profile người dùng"

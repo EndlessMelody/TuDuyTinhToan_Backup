@@ -1,4 +1,6 @@
-import React from "react";
+"use client";
+
+import React, { useState } from "react";
 import { cn } from "@/lib/cn";
 
 // ---- Helpers ----
@@ -74,30 +76,78 @@ export const Column = React.forwardRef<HTMLDivElement, any>(
     const computedStyle: React.CSSProperties = {
       ...(gap != null && { gap: `${gap}px` }),
       ...(padding && { padding: resolvePadding(padding) }),
-      ...(paddingX && { paddingLeft: resolvePadding(paddingX), paddingRight: resolvePadding(paddingX) }),
+      ...(paddingX && {
+        paddingLeft: resolvePadding(paddingX),
+        paddingRight: resolvePadding(paddingX),
+      }),
       ...(paddingLeft && { paddingLeft: resolvePadding(paddingLeft) }),
       ...(paddingRight && { paddingRight: resolvePadding(paddingRight) }),
-      ...((paddingTop || paddingY) && { paddingTop: resolvePadding(paddingTop) ?? resolvePadding(paddingY) }),
-      ...((paddingBottom || paddingY) && { paddingBottom: resolvePadding(paddingBottom) ?? resolvePadding(paddingY) }),
+      ...((paddingTop || paddingY) && {
+        paddingTop: resolvePadding(paddingTop) ?? resolvePadding(paddingY),
+      }),
+      ...((paddingBottom || paddingY) && {
+        paddingBottom:
+          resolvePadding(paddingBottom) ?? resolvePadding(paddingY),
+      }),
       ...(background && { backgroundColor: BG_MAP[background] }),
       ...(radius && { borderRadius: RADIUS_MAP[radius] }),
-      
+
       // Hyper-Longhand Borders
-      borderTopWidth: (border === "neutral-alpha-weak" || borderTop === "neutral-alpha-weak") ? BORDER_WIDTH : undefined,
-      borderBottomWidth: (border === "neutral-alpha-weak" || borderBottom === "neutral-alpha-weak") ? BORDER_WIDTH : undefined,
-      borderLeftWidth: (border === "neutral-alpha-weak" || borderLeft === "neutral-alpha-weak") ? BORDER_WIDTH : undefined,
-      borderRightWidth: (border === "neutral-alpha-weak" || borderRight === "neutral-alpha-weak") ? BORDER_WIDTH : undefined,
-      
-      borderTopStyle: (border === "neutral-alpha-weak" || borderTop === "neutral-alpha-weak" || borderBottom === "neutral-alpha-weak" || borderLeft === "neutral-alpha-weak" || borderRight === "neutral-alpha-weak") ? BORDER_STYLE : undefined,
-      borderBottomStyle: (border === "neutral-alpha-weak" || borderBottom === "neutral-alpha-weak") ? BORDER_STYLE : undefined,
-      borderLeftStyle: (border === "neutral-alpha-weak" || borderLeft === "neutral-alpha-weak") ? BORDER_STYLE : undefined,
-      borderRightStyle: (border === "neutral-alpha-weak" || borderRight === "neutral-alpha-weak") ? BORDER_STYLE : undefined,
-      
-      borderTopColor: (border === "neutral-alpha-weak" || borderTop === "neutral-alpha-weak") ? BORDER_COLOR : undefined,
-      borderBottomColor: (border === "neutral-alpha-weak" || borderBottom === "neutral-alpha-weak") ? BORDER_COLOR : undefined,
-      borderLeftColor: (border === "neutral-alpha-weak" || borderLeft === "neutral-alpha-weak") ? BORDER_COLOR : undefined,
-      borderRightColor: (border === "neutral-alpha-weak" || borderRight === "neutral-alpha-weak") ? BORDER_COLOR : undefined,
-      
+      borderTopWidth:
+        border === "neutral-alpha-weak" || borderTop === "neutral-alpha-weak"
+          ? BORDER_WIDTH
+          : undefined,
+      borderBottomWidth:
+        border === "neutral-alpha-weak" || borderBottom === "neutral-alpha-weak"
+          ? BORDER_WIDTH
+          : undefined,
+      borderLeftWidth:
+        border === "neutral-alpha-weak" || borderLeft === "neutral-alpha-weak"
+          ? BORDER_WIDTH
+          : undefined,
+      borderRightWidth:
+        border === "neutral-alpha-weak" || borderRight === "neutral-alpha-weak"
+          ? BORDER_WIDTH
+          : undefined,
+
+      borderTopStyle:
+        border === "neutral-alpha-weak" ||
+        borderTop === "neutral-alpha-weak" ||
+        borderBottom === "neutral-alpha-weak" ||
+        borderLeft === "neutral-alpha-weak" ||
+        borderRight === "neutral-alpha-weak"
+          ? BORDER_STYLE
+          : undefined,
+      borderBottomStyle:
+        border === "neutral-alpha-weak" || borderBottom === "neutral-alpha-weak"
+          ? BORDER_STYLE
+          : undefined,
+      borderLeftStyle:
+        border === "neutral-alpha-weak" || borderLeft === "neutral-alpha-weak"
+          ? BORDER_STYLE
+          : undefined,
+      borderRightStyle:
+        border === "neutral-alpha-weak" || borderRight === "neutral-alpha-weak"
+          ? BORDER_STYLE
+          : undefined,
+
+      borderTopColor:
+        border === "neutral-alpha-weak" || borderTop === "neutral-alpha-weak"
+          ? BORDER_COLOR
+          : undefined,
+      borderBottomColor:
+        border === "neutral-alpha-weak" || borderBottom === "neutral-alpha-weak"
+          ? BORDER_COLOR
+          : undefined,
+      borderLeftColor:
+        border === "neutral-alpha-weak" || borderLeft === "neutral-alpha-weak"
+          ? BORDER_COLOR
+          : undefined,
+      borderRightColor:
+        border === "neutral-alpha-weak" || borderRight === "neutral-alpha-weak"
+          ? BORDER_COLOR
+          : undefined,
+
       ...(flex && { flex }),
       ...(flexGrow !== undefined && { flexGrow }),
       ...(flexShrink !== undefined && { flexShrink }),
@@ -182,30 +232,78 @@ export const Row = React.forwardRef<HTMLDivElement, any>(
     const computedStyle: React.CSSProperties = {
       ...(gap != null && { gap: `${gap}px` }),
       ...(padding && { padding: resolvePadding(padding) }),
-      ...(paddingX && { paddingLeft: resolvePadding(paddingX), paddingRight: resolvePadding(paddingX) }),
+      ...(paddingX && {
+        paddingLeft: resolvePadding(paddingX),
+        paddingRight: resolvePadding(paddingX),
+      }),
       ...(paddingLeft && { paddingLeft: resolvePadding(paddingLeft) }),
       ...(paddingRight && { paddingRight: resolvePadding(paddingRight) }),
-      ...((paddingTop || paddingY) && { paddingTop: resolvePadding(paddingTop) ?? resolvePadding(paddingY) }),
-      ...((paddingBottom || paddingY) && { paddingBottom: resolvePadding(paddingBottom) ?? resolvePadding(paddingY) }),
+      ...((paddingTop || paddingY) && {
+        paddingTop: resolvePadding(paddingTop) ?? resolvePadding(paddingY),
+      }),
+      ...((paddingBottom || paddingY) && {
+        paddingBottom:
+          resolvePadding(paddingBottom) ?? resolvePadding(paddingY),
+      }),
       ...(background && { backgroundColor: BG_MAP[background] }),
       ...(radius && { borderRadius: RADIUS_MAP[radius] }),
-      
+
       // Hyper-Longhand Borders
-      borderTopWidth: (border === "neutral-alpha-weak" || borderTop === "neutral-alpha-weak") ? BORDER_WIDTH : undefined,
-      borderBottomWidth: (border === "neutral-alpha-weak" || borderBottom === "neutral-alpha-weak") ? BORDER_WIDTH : undefined,
-      borderLeftWidth: (border === "neutral-alpha-weak" || borderLeft === "neutral-alpha-weak") ? BORDER_WIDTH : undefined,
-      borderRightWidth: (border === "neutral-alpha-weak" || borderRight === "neutral-alpha-weak") ? BORDER_WIDTH : undefined,
-      
-      borderTopStyle: (border === "neutral-alpha-weak" || borderTop === "neutral-alpha-weak" || borderBottom === "neutral-alpha-weak" || borderLeft === "neutral-alpha-weak" || borderRight === "neutral-alpha-weak") ? BORDER_STYLE : undefined,
-      borderBottomStyle: (border === "neutral-alpha-weak" || borderBottom === "neutral-alpha-weak") ? BORDER_STYLE : undefined,
-      borderLeftStyle: (border === "neutral-alpha-weak" || borderLeft === "neutral-alpha-weak") ? BORDER_STYLE : undefined,
-      borderRightStyle: (border === "neutral-alpha-weak" || borderRight === "neutral-alpha-weak") ? BORDER_STYLE : undefined,
-      
-      borderTopColor: (border === "neutral-alpha-weak" || borderTop === "neutral-alpha-weak") ? BORDER_COLOR : undefined,
-      borderBottomColor: (border === "neutral-alpha-weak" || borderBottom === "neutral-alpha-weak") ? BORDER_COLOR : undefined,
-      borderLeftColor: (border === "neutral-alpha-weak" || borderLeft === "neutral-alpha-weak") ? BORDER_COLOR : undefined,
-      borderRightColor: (border === "neutral-alpha-weak" || borderRight === "neutral-alpha-weak") ? BORDER_COLOR : undefined,
-      
+      borderTopWidth:
+        border === "neutral-alpha-weak" || borderTop === "neutral-alpha-weak"
+          ? BORDER_WIDTH
+          : undefined,
+      borderBottomWidth:
+        border === "neutral-alpha-weak" || borderBottom === "neutral-alpha-weak"
+          ? BORDER_WIDTH
+          : undefined,
+      borderLeftWidth:
+        border === "neutral-alpha-weak" || borderLeft === "neutral-alpha-weak"
+          ? BORDER_WIDTH
+          : undefined,
+      borderRightWidth:
+        border === "neutral-alpha-weak" || borderRight === "neutral-alpha-weak"
+          ? BORDER_WIDTH
+          : undefined,
+
+      borderTopStyle:
+        border === "neutral-alpha-weak" ||
+        borderTop === "neutral-alpha-weak" ||
+        borderBottom === "neutral-alpha-weak" ||
+        borderLeft === "neutral-alpha-weak" ||
+        borderRight === "neutral-alpha-weak"
+          ? BORDER_STYLE
+          : undefined,
+      borderBottomStyle:
+        border === "neutral-alpha-weak" || borderBottom === "neutral-alpha-weak"
+          ? BORDER_STYLE
+          : undefined,
+      borderLeftStyle:
+        border === "neutral-alpha-weak" || borderLeft === "neutral-alpha-weak"
+          ? BORDER_STYLE
+          : undefined,
+      borderRightStyle:
+        border === "neutral-alpha-weak" || borderRight === "neutral-alpha-weak"
+          ? BORDER_STYLE
+          : undefined,
+
+      borderTopColor:
+        border === "neutral-alpha-weak" || borderTop === "neutral-alpha-weak"
+          ? BORDER_COLOR
+          : undefined,
+      borderBottomColor:
+        border === "neutral-alpha-weak" || borderBottom === "neutral-alpha-weak"
+          ? BORDER_COLOR
+          : undefined,
+      borderLeftColor:
+        border === "neutral-alpha-weak" || borderLeft === "neutral-alpha-weak"
+          ? BORDER_COLOR
+          : undefined,
+      borderRightColor:
+        border === "neutral-alpha-weak" || borderRight === "neutral-alpha-weak"
+          ? BORDER_COLOR
+          : undefined,
+
       ...(flex && { flex }),
       ...(flexGrow !== undefined && { flexGrow }),
       ...(flexShrink !== undefined && { flexShrink }),
@@ -320,10 +418,10 @@ export const Text = ({
 }: any) => (
   <p
     className={cn("font-sans m-0 leading-relaxed", className)}
-    style={{ 
-      fontSize: TEXT_SIZE[variant] ?? "0.9375rem", 
-      textAlign: align, 
-      ...style 
+    style={{
+      fontSize: TEXT_SIZE[variant] ?? "0.9375rem",
+      textAlign: align,
+      ...style,
     }}
     {...props}
   >
@@ -361,7 +459,8 @@ export const Button = ({
           : variant === "danger"
             ? "bg-[#FFF0F0] text-[#FF3B30] hover:bg-[#FFE5E5]"
             : "bg-[#007AFF] text-[#FFFFFF] hover:bg-[#0062CC]",
-      disabled && "bg-[#E5E5EA] text-[#8E8E93] cursor-not-allowed hover:bg-[#E5E5EA]",
+      disabled &&
+        "bg-[#E5E5EA] text-[#8E8E93] cursor-not-allowed hover:bg-[#E5E5EA]",
       fillWidth && "w-full",
       className,
     )}
@@ -399,7 +498,8 @@ export const IconButton = ({
           : variant === "danger"
             ? "bg-[#FFF0F0] text-[#FF3B30] hover:bg-[#FFE5E5]"
             : "bg-[#007AFF] text-[#FFFFFF] hover:bg-[#0062CC]",
-      disabled && "bg-[#E5E5EA] text-[#8E8E93] cursor-not-allowed hover:bg-[#E5E5EA]",
+      disabled &&
+        "bg-[#E5E5EA] text-[#8E8E93] cursor-not-allowed hover:bg-[#E5E5EA]",
       className,
     )}
     style={style}
@@ -435,18 +535,79 @@ const AVATAR_SIZE: Record<string, string> = {
   xs: "20px",
 };
 
+const AVATAR_COLORS = [
+  "#007AFF",
+  "#34C759",
+  "#FF9500",
+  "#FF3B30",
+  "#AF52DE",
+  "#5AC8FA",
+  "#FF6B6B",
+  "#FF9F0A",
+];
+
+function colorFromName(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function initials(name?: string): string {
+  if (!name) return "?";
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
 export const Avatar = ({
   size = "m",
   src,
+  name,
   className,
   style,
   ...props
 }: any) => {
+  const [imgError, setImgError] = useState(false);
   const dim = AVATAR_SIZE[size] ?? "36px";
+  const showFallback = !src || imgError;
+
+  if (showFallback) {
+    const bg = colorFromName(name ?? "");
+    const fontSize = `calc(${dim} * 0.38)`;
+    return (
+      <div
+        className={cn(
+          "rounded-full shrink-0 flex items-center justify-center select-none",
+          className,
+        )}
+        style={{
+          width: dim,
+          height: dim,
+          backgroundColor: bg,
+          flexShrink: 0,
+          ...style,
+        }}
+        {...props}
+      >
+        <span
+          style={{ fontSize, fontWeight: 700, color: "white", lineHeight: 1 }}
+        >
+          {initials(name)}
+        </span>
+      </div>
+    );
+  }
+
   return (
     <img
       src={src}
-      alt=""
+      alt={name ?? ""}
+      onError={() => setImgError(true)}
       className={cn("rounded-full object-cover shrink-0", className)}
       style={{ width: dim, height: dim, ...style }}
       {...props}

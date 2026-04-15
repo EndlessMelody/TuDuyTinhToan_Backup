@@ -22,6 +22,7 @@ class GroupCreate(BaseModel):
     max_spots: int = 6
     cover_image_url: Optional[str] = None
     accent_color: Optional[str] = None
+    is_public: bool = True
 
 
 class GroupResponse(BaseModel):
@@ -33,6 +34,8 @@ class GroupResponse(BaseModel):
     max_spots: int = 6
     cover_image_url: Optional[str] = None
     accent_color: Optional[str] = None
+    is_public: bool = True
+    invite_code: Optional[str] = None
     created_at: Optional[datetime] = None
     members: List[MemberSummary] = []
     spots_remaining: int = 0
@@ -47,6 +50,10 @@ class GroupListResponse(BaseModel):
 
 class ReadyUpdate(BaseModel):
     is_ready: bool
+
+
+class JoinByCodeRequest(BaseModel):
+    invite_code: str
 
 
 # ─── Recommend (Minimax Referee — đang chơi) ─────────────────────────────

@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 import redis.asyncio as redis
 from src.core.config import settings
 from src.api.router import api_router
+from src.db.redis import init_redis
 
 class InMemoryRedis:
     """Fallback khi Redis chưa bật — giả lập get/set bằng dict trong RAM."""
@@ -35,6 +36,9 @@ async def lifespan(app: FastAPI):
     # Khởi động cronjob dọn dẹp interaction (3:00 AM hàng ngày)
     from src.tasks.interaction_cleanup import schedule_cleanup
     schedule_cleanup(app)
+    
+    # Initialize redis client for global access
+    init_redis(app)
 
     yield
     await app.state.redis.close()
@@ -52,7 +56,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

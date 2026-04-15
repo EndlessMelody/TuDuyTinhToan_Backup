@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { apiGet, ApiError } from "@/lib/api";
+import { normalizeMediaUrl } from "@/lib/media";
 import type { ReelData } from "@/types/dashboard";
 
 // ─── API Response Types ───────────────────────────────────────────────────────
@@ -44,19 +45,20 @@ function formatViews(n: number): string {
 }
 
 function adaptReel(r: ApiReel): ReelData {
-  const authorName = r.user.display_name ?? r.user.username ?? `User ${r.user.id}`;
+  const authorName =
+    r.user.display_name ?? r.user.username ?? `User ${r.user.id}`;
   return {
     id: r.id,
     title: r.title,
     user: `@${r.user.username ?? authorName.toLowerCase().replace(/\s+/g, "_")}`,
     views: formatViews(r.views_count),
     userAvatar:
-      r.user.avatar_url ??
+      normalizeMediaUrl(r.user.avatar_url) ??
       `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=random&size=64`,
     img:
-      r.thumbnail_url ??
+      normalizeMediaUrl(r.thumbnail_url) ??
       "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&h=700&fit=crop",
-    videoUrl: r.video_url || undefined,
+    videoUrl: normalizeMediaUrl(r.video_url) || undefined,
     likes: r.likes_count,
     comments: r.comments_count,
   };
@@ -81,7 +83,7 @@ export function useReels(limit: number = 8): UseReelsResult {
     try {
       // Backend may return { items: [...] } or a bare array
       const data = await apiGet<ReelsResponse | ApiReel[]>(
-        `/api/v1/reels/?sort=trending&limit=${limit}`
+        `/api/v1/reels/?sort=trending&limit=${limit}`,
       );
       let items: ApiReel[] = [];
       if (Array.isArray(data)) {

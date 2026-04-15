@@ -41,12 +41,54 @@ import {
   PolarAngleAxis,
   ResponsiveContainer,
 } from "recharts";
-import ClientOnly from '@/components/common/ClientOnly';
-import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/lib/supabase';
-import { useUserVector } from '@/context/UserVectorContext';
+import ClientOnly from "@/components/common/ClientOnly";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
+import { useUserVector } from "@/context/UserVectorContext";
 
 // ═══════════ PROFILE PAGE ═══════════ //
+
+const StatItem = ({
+  value,
+  label,
+  delay,
+}: {
+  value: number | string;
+  label: string;
+  delay: number;
+}) => (
+  <motion.div
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.4, delay: delay / 1000 }}
+    style={{ display: "flex", flexDirection: "column", alignItems: "center" }}
+  >
+    <Text
+      style={{
+        color: "#1C1C1E",
+        fontSize: "1.4rem",
+        fontWeight: 800,
+        letterSpacing: "-0.5px",
+      }}
+    >
+      {typeof value === "number" && value >= 1000
+        ? `${(value / 1000).toFixed(1)}K`
+        : value}
+    </Text>
+    <Text
+      style={{
+        color: "#8E8E93",
+        fontSize: "0.75rem",
+        fontWeight: 600,
+        textTransform: "uppercase",
+        letterSpacing: "0.5px",
+        marginTop: "2px",
+      }}
+    >
+      {label}
+    </Text>
+  </motion.div>
+);
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -56,16 +98,16 @@ export default function ProfilePage() {
     if (scrollRef.current) setShowSticky(scrollRef.current.scrollTop > 360);
   }, []);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('Posts');
+  const [activeTab, setActiveTab] = useState("Posts");
   const { user, loading, refetch } = useAuth();
   const { radarData } = useUserVector();
 
   // Form state
-  const [formName, setFormName] = useState('');
-  const [formUsername, setFormUsername] = useState('');
-  const [formBio, setFormBio] = useState('');
-  const [formEmail, setFormEmail] = useState('guest@email.com');
-  const [formPhone, setFormPhone] = useState('+84 901 234 567');
+  const [formName, setFormName] = useState("");
+  const [formUsername, setFormUsername] = useState("");
+  const [formBio, setFormBio] = useState("");
+  const [formEmail, setFormEmail] = useState("guest@email.com");
+  const [formPhone, setFormPhone] = useState("+84 901 234 567");
 
   // File upload state
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -85,11 +127,11 @@ export default function ProfilePage() {
       setFormBio(user.bio || "");
       setFormEmail(user.email || "");
       setFormPhone(user.phone || "");
-      
+
       // Cleanup Object URLs on unmount/user change if modal was closed dirty
       return () => {
-         if (avatarPreview) URL.revokeObjectURL(avatarPreview);
-         if (coverPreview) URL.revokeObjectURL(coverPreview);
+        if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+        if (coverPreview) URL.revokeObjectURL(coverPreview);
       };
     }
   }, [user]);
@@ -98,16 +140,16 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const validTypes = ["image/jpeg", "image/png", "image/webp"];
     if (!validTypes.includes(file.type)) {
-      toast.error('Avatar must be JPEG, PNG, or WEBP (No GIFs).');
-      if (avatarInputRef.current) avatarInputRef.current.value = '';
+      toast.error("Avatar must be JPEG, PNG, or WEBP (No GIFs).");
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
       return;
     }
 
     if (file.size > 2 * 1024 * 1024) {
-      toast.error('Avatar size must be less than 2MB.');
-      if (avatarInputRef.current) avatarInputRef.current.value = '';
+      toast.error("Avatar size must be less than 2MB.");
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
       return;
     }
 
@@ -120,16 +162,16 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const validTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
     if (!validTypes.includes(file.type)) {
-      toast.error('Cover must be JPEG, PNG, WEBP, or GIF.');
-      if (coverInputRef.current) coverInputRef.current.value = '';
+      toast.error("Cover must be JPEG, PNG, WEBP, or GIF.");
+      if (coverInputRef.current) coverInputRef.current.value = "";
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Cover size must be less than 5MB.');
-      if (coverInputRef.current) coverInputRef.current.value = '';
+      toast.error("Cover size must be less than 5MB.");
+      if (coverInputRef.current) coverInputRef.current.value = "";
       return;
     }
 
@@ -141,7 +183,9 @@ export default function ProfilePage() {
   const handleSave = async () => {
     setSaveLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) throw new Error("No session found");
 
       const formData = new FormData();
@@ -154,28 +198,30 @@ export default function ProfilePage() {
       if (avatarFile) formData.append("avatar_file", avatarFile);
       if (coverFile) formData.append("cover_file", coverFile);
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:8000";
-      
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ??
+        "http://127.0.0.1:8000";
+
       const res = await fetch(`${API_URL}/api/v1/users/me`, {
         method: "PATCH",
         headers: {
-          "Authorization": `Bearer ${session.access_token}`
+          Authorization: `Bearer ${session.access_token}`,
         },
-        body: formData
+        body: formData,
       });
 
       if (!res.ok) {
         let errMessage = "Unknown error";
         try {
-           const errJson = await res.json();
-           errMessage = errJson.detail || errMessage;
+          const errJson = await res.json();
+          errMessage = errJson.detail || errMessage;
         } catch {}
         throw new Error(errMessage);
       }
 
       await refetch();
-      
-      toast.success('Profile updated successfully! ✨');
+
+      toast.success("Profile updated successfully! ✨");
       setIsEditModalOpen(false);
 
       if (avatarPreview) URL.revokeObjectURL(avatarPreview);
@@ -243,7 +289,7 @@ export default function ProfilePage() {
             >
               <Row style={{ gap: "14px", alignItems: "center" }}>
                 <Avatar
-                  src={MOCK_USER.avatar}
+                  src={user?.avatar_url || ""}
                   size="s"
                   style={{
                     width: "38px",
@@ -261,7 +307,7 @@ export default function ProfilePage() {
                       lineHeight: 1,
                     }}
                   >
-                    {MOCK_USER.name}
+                    {user?.display_name || user?.username || ""}
                   </Text>
                   <Text
                     style={{
@@ -270,7 +316,7 @@ export default function ProfilePage() {
                       fontWeight: 500,
                     }}
                   >
-                    {MOCK_USER.username}
+                    @{user?.username || ""}
                   </Text>
                 </Column>
               </Row>
@@ -323,9 +369,33 @@ export default function ProfilePage() {
       </div>
 
       {/* ═══ COVER PHOTO ═══ */}
-      <div style={{ position: 'relative', width: '100%', height: '320px', flexShrink: 0 }}>
-        <img src={user?.cover_url || "https://images.unsplash.com/photo-1543353071-087092ec393a?auto=format&fit=crop&q=80"} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.6) 100%)' }} />
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          height: "320px",
+          flexShrink: 0,
+        }}
+      >
+        <img
+          src={
+            user?.cover_url ||
+            "https://images.unsplash.com/photo-1543353071-087092ec393a?auto=format&fit=crop&q=80"
+          }
+          alt="Cover"
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background:
+              "linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.6) 100%)",
+          }}
+        />
 
         {/* Back Button */}
         <Link
@@ -431,75 +501,143 @@ export default function ProfilePage() {
         }}
       >
         {/* Avatar Area */}
-        <Row fillWidth style={{ marginBottom: '32px' }}>
-          <div style={{ position: 'relative' }}>
-            <Avatar src={user?.avatar_url || ""} size="xl" style={{
-              width: '160px', height: '160px', borderRadius: '50%',
-              borderTopWidth: '6px', borderBottomWidth: '6px', borderLeftWidth: '6px', borderRightWidth: '6px',
-              borderStyle: 'solid', borderColor: '#FFFFFF',
-              boxShadow: '0 12px 32px rgba(0,0,0,0.1)',
-            }} />
+        <Row fillWidth style={{ marginBottom: "32px" }}>
+          <div style={{ position: "relative" }}>
+            <Avatar
+              src={user?.avatar_url || ""}
+              size="xl"
+              style={{
+                width: "160px",
+                height: "160px",
+                borderRadius: "50%",
+                borderTopWidth: "6px",
+                borderBottomWidth: "6px",
+                borderLeftWidth: "6px",
+                borderRightWidth: "6px",
+                borderStyle: "solid",
+                borderColor: "#FFFFFF",
+                boxShadow: "0 12px 32px rgba(0,0,0,0.1)",
+              }}
+            />
             {/* Level Badge */}
-            <div style={{
-              position: 'absolute', bottom: '8px', right: '8px',
-              backgroundColor: '#007AFF', borderRadius: '14px',
-              paddingTop: '6px', paddingBottom: '6px', paddingLeft: '12px', paddingRight: '12px',
-              borderTopWidth: '4px', borderBottomWidth: '4px', borderLeftWidth: '4px', borderRightWidth: '4px',
-              borderStyle: 'solid', borderColor: '#FFFFFF',
-              boxShadow: '0 4px 12px rgba(0,122,255,0.3)',
-            }}>
-              <Text style={{ color: 'white', fontSize: '0.75rem', fontWeight: 800 }}>LV {user?.level || 1}</Text>
+            <div
+              style={{
+                position: "absolute",
+                bottom: "8px",
+                right: "8px",
+                backgroundColor: "#007AFF",
+                borderRadius: "14px",
+                paddingTop: "6px",
+                paddingBottom: "6px",
+                paddingLeft: "12px",
+                paddingRight: "12px",
+                borderTopWidth: "4px",
+                borderBottomWidth: "4px",
+                borderLeftWidth: "4px",
+                borderRightWidth: "4px",
+                borderStyle: "solid",
+                borderColor: "#FFFFFF",
+                boxShadow: "0 4px 12px rgba(0,122,255,0.3)",
+              }}
+            >
+              <Text
+                style={{ color: "white", fontSize: "0.75rem", fontWeight: 800 }}
+              >
+                LV {user?.level || 1}
+              </Text>
             </div>
           </div>
         </Row>
 
         {/* Name + Info */}
-        <Column style={{ gap: '10px', marginBottom: '32px' }}>
-          <Heading variant="display-strong-s" style={{ color: '#1C1C1E', fontSize: '2.5rem' }}>{user?.display_name || user?.username || "Guest"}</Heading>
-          
-          <Row style={{ gap: '12px', alignItems: 'center' }}>
-            <Text style={{ color: '#007AFF', fontWeight: 600, fontSize: '1rem' }}>@{user?.username || "guest"} • {user?.title || "Taste Explorer"}</Text>
-            <div style={{ backgroundColor: '#EAF2FF', height: '14px', width: '2px' }} />
-            <Row style={{ gap: '8px', alignItems: 'center' }}>
-              <TrendingUp size={14} color="#007AFF" />
+        <Column style={{ gap: "10px", marginBottom: "32px" }}>
+          <Heading
+            variant="display-strong-s"
+            style={{ color: "#1C1C1E", fontSize: "2.5rem" }}
+          >
+            {user?.display_name || user?.username || "Guest"}
+          </Heading>
+
+          <Row style={{ gap: "12px", alignItems: "center" }}>
+            <Text
+              style={{ color: "#007AFF", fontWeight: 600, fontSize: "1rem" }}
+            >
+              @{user?.username || "guest"} • {user?.title || "Taste Explorer"}
+            </Text>
+          </Row>
+
+          <Text
+            style={{
+              color: "#636366",
+              fontSize: "1rem",
+              lineHeight: 1.6,
+              maxWidth: "720px",
+            }}
+          >
+            {user?.bio || "Enjoying the food exploration journey!"}
+          </Text>
+
+          {/* Level Progress Bar */}
+          <Column style={{ gap: "8px", maxWidth: "320px", marginTop: "8px" }}>
+            <Row style={{ justifyContent: "space-between" }}>
               <Text
                 style={{
-                  color: "#007AFF",
-                  fontSize: "0.85rem",
+                  color: "#8E8E93",
+                  fontSize: "0.75rem",
+                  fontWeight: 600,
+                }}
+              >
+                Level {user?.level || 1} Progress
+              </Text>
+              <Text
+                style={{
+                  color: "#1C1C1E",
+                  fontSize: "0.75rem",
                   fontWeight: 700,
                 }}
               >
-                Top 1% in Sài Gòn
+                {user?.xp || 0} / {(user?.level || 1) * 1000} XP
               </Text>
             </Row>
-          </Row>
-
-          <Text style={{ color: '#636366', fontSize: '1rem', lineHeight: 1.6, maxWidth: '720px' }}>{user?.bio || "Enjoying the food exploration journey!"}</Text>
-
-          {/* Level Progress Bar */}
-          <Column style={{ gap: '8px', maxWidth: '320px', marginTop: '8px' }}>
-             <Row style={{ justifyContent: 'space-between' }}>
-                <Text style={{ color: '#8E8E93', fontSize: '0.75rem', fontWeight: 600 }}>Level {user?.level || 1} Progress</Text>
-                <Text style={{ color: '#1C1C1E', fontSize: '0.75rem', fontWeight: 700 }}>{user?.xp || 0} / {((user?.level || 1) * 1000)} XP</Text>
-             </Row>
-             <div style={{ width: '100%', height: '6px', backgroundColor: '#EAF2FF', borderRadius: '3px', overflow: 'hidden' }}>
-                <motion.div 
-                  initial={{ width: 0 }}
-                  animate={{ width: `${((user?.xp || 0) / ((user?.level || 1) * 1000)) * 100}%` }}
-                  transition={{ duration: 1, delay: 0.5 }}
-                  style={{ height: '100%', backgroundColor: '#007AFF', borderRadius: '3px' }} 
-                />
-             </div>
+            <div
+              style={{
+                width: "100%",
+                height: "6px",
+                backgroundColor: "#EAF2FF",
+                borderRadius: "3px",
+                overflow: "hidden",
+              }}
+            >
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{
+                  width: `${((user?.xp || 0) / ((user?.level || 1) * 1000)) * 100}%`,
+                }}
+                transition={{ duration: 1, delay: 0.5 }}
+                style={{
+                  height: "100%",
+                  backgroundColor: "#007AFF",
+                  borderRadius: "3px",
+                }}
+              />
+            </div>
           </Column>
 
           <Row style={{ gap: "24px", marginTop: "16px" }}>
             <Row style={{ gap: "8px", alignItems: "center" }}>
               <MapPin size={16} color="#8E8E93" />
-              <Text style={{ color: '#8E8E93', fontSize: '0.9rem' }}>{user?.location || "Khám phá"}</Text>
+              <Text style={{ color: "#8E8E93", fontSize: "0.9rem" }}>
+                {user?.location || "Khám phá"}
+              </Text>
             </Row>
             <Row style={{ gap: "8px", alignItems: "center" }}>
               <Calendar size={16} color="#8E8E93" />
-              <Text style={{ color: '#8E8E93', fontSize: '0.9rem' }}>Joined {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'March 2025'}</Text>
+              <Text style={{ color: "#8E8E93", fontSize: "0.9rem" }}>
+                Joined{" "}
+                {user?.created_at
+                  ? new Date(user.created_at).toLocaleDateString()
+                  : "March 2025"}
+              </Text>
             </Row>
           </Row>
         </Column>
@@ -514,22 +652,22 @@ export default function ProfilePage() {
             {(
               [
                 {
-                  value: MOCK_USER.stats.followers,
+                  value: user?.stats?.followers ?? 0,
                   label: "Followers",
                   delay: 150,
                 },
                 {
-                  value: MOCK_USER.stats.following,
+                  value: user?.stats?.following ?? 0,
                   label: "Following",
                   delay: 300,
                 },
                 {
-                  value: MOCK_USER.stats.reviews,
+                  value: user?.stats?.reviews ?? 0,
                   label: "Reviews",
                   delay: 450,
                 },
                 {
-                  value: MOCK_USER.stats.visited,
+                  value: user?.stats?.visited ?? 0,
                   label: "Visited",
                   delay: 600,
                 },
@@ -634,8 +772,18 @@ export default function ProfilePage() {
               }}
             >
               <ClientOnly>
-                <ResponsiveContainer width="100%" height={280} minWidth={100} debounce={50}>
-                  <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
+                <ResponsiveContainer
+                  width="100%"
+                  height={280}
+                  minWidth={100}
+                  debounce={50}
+                >
+                  <RadarChart
+                    cx="50%"
+                    cy="50%"
+                    outerRadius="70%"
+                    data={radarData}
+                  >
                     <PolarGrid stroke="rgba(0,122,255,0.1)" />
                     <PolarAngleAxis
                       dataKey="subject"
@@ -856,42 +1004,89 @@ export default function ProfilePage() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
             >
-              {activeTab === 'Posts' && (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
-                  <Text style={{ color: '#8E8E93' }}>No posts yet.</Text>
+              {activeTab === "Posts" && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    padding: "40px",
+                  }}
+                >
+                  <Text style={{ color: "#8E8E93" }}>No posts yet.</Text>
                 </div>
               )}
 
-              {activeTab === 'Achievements' && (
-                <Column style={{ gap: '32px' }}>
-                  <Row style={{ gap: '16px', flexWrap: 'wrap' }}>
+              {activeTab === "Achievements" && (
+                <Column style={{ gap: "32px" }}>
+                  <Row style={{ gap: "16px", flexWrap: "wrap" }}>
                     {(user?.badges || []).map((badge: any) => (
-                      <Row key={badge.label} style={{
-                        gap: '16px', alignItems: 'center',
-                        paddingTop: '18px', paddingBottom: '18px', paddingLeft: '32px', paddingRight: '32px',
-                        backgroundColor: '#EAF2FF',
-                        borderTopWidth: '1px', borderBottomWidth: '1px', borderLeftWidth: '1px', borderRightWidth: '1px',
-                        borderStyle: 'solid', borderColor: 'rgba(0,122,255,0.08)',
-                        borderRadius: '24px',
-                      }}>
-                        <span style={{ fontSize: '1.5rem' }}>{badge.icon}</span>
+                      <Row
+                        key={badge.label}
+                        style={{
+                          gap: "16px",
+                          alignItems: "center",
+                          paddingTop: "18px",
+                          paddingBottom: "18px",
+                          paddingLeft: "32px",
+                          paddingRight: "32px",
+                          backgroundColor: "#EAF2FF",
+                          borderTopWidth: "1px",
+                          borderBottomWidth: "1px",
+                          borderLeftWidth: "1px",
+                          borderRightWidth: "1px",
+                          borderStyle: "solid",
+                          borderColor: "rgba(0,122,255,0.08)",
+                          borderRadius: "24px",
+                        }}
+                      >
+                        <span style={{ fontSize: "1.5rem" }}>{badge.icon}</span>
                         <Column>
-                           <Text style={{ color: '#007AFF', fontWeight: 700, fontSize: '0.95rem' }}>{badge.label}</Text>
-                           <Text style={{ color: 'rgba(0,122,255,0.6)', fontSize: '0.75rem', fontWeight: 600 }}>Unlocked recently</Text>
+                          <Text
+                            style={{
+                              color: "#007AFF",
+                              fontWeight: 700,
+                              fontSize: "0.95rem",
+                            }}
+                          >
+                            {badge.label}
+                          </Text>
+                          <Text
+                            style={{
+                              color: "rgba(0,122,255,0.6)",
+                              fontSize: "0.75rem",
+                              fontWeight: 600,
+                            }}
+                          >
+                            Unlocked recently
+                          </Text>
                         </Column>
                       </Row>
                     ))}
                     {!user?.badges?.length && (
-                      <Text style={{ color: '#8E8E93', paddingTop: '16px', paddingBottom: '16px' }}>No achievements unlocked yet.</Text>
+                      <Text
+                        style={{
+                          color: "#8E8E93",
+                          paddingTop: "16px",
+                          paddingBottom: "16px",
+                        }}
+                      >
+                        No achievements unlocked yet.
+                      </Text>
                     )}
                   </Row>
                 </Column>
               )}
 
-              {activeTab === 'Reviews' && (
-                 <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
-                    <Text style={{ color: '#8E8E93' }}>No reviews yet.</Text>
-                 </div>
+              {activeTab === "Reviews" && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    padding: "40px",
+                  }}
+                >
+                  <Text style={{ color: "#8E8E93" }}>No reviews yet.</Text>
+                </div>
               )}
 
               {activeTab === "Visited" && (
@@ -1058,9 +1253,37 @@ export default function ProfilePage() {
                   }}
                 >
                   {/* Cover Photo */}
-                  <div style={{ position: 'relative', height: '140px', borderRadius: '18px', overflow: 'hidden' }}>
-                    <img src={coverPreview || user?.cover_url || "https://images.unsplash.com/photo-1543353071-087092ec393a?auto=format&fit=crop&q=80"} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.1)' }} />
+                  <div
+                    style={{
+                      position: "relative",
+                      height: "140px",
+                      borderRadius: "18px",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <img
+                      src={
+                        coverPreview ||
+                        user?.cover_url ||
+                        "https://images.unsplash.com/photo-1543353071-087092ec393a?auto=format&fit=crop&q=80"
+                      }
+                      alt="Cover"
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: "rgba(0,0,0,0.1)",
+                      }}
+                    />
                     <div
                       onClick={() => coverInputRef.current?.click()}
                       style={{
@@ -1090,14 +1313,30 @@ export default function ProfilePage() {
                   </div>
 
                   {/* Avatar */}
-                  <Row style={{ marginTop: '-54px', marginLeft: '24px', zIndex: 2 }}>
-                    <div style={{ position: 'relative' }}>
-                      <Avatar src={avatarPreview || user?.avatar_url || ""} size="xl" style={{
-                        width: '100px', height: '100px', borderRadius: '50%',
-                        borderTopWidth: '4px', borderBottomWidth: '4px', borderLeftWidth: '4px', borderRightWidth: '4px',
-                        borderStyle: 'solid', borderColor: '#FFFFFF',
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
-                      }} />
+                  <Row
+                    style={{
+                      marginTop: "-54px",
+                      marginLeft: "24px",
+                      zIndex: 2,
+                    }}
+                  >
+                    <div style={{ position: "relative" }}>
+                      <Avatar
+                        src={avatarPreview || user?.avatar_url || ""}
+                        size="xl"
+                        style={{
+                          width: "100px",
+                          height: "100px",
+                          borderRadius: "50%",
+                          borderTopWidth: "4px",
+                          borderBottomWidth: "4px",
+                          borderLeftWidth: "4px",
+                          borderRightWidth: "4px",
+                          borderStyle: "solid",
+                          borderColor: "#FFFFFF",
+                          boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
+                        }}
+                      />
                       <div
                         onClick={() => avatarInputRef.current?.click()}
                         style={{
@@ -1419,9 +1658,20 @@ export default function ProfilePage() {
                   </Column>
 
                   {/* Hidden File Inputs */}
-                  <input type="file" ref={avatarInputRef} style={{ display: 'none' }} onChange={handleAvatarChange} accept="image/jpeg, image/png, image/webp" />
-                  <input type="file" ref={coverInputRef} style={{ display: 'none' }} onChange={handleCoverChange} accept="image/jpeg, image/png, image/webp, image/gif" />
-
+                  <input
+                    type="file"
+                    ref={avatarInputRef}
+                    style={{ display: "none" }}
+                    onChange={handleAvatarChange}
+                    accept="image/jpeg, image/png, image/webp"
+                  />
+                  <input
+                    type="file"
+                    ref={coverInputRef}
+                    style={{ display: "none" }}
+                    onChange={handleCoverChange}
+                    accept="image/jpeg, image/png, image/webp, image/gif"
+                  />
                 </Column>
               </div>
 
@@ -1471,20 +1721,28 @@ export default function ProfilePage() {
                   size="m"
                   onClick={handleSave}
                   style={{
-                    backgroundColor: saveLoading ? '#B0CBFA' : '#007AFF', color: '#FFFFFF',
-                    borderRadius: '16px', fontWeight: 700,
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
-                    paddingLeft: '32px',
-                    paddingRight: '32px',
-                    cursor: saveLoading ? 'not-allowed' : 'pointer',
-                    borderTopWidth: '0px', borderBottomWidth: '0px', borderLeftWidth: '0px', borderRightWidth: '0px',
-                    borderStyle: 'none',
-                    boxShadow: saveLoading ? 'none' : '0 8px 24px rgba(0,122,255,0.3)',
+                    backgroundColor: saveLoading ? "#B0CBFA" : "#007AFF",
+                    color: "#FFFFFF",
+                    borderRadius: "16px",
+                    fontWeight: 700,
+                    paddingTop: "12px",
+                    paddingBottom: "12px",
+                    paddingLeft: "32px",
+                    paddingRight: "32px",
+                    cursor: saveLoading ? "not-allowed" : "pointer",
+                    borderTopWidth: "0px",
+                    borderBottomWidth: "0px",
+                    borderLeftWidth: "0px",
+                    borderRightWidth: "0px",
+                    borderStyle: "none",
+                    boxShadow: saveLoading
+                      ? "none"
+                      : "0 8px 24px rgba(0,122,255,0.3)",
                   }}
                   disabled={saveLoading}
                 >
-                  <Save size={16} style={{ marginRight: '8px' }} /> {saveLoading ? "Saving..." : "Save Changes"}
+                  <Save size={16} style={{ marginRight: "8px" }} />{" "}
+                  {saveLoading ? "Saving..." : "Save Changes"}
                 </Button>
               </Row>
             </motion.div>

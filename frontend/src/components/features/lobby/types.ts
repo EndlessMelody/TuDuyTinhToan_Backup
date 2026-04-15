@@ -53,6 +53,12 @@ export interface LobbyData {
   host?: { name: string; avatar: string };
   /** Current status */
   status?: LobbyStatus;
+  /** Room ID (from backend) */
+  id?: number;
+  /** Whether the room is publicly browseable */
+  is_public?: boolean;
+  /** Invite code for private rooms (e.g. FEAST-4X2K) */
+  invite_code?: string;
 }
 
 /** Props for a single lobby card component. */

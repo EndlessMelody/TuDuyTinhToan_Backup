@@ -28,3 +28,20 @@ class PendingRequest(BaseModel):
     friendship_id: int
     from_user: Optional[UserStub] = None
     created_at: Optional[datetime] = None
+
+
+class FoodieFriend(BaseModel):
+    id: int
+    username: str
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    cover_url: Optional[str] = None
+    bio: Optional[str] = None
+    location: Optional[str] = None
+    title: Optional[str] = None
+    match_score: int = 0
+    friendship_id: Optional[int] = None
+
+
+class FoodiesListResponse(BaseModel):
+    items: List[FoodieFriend]

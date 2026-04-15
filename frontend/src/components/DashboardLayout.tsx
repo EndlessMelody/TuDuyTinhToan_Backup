@@ -23,7 +23,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppStatusBar } from "./common/AppStatusBar";
-import { useAuth } from "@/hooks/useAuth";
 import {
   Radar,
   RadarChart,
@@ -38,6 +37,7 @@ import { Sidebar } from "./common/Sidebar";
 import { ChatProvider, useChat } from "@/context/ChatContext";
 import { MessagingSidebar } from "./features/foodies/MessagingSidebar";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { AuthProvider as HooksAuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { motion } from "framer-motion";
@@ -129,11 +129,13 @@ export default function DashboardLayout({
     <ThemeProvider>
       <LanguageProvider>
         <AuthProvider>
-          <UserVectorProvider>
-            <ChatProvider>
-              <LayoutContent>{children}</LayoutContent>
-            </ChatProvider>
-          </UserVectorProvider>
+          <HooksAuthProvider>
+            <UserVectorProvider>
+              <ChatProvider>
+                <LayoutContent>{children}</LayoutContent>
+              </ChatProvider>
+            </UserVectorProvider>
+          </HooksAuthProvider>
         </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>
@@ -142,7 +144,7 @@ export default function DashboardLayout({
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const { radarData, mergedRadarData, isPulsing } = useUserVector();
-  const { user } = useAuth();
+  const { user, isInitializing, isLoggedIn } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isRightExpanded, setIsRightExpanded] = useState(false);
   const router = useRouter();

@@ -1,7 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { Row, Column, Heading, Text } from "@/components/OnceUI";
-import { Sparkles } from "lucide-react";
+import { Sparkles, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRecommendations } from "@/hooks/useRecommendations";
 
@@ -31,6 +31,12 @@ export const AIPicksSection: React.FC<AIPicksSectionProps> = ({
 }) => {
   const router = useRouter();
   const { picks, loading, error, refetch } = useRecommendations(4);
+  const [rotation, setRotation] = React.useState(0);
+
+  const handleRefresh = () => {
+    setRotation((prev) => prev + 360);
+    refetch();
+  };
 
   const renderCards = () => {
     if (loading) {
@@ -53,7 +59,9 @@ export const AIPicksSection: React.FC<AIPicksSectionProps> = ({
 
     if (error || picks.length === 0) {
       return (
-        <Text style={{ color: "#8E8E93", fontSize: "0.85rem", padding: "16px 0" }}>
+        <Text
+          style={{ color: "#8E8E93", fontSize: "0.85rem", padding: "16px 0" }}
+        >
           {error
             ? `Lỗi: ${error}`
             : "Chưa có gợi ý nào. Hãy thêm địa điểm vào hệ thống!"}
@@ -79,7 +87,11 @@ export const AIPicksSection: React.FC<AIPicksSectionProps> = ({
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
           transition={{ delay: idx * 0.1, type: "spring", stiffness: 100 }}
-          whileHover={{ y: -10, scale: 1.02, boxShadow: "0 20px 48px rgba(0,0,0,0.1)" }}
+          whileHover={{
+            y: -10,
+            scale: 1.02,
+            boxShadow: "0 20px 48px rgba(0,0,0,0.1)",
+          }}
           onClick={() => router.push("/tour-builder")}
           style={{
             minWidth: "260px",
@@ -93,11 +105,22 @@ export const AIPicksSection: React.FC<AIPicksSectionProps> = ({
           }}
         >
           {/* Card Image */}
-          <div style={{ height: "140px", position: "relative", overflow: "hidden" }}>
+          <div
+            style={{
+              height: "140px",
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
             <img
               src={imgSrc}
               alt={pick.name}
-              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                display: "block",
+              }}
             />
             <div
               style={{
@@ -119,7 +142,13 @@ export const AIPicksSection: React.FC<AIPicksSectionProps> = ({
                 border: "1px solid rgba(255,255,255,0.4)",
               }}
             >
-              <Text style={{ color: "#1C1C1E", fontSize: "0.75rem", fontWeight: 800 }}>
+              <Text
+                style={{
+                  color: "#1C1C1E",
+                  fontSize: "0.75rem",
+                  fontWeight: 800,
+                }}
+              >
                 {matchPct}% Match
               </Text>
             </div>
@@ -127,7 +156,14 @@ export const AIPicksSection: React.FC<AIPicksSectionProps> = ({
 
           {/* Card Content */}
           <Column style={{ padding: "16px", gap: "8px" }}>
-            <Text style={{ color: "#1C1C1E", fontWeight: 700, fontSize: "0.95rem", letterSpacing: "-0.01em" }}>
+            <Text
+              style={{
+                color: "#1C1C1E",
+                fontWeight: 700,
+                fontSize: "0.95rem",
+                letterSpacing: "-0.01em",
+              }}
+            >
               {pick.name}
             </Text>
             <Row style={{ gap: "6px", alignItems: "center" }}>
@@ -145,11 +181,29 @@ export const AIPicksSection: React.FC<AIPicksSectionProps> = ({
               </Text>
             </Row>
             {pick.price_range && (
-              <Row style={{ justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
-                <Text style={{ color: "#8E8E93", fontSize: "0.8rem", fontWeight: 500 }}>
+              <Row
+                style={{
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginTop: "4px",
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#8E8E93",
+                    fontSize: "0.8rem",
+                    fontWeight: 500,
+                  }}
+                >
                   {pick.price_range}
                 </Text>
-                <div style={{ padding: "4px", borderRadius: "8px", backgroundColor: "#F2F2F7" }}>
+                <div
+                  style={{
+                    padding: "4px",
+                    borderRadius: "8px",
+                    backgroundColor: "#F2F2F7",
+                  }}
+                >
                   <Sparkles size={12} color="#A855F7" />
                 </div>
               </Row>
@@ -168,16 +222,28 @@ export const AIPicksSection: React.FC<AIPicksSectionProps> = ({
     >
       <Column fillWidth style={{ gap: "16px" }}>
         {/* Section Header */}
-        <Row fillWidth style={{ justifyContent: "space-between", alignItems: "flex-end" }}>
+        <Row
+          fillWidth
+          style={{ justifyContent: "space-between", alignItems: "flex-end" }}
+        >
           <Row style={{ alignItems: "center", gap: "10px" }}>
             <Sparkles size={20} color="#A855F7" />
-            <Heading variant="heading-strong-l" weight="strong" style={{ color: "#1C1C1E" }}>
+            <Heading
+              variant="heading-strong-l"
+              weight="strong"
+              style={{ color: "#1C1C1E" }}
+            >
               AI Picks For You
             </Heading>
           </Row>
           <Text
-            onClick={refetch}
-            style={{ color: "#A855F7", fontSize: "0.85rem", fontWeight: 600, cursor: "pointer" }}
+            onClick={handleRefresh}
+            style={{
+              color: "#A855F7",
+              fontSize: "0.85rem",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
           >
             <motion.span
               animate={{ rotate: rotation }}
@@ -191,11 +257,15 @@ export const AIPicksSection: React.FC<AIPicksSectionProps> = ({
             >
               Refresh
             </span>
-          </motion.button>
+          </Text>
         </Row>
 
         {/* Cards */}
-        <Row className="no-scrollbar" fillWidth style={{ gap: "16px", overflowX: "auto", paddingBottom: "4px" }}>
+        <Row
+          className="no-scrollbar"
+          fillWidth
+          style={{ gap: "16px", overflowX: "auto", paddingBottom: "4px" }}
+        >
           {renderCards()}
         </Row>
         <style>{`@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>

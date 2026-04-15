@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/context/AuthContext";
 import { apiPost } from "@/lib/api";
 
 interface RadarPoint {
@@ -59,14 +59,15 @@ export const UserVectorProvider: ({ children }: {
   ]);
 
   useEffect(() => {
-    if (user?.food_vector && user.food_vector.length >= 6) {
+    const vec = (user as any)?.food_vector;
+    if (Array.isArray(vec) && vec.length >= 6) {
       setRadarData([
-        { subject: "Street Food", A: Math.round(user.food_vector[0] * 150) || 100, fullMark: 150 },
-        { subject: "Spicy", A: Math.round(user.food_vector[1] * 150) || 71, fullMark: 150 },
-        { subject: "Sweet", A: Math.round(user.food_vector[2] * 150) || 90, fullMark: 150 },
-        { subject: "Luxury", A: Math.round(user.food_vector[3] * 150) || 56, fullMark: 150 },
-        { subject: "Quiet", A: Math.round(user.food_vector[4] * 150) || 85, fullMark: 150 },
-        { subject: "Group", A: Math.round(user.food_vector[5] * 150) || 120, fullMark: 150 },
+        { subject: "Street Food", A: Math.round(vec[0] * 150) || 100, fullMark: 150 },
+        { subject: "Spicy", A: Math.round(vec[1] * 150) || 71, fullMark: 150 },
+        { subject: "Sweet", A: Math.round(vec[2] * 150) || 90, fullMark: 150 },
+        { subject: "Luxury", A: Math.round(vec[3] * 150) || 56, fullMark: 150 },
+        { subject: "Quiet", A: Math.round(vec[4] * 150) || 85, fullMark: 150 },
+        { subject: "Group", A: Math.round(vec[5] * 150) || 120, fullMark: 150 },
       ]);
     }
   }, [user]);
@@ -84,7 +85,7 @@ export const UserVectorProvider: ({ children }: {
     swipeQueueRef.current = []; 
     
     // We use a fallback ID for absolute guests
-    const userId = user?.id || "guest-id"; 
+    const userId = (user as any)?.id || "guest-id"; 
 
     try {
       await apiPost<any>("/api/v1/interactions/swipe-batch", {

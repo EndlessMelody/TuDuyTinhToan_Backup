@@ -23,6 +23,14 @@ class Settings(BaseSettings):
     SUPABASE_ANON_KEY: str | None = None
     SUPABASE_PROJECT_REF: str = "bjuikfhjrpmrpbvhduey"
 
+    # --- Email / SMTP ---
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
+    FROM_EMAIL: str = "noreply@tastemap.app"
+    FROM_NAME: str = "TasteMap"
+
     class Config:
         case_sensitive = True
         env_file = ".env"

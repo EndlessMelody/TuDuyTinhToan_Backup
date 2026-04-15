@@ -1,8 +1,9 @@
 """
-Auth router — JIT User Provisioning.
+Auth router - JIT User Provisioning + Backend OTP.
 
-POST /sync: Nhận Supabase JWT → xác thực token → tìm hoặc tạo User trong DB nội bộ.
-Dùng get_token_payload thay vì get_current_user_id để tránh nghịch lý gà-và-trứng.
+POST /sync: Nhan Supabase JWT -> xac thuc token -> tim hoac tao User trong DB noi bo.
+POST /register/check: Kiem tra email/username da ton tai chua.
+Dung get_token_payload thay vi get_current_user_id de tranh nghich ly ga-va-trung.
 """
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,6 +14,13 @@ from src.db.database import get_db
 from src.users.models import User
 from src.users.schemas import UserMe
 from src.core.dependencies import get_token_payload
+from src.auth.schemas import (
+    SendOTPRequest, SendOTPResponse, VerifyOTPRequest, VerifyOTPResponse,
+    CheckUserExistsRequest, CheckUserExistsResponse,
+    ResolveEmailRequest, ResolveEmailResponse,
+)
+from src.users.otp_service import create_otp, verify_otp as verify_otp_code
+from src.core.email_service import email_service
 
 router = APIRouter()
 
@@ -63,16 +71,40 @@ async def sync_user(
     if user is not None:
         return UserMe.model_validate(user)
 
-    # ── 3b. Chưa tồn tại → tạo mới (JIT Provisioning) ────────────────────
-    # Username: phần đầu email + 4 ký tự uuid ngẫu nhiên để tránh trùng
+    # ── 3b. Chưa tồn tại theo supabase_uid → kiểm tra orphaned row theo email ─
+    orphaned_result = await db.execute(select(User).where(User.email == email))
+    orphaned_user: User | None = orphaned_result.scalar_one_or_none()
+
+    username_from_meta: str | None = user_metadata.get("username")
     username_base = email.split("@")[0].replace(".", "_").lower()
-    username = f"{username_base}_{uuid.uuid4().hex[:6]}"
+
+    if username_from_meta:
+        dup = await db.execute(select(User).where(User.username == username_from_meta))
+        if dup.scalar_one_or_none() is None:
+            username = username_from_meta
+        else:
+            username = f"{username_from_meta}_{uuid.uuid4().hex[:4]}"
+    else:
+        username = f"{username_base}_{uuid.uuid4().hex[:6]}"
+
+    if orphaned_user is not None:
+        # Reclaim orphaned row: update supabase_uid to new Supabase account
+        orphaned_user.supabase_uid = supabase_uid
+        if username_from_meta:
+            orphaned_user.username = username
+        if display_name:
+            orphaned_user.display_name = display_name
+        if avatar_url:
+            orphaned_user.avatar_url = avatar_url
+        await db.commit()
+        await db.refresh(orphaned_user)
+        return UserMe.model_validate(orphaned_user)
 
     new_user = User(
         supabase_uid=supabase_uid,
         email=email,
         username=username,
-        display_name=display_name or username_base,
+        display_name=display_name or username_from_meta or username_base,
         avatar_url=avatar_url,
         food_vector=_DEFAULT_VECTOR,
         place_vector=_DEFAULT_VECTOR,
@@ -85,3 +117,99 @@ async def sync_user(
     await db.refresh(new_user)
 
     return UserMe.model_validate(new_user)
+
+
+@router.post(
+    "/register/send-otp",
+    response_model=SendOTPResponse,
+    summary="Gửi OTP xác minh email khi đăng ký",
+)
+async def send_registration_otp(
+    request: SendOTPRequest,
+    db: AsyncSession = Depends(get_db),
+) -> SendOTPResponse:
+    # ── 1. Kiểm tra email chưa được đăng ký ───────────────────────────────
+    existing_email = await db.execute(select(User).where(User.email == request.email))
+    if existing_email.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    # ── 2. Kiểm tra username chưa được sử dụng ────────────────────────────
+    existing_username = await db.execute(select(User).where(User.username == request.username))
+    if existing_username.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Username already taken")
+
+    # ── 3. Tạo OTP và gửi email ────────────────────────────────────────────
+    otp = await create_otp(request.email)
+    await email_service.send_otp_email(request.email, otp, request.username)
+
+    return SendOTPResponse(
+        success=True,
+        message="Verification code sent to your email",
+        expires_in=600,
+    )
+
+
+@router.post(
+    "/register/verify-otp",
+    response_model=VerifyOTPResponse,
+    summary="Xac minh ma OTP dang ky",
+)
+async def verify_registration_otp(
+    request: VerifyOTPRequest,
+) -> VerifyOTPResponse:
+    is_valid = await verify_otp_code(request.email, request.otp)
+    if not is_valid:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or expired code. Please check the code and try again.",
+        )
+    return VerifyOTPResponse(success=True, message="Email verified successfully")
+
+
+@router.post(
+    "/resolve-email",
+    response_model=ResolveEmailResponse,
+    summary="Resolve username to email for login",
+)
+async def resolve_email(
+    request: ResolveEmailRequest,
+    db: AsyncSession = Depends(get_db),
+) -> ResolveEmailResponse:
+    result = await db.execute(select(User.email).where(User.username == request.username))
+    email: str | None = result.scalar_one_or_none()
+    if not email:
+        raise HTTPException(status_code=404, detail="No account found with that username.")
+    return ResolveEmailResponse(email=email)
+
+
+@router.post(
+    "/register/check",
+    response_model=CheckUserExistsResponse,
+    summary="Kiem tra email va username da ton tai chua",
+)
+async def check_user_exists(
+    request: CheckUserExistsRequest,
+    db: AsyncSession = Depends(get_db),
+) -> CheckUserExistsResponse:
+    """Kiem tra email va username co san de dang ky khong."""
+    # Email uniqueness is enforced by Supabase during signUp.
+    # Only check username here to avoid false positives from orphaned Postgres rows.
+    username_exists = False
+
+    existing_username = await db.execute(select(User).where(User.username == request.username))
+    if existing_username.scalar_one_or_none():
+        username_exists = True
+
+    if username_exists:
+        return CheckUserExistsResponse(
+            available=False,
+            email_exists=False,
+            username_exists=True,
+            message="Username already taken",
+        )
+    return CheckUserExistsResponse(
+        available=True,
+        email_exists=False,
+        username_exists=False,
+        message="Email and username are available",
+    )

@@ -1,3 +1,4 @@
+"use client";
 import React, { useState, useRef, useEffect } from "react";
 import {
   motion,
@@ -14,20 +15,13 @@ import {
   Input,
   Avatar,
 } from "@/components/OnceUI";
-import { MapPin, Bell, MessageSquare, Sparkles, Compass } from "lucide-react";
+import { MapPin, Bell, MessageSquare } from "lucide-react";
 import { ProfileMenuItem } from "@/components/common/ProfileMenuItem";
-import {
-  LogOut,
-  User,
-  Settings,
-  Info,
-  Palette,
-  Globe,
-  BellRing,
-} from "lucide-react";
+import { LogOut, User, Settings, Info } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/context/AuthContext";
+import { useNotifications } from "@/hooks/useNotifications";
 
 interface DashboardHeaderProps {
   scrollY: MotionValue<number>;
@@ -38,14 +32,20 @@ interface DashboardHeaderProps {
 
 export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   scrollY,
-  onProfileClick,
   onSettingsClick,
-  onNotifClick,
 }) => {
   const router = useRouter();
-  const { user, loading, signOut } = useAuth();
+  const { user, isInitializing: loading, logout: signOut } = useAuth();
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const {
+    notifications,
+    unreadCount,
+    loading: notifsLoading,
+    markAllRead,
+    acceptFriendRequest,
+    declineFriendRequest,
+  } = useNotifications();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const headerWidth = useTransform(scrollY, [0, 80], ["100%", "80%"]);
@@ -146,7 +146,9 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           }}
         >
           <MapPin size={16} color="#ED1B24" />
-          <Text style={{ color: "#1C1C1E", fontWeight: 600, fontSize: "0.82rem" }}>
+          <Text
+            style={{ color: "#1C1C1E", fontWeight: 600, fontSize: "0.82rem" }}
+          >
             {user?.location || "Khám phá"}
           </Text>
           <span
@@ -262,29 +264,30 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             onClick={() => setIsNotifOpen(!isNotifOpen)}
             style={{ borderRadius: "10px" }}
           />
-          <div
-            style={{
-              position: "absolute",
-              top: "6px",
-              right: "6px",
-              width: "8px",
-              height: "8px",
-              borderRadius: "50%",
-              backgroundColor: "#ED1B24",
-              borderTopWidth: "2px",
-              borderBottomWidth: "2px",
-              borderLeftWidth: "2px",
-              borderRightWidth: "2px",
-              borderTopStyle: "solid",
-              borderBottomStyle: "solid",
-              borderLeftStyle: "solid",
-              borderRightStyle: "solid",
-              borderTopColor: "#FFFFFF",
-              borderBottomColor: "#FFFFFF",
-              borderLeftColor: "#FFFFFF",
-              borderRightColor: "#FFFFFF",
-            }}
-          />
+          {unreadCount > 0 && (
+            <div
+              style={{
+                position: "absolute",
+                top: "4px",
+                right: "4px",
+                minWidth: unreadCount > 9 ? "16px" : "14px",
+                height: "14px",
+                borderRadius: "9px",
+                backgroundColor: "#ED1B24",
+                border: "2px solid #FFFFFF",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "8px",
+                fontWeight: 800,
+                color: "white",
+                lineHeight: 1,
+                padding: "0 2px",
+              }}
+            >
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </div>
+          )}
 
           <AnimatePresence>
             {isNotifOpen && (
@@ -311,26 +314,167 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   boxShadow: "0 24px 64px rgba(0,0,0,0.12)",
                 }}
               >
-                {/* Notification Content (Simplified for now) */}
-                <Column
+                {/* Notification Header */}
+                <div
                   style={{
-                    paddingTop: "20px",
-                    paddingBottom: "20px",
-                    paddingLeft: "20px",
-                    paddingRight: "20px",
+                    padding: "16px 20px 12px",
+                    borderBottom: "1px solid #F2F2F7",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
                   }}
                 >
                   <Heading variant="heading-strong-s">Notifications</Heading>
-                  <Text
-                    style={{
-                      color: "#8E8E93",
-                      fontSize: "0.8rem",
-                      marginTop: "12px",
-                    }}
-                  >
-                    No new notifications
-                  </Text>
-                </Column>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={markAllRead}
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: "#007AFF",
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: 0,
+                      }}
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+
+                {/* Notification List */}
+                <div style={{ maxHeight: 380, overflowY: "auto" }}>
+                  {notifsLoading ? (
+                    <div style={{ padding: "24px 20px", textAlign: "center" }}>
+                      <Text style={{ color: "#8E8E93", fontSize: "0.8rem" }}>
+                        Loading…
+                      </Text>
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div style={{ padding: "32px 20px", textAlign: "center" }}>
+                      <div style={{ fontSize: "2rem", marginBottom: 8 }}>
+                        🔔
+                      </div>
+                      <Text style={{ color: "#8E8E93", fontSize: "0.8rem" }}>
+                        You&apos;re all caught up!
+                      </Text>
+                    </div>
+                  ) : (
+                    notifications.map((n) => {
+                      const isFriendReq =
+                        n.reference_type === "friendship" &&
+                        n.title === "New Friend Request";
+                      return (
+                        <div
+                          key={n.id}
+                          style={{
+                            padding: "12px 20px",
+                            borderBottom: "1px solid #F2F2F7",
+                            backgroundColor: n.is_read
+                              ? "transparent"
+                              : "rgba(0,122,255,0.03)",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 6,
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "flex-start",
+                              gap: 10,
+                            }}
+                          >
+                            {!n.is_read && (
+                              <div
+                                style={{
+                                  width: 7,
+                                  height: 7,
+                                  borderRadius: "50%",
+                                  backgroundColor: "#007AFF",
+                                  marginTop: 4,
+                                  flexShrink: 0,
+                                }}
+                              />
+                            )}
+                            <div style={{ flex: 1 }}>
+                              <Text
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  color: "#1C1C1E",
+                                  lineHeight: 1.4,
+                                }}
+                              >
+                                {n.title}
+                              </Text>
+                              {n.body && (
+                                <Text
+                                  style={{
+                                    fontSize: 12,
+                                    color: "#8E8E93",
+                                    marginTop: 2,
+                                    lineHeight: 1.4,
+                                  }}
+                                >
+                                  {n.body}
+                                </Text>
+                              )}
+                            </div>
+                          </div>
+                          {isFriendReq && n.reference_id && (
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: 8,
+                                marginTop: 4,
+                                marginLeft: n.is_read ? 0 : 17,
+                              }}
+                            >
+                              <button
+                                onClick={() =>
+                                  acceptFriendRequest(n.reference_id!, n.id)
+                                }
+                                style={{
+                                  flex: 1,
+                                  padding: "6px 0",
+                                  borderRadius: 8,
+                                  border: "none",
+                                  backgroundColor: "#007AFF",
+                                  color: "white",
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Accept
+                              </button>
+                              <button
+                                onClick={() =>
+                                  declineFriendRequest(n.reference_id!, n.id)
+                                }
+                                style={{
+                                  flex: 1,
+                                  padding: "6px 0",
+                                  borderRadius: 8,
+                                  border: "1px solid #E5E5EA",
+                                  backgroundColor: "transparent",
+                                  color: "#8E8E93",
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Decline
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -431,7 +575,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     fontSize: "0.85rem",
                   }}
                 >
-                  {user?.display_name || user?.username || 'User'}
+                  {user?.display_name || user?.username || "User"}
                 </Text>
                 <Text style={{ color: "#AEAEB2", fontSize: "0.7rem" }}>
                   Level {user?.level ?? 1}

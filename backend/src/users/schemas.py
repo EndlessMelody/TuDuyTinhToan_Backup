@@ -135,11 +135,15 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+
 class RegisterRequest(BaseModel):
     username: str
     email: EmailStr
     password: str
+    confirm_password: str
     name: Optional[str] = None
+    otp_verified: bool = False  # Set to True after OTP verification
+
 
 class AuthResponse(BaseModel):
     """Response sau khi login/register thành công"""
@@ -147,18 +151,41 @@ class AuthResponse(BaseModel):
     user: UserResponse
 
 
+# ─── OTP Schemas ───
+
+class SendOTPRequest(BaseModel):
+    email: EmailStr
+    username: str
+
+
+class SendOTPResponse(BaseModel):
+    success: bool
+    message: str
+    expires_in: int = 600  # 10 minutes in seconds
+
+
+class VerifyOTPRequest(BaseModel):
+    email: EmailStr
+    otp: str
+
+
+class VerifyOTPResponse(BaseModel):
+    success: bool
+    message: str
+
+
+class CheckEmailVerifiedRequest(BaseModel):
+    email: EmailStr
+
+
+class CheckEmailVerifiedResponse(BaseModel):
+    verified: bool
+    email: str
+
+
 # ─── Profile Schemas (cho /profile page) ───
 
-class UserStats(BaseModel):
-    reviews: int = 0
-    visited: int = 0
-    followers: int = 0
-    following: int = 0
 
-class Badge(BaseModel):
-    icon: str
-    label: str
-    color: str
 
 class RadarDataPoint(BaseModel):
     subject: str
@@ -203,7 +230,7 @@ class ProfileResponse(BaseModel):
     radarData: List[RadarDataPoint]
     
     # Achievements
-    badges: List[Badge]
+    badges: List[BadgeSummary]
     
     # Content
     posts: List[Post]

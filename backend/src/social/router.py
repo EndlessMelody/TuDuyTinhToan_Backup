@@ -36,3 +36,13 @@ async def delete(friendship_id: int, user_id: int = Depends(get_current_user_id)
 @router.get("/requests", summary="Lời mời kết bạn đang chờ")
 async def pending_requests(user_id: int = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
     return await service.list_pending_requests(db, user_id)
+
+
+@router.get("/foodies", summary="Friends list with taste match scores")
+async def list_foodies(user_id: int = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
+    return await service.list_friends_foodies(db, user_id)
+
+
+@router.get("/discover", summary="Discover foodies with high taste match (not yet friends)")
+async def discover_foodies(user_id: int = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
+    return await service.list_discover_foodies(db, user_id)

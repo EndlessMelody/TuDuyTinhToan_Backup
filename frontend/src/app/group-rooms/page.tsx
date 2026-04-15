@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft,
@@ -12,11 +13,14 @@ import {
   Crown,
   Zap,
   Lock,
+  Globe,
+  KeyRound,
+  Check,
   X,
   Save,
 } from "lucide-react";
 import { toast } from "sonner";
-import { MOCK_LOBBIES } from "@/components/features/lobby/data";
+import { apiGet, apiPost } from "@/lib/api";
 import {
   LobbyDetailModal,
   AvatarStack,
@@ -27,6 +31,75 @@ import type {
   LobbyCategory,
   LobbyStatus,
 } from "@/components/features/lobby/types";
+
+// ─── API types ───────────────────────────────────────────────────────────────
+
+interface ApiMember {
+  user_id: number;
+  display_name?: string | null;
+  avatar_url?: string | null;
+  is_host: boolean;
+  is_ready: boolean;
+}
+
+interface ApiRoom {
+  id: number;
+  name: string;
+  status: string;
+  route_description?: string | null;
+  scheduled_time?: string | null;
+  max_spots: number;
+  cover_image_url?: string | null;
+  accent_color?: string | null;
+  is_public: boolean;
+  invite_code?: string | null;
+  members: ApiMember[];
+  spots_remaining: number;
+}
+
+function mapApiRoom(r: ApiRoom): LobbyData {
+  const host = r.members.find((m) => m.is_host);
+  const status: LobbyStatus =
+    r.spots_remaining === 0
+      ? "full"
+      : r.status === "in_progress" || r.status === "in-progress"
+        ? "in-progress"
+        : "waiting";
+  return {
+    id: r.id,
+    name: r.name,
+    route: r.route_description ?? "—",
+    time: r.scheduled_time
+      ? new Date(r.scheduled_time).toLocaleString([], {
+          dateStyle: "short",
+          timeStyle: "short",
+        })
+      : "TBD",
+    spots: r.max_spots,
+    bg:
+      r.cover_image_url ??
+      "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&h=320&fit=crop",
+    accent: r.accent_color ?? "#007AFF",
+    is_public: r.is_public,
+    invite_code: r.invite_code ?? undefined,
+    status,
+    members: r.members.map((m) => ({
+      name: m.display_name ?? "Member",
+      avatar:
+        m.avatar_url ??
+        `https://api.dicebear.com/9.x/thumbs/svg?seed=${m.user_id}`,
+      ready: m.is_ready,
+    })),
+    host: host
+      ? {
+          name: host.display_name ?? "Host",
+          avatar:
+            host.avatar_url ??
+            `https://api.dicebear.com/9.x/thumbs/svg?seed=${host.user_id}`,
+        }
+      : undefined,
+  };
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -81,6 +154,116 @@ const STATUS_CONFIG: Record<
   },
 };
 
+// ─── JoinByCode Modal ─────────────────────────────────────────────────────────
+
+function JoinByCodeModal({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
+  const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleJoin = async () => {
+    if (!code.trim()) {
+      toast.error("Please enter an invite code.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const room = await apiPost<ApiRoom>("/api/v1/groups/join-by-code", {
+        invite_code: code.trim().toUpperCase(),
+      });
+      toast.success(`Joined "${room.name}"! 🎉`);
+      onClose();
+      router.push(`/group-rooms/${room.id}`);
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "Invalid or expired invite code.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 backdrop-blur-md p-4"
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 16 }}
+        transition={{ type: "spring", damping: 28, stiffness: 320 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-[28px] w-full max-w-sm overflow-hidden relative"
+        style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.12)" }}
+      >
+        <div className="bg-gradient-to-br from-[#1C1C1E] to-[#3A3A3C] px-6 pt-6 pb-5">
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white rounded-full p-1.5 transition"
+          >
+            <X size={16} />
+          </button>
+          <div className="w-12 h-12 rounded-[16px] bg-white/10 flex items-center justify-center mb-3">
+            <KeyRound size={22} className="text-white" />
+          </div>
+          <h2 className="text-[20px] font-bold text-white tracking-tight">
+            Join Private Room
+          </h2>
+          <p className="text-[13px] text-white/60 mt-1">
+            Enter the invite code from your host
+          </p>
+        </div>
+        <div className="px-6 py-5 flex flex-col gap-4">
+          <div>
+            <label className="text-[13px] font-semibold text-[#1C1C1E] block mb-1.5">
+              Invite Code
+            </label>
+            <input
+              className="w-full px-4 py-3 rounded-[14px] text-[17px] font-mono font-bold text-[#1C1C1E] bg-[#F9F9FB] border border-[#E5E5EA] outline-none focus:border-[#6366F1] focus:ring-2 focus:ring-indigo-100 transition-all text-center tracking-widest uppercase"
+              placeholder="FEAST-4X2K"
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              maxLength={10}
+              onKeyDown={(e) => e.key === "Enter" && handleJoin()}
+            />
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 py-3 rounded-[14px] text-[15px] font-semibold text-[#8E8E93] bg-[#F2F2F7] hover:bg-[#E5E5EA] transition"
+            >
+              Cancel
+            </button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={handleJoin}
+              disabled={loading}
+              className="flex-[2] py-3 rounded-[14px] text-[15px] font-bold text-white flex items-center justify-center gap-2 disabled:opacity-60"
+              style={{
+                background: "linear-gradient(135deg, #6366F1, #4F46E5)",
+                boxShadow: "0 4px 14px rgba(99,102,241,0.35)",
+              }}
+            >
+              {loading ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <KeyRound size={14} /> Join Room
+                </>
+              )}
+            </motion.button>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 // ─── RoomCard ─────────────────────────────────────────────────────────────────
 
 function RoomCard({
@@ -90,6 +273,7 @@ function RoomCard({
   lobby: LobbyData;
   onClick: () => void;
 }) {
+  const router = useRouter();
   const spotsLeft = lobby.spots - lobby.members.length;
   const status = lobby.status ?? "waiting";
   const statusCfg = STATUS_CONFIG[status];
@@ -149,6 +333,22 @@ function RoomCard({
             {lobby.category}
           </div>
         )}
+
+        {/* Private / Public badge */}
+        <div
+          className="absolute bottom-3 right-3 flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold backdrop-blur-sm"
+          style={{
+            backgroundColor:
+              lobby.is_public === false
+                ? "rgba(99,102,241,0.85)"
+                : "rgba(52,199,89,0.75)",
+            color: "#fff",
+            border: "1px solid rgba(255,255,255,0.2)",
+          }}
+        >
+          {lobby.is_public === false ? <Lock size={9} /> : <Globe size={9} />}
+          {lobby.is_public === false ? "Private" : "Public"}
+        </div>
 
         {/* Status badge */}
         <div
@@ -266,7 +466,11 @@ function RoomCard({
               whileTap={{ scale: 0.94 }}
               onClick={(e) => {
                 e.stopPropagation();
-                onClick();
+                if (status !== "full" && lobby.id) {
+                  router.push(`/group-rooms/${lobby.id}`);
+                } else {
+                  onClick();
+                }
               }}
               className="text-[13px] font-semibold px-3.5 py-1.5 rounded-full transition-colors"
               style={
@@ -298,25 +502,61 @@ function RoomCard({
 
 // ─── Create Room Modal ─────────────────────────────────────────────────────────
 
-function CreateRoomModal({ onClose }: { onClose: () => void }) {
+function CreateRoomModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (room: LobbyData) => void;
+}) {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [route, setRoute] = useState("");
   const [time, setTime] = useState("");
   const [spots, setSpots] = useState(4);
   const [category, setCategory] = useState<LobbyCategory>("Food Challenge");
+  const [isPublic, setIsPublic] = useState(true);
+  const [pendingCode, setPendingCode] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!name.trim() || !route.trim()) {
       toast.error("Room name and route are required.");
       return;
     }
-    toast.success(`Room "${name}" created! 🎉`);
-    onClose();
+    if (!isPublic && !pendingCode) {
+      setPendingCode(true);
+      return;
+    }
+    setLoading(true);
+    try {
+      const body = {
+        name: name.trim(),
+        route_description: route.trim(),
+        max_spots: spots,
+        is_public: isPublic,
+        ...(description.trim() ? { description: description.trim() } : {}),
+      };
+      const created = await apiPost<ApiRoom>("/api/v1/groups/", body);
+      const mapped = mapApiRoom(created);
+      onCreated(mapped);
+      toast.success(`Room "${name}" created! 🎉`);
+      onClose();
+      router.push(`/group-rooms/${created.id}`);
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to create room.",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const inputCls =
     "w-full px-4 py-3 rounded-[14px] text-[15px] text-[#1C1C1E] bg-[#F9F9FB] border border-[#E5E5EA] outline-none focus:border-[#007AFF] focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all";
+
+  // ... (rest of the code remains the same)
 
   return (
     <motion.div
@@ -476,6 +716,73 @@ function CreateRoomModal({ onClose }: { onClose: () => void }) {
               </div>
             </div>
           </div>
+
+          {/* Visibility toggle */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[13px] font-semibold text-[#1C1C1E]">
+              Room Visibility
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {([true, false] as const).map((pub) => (
+                <button
+                  key={String(pub)}
+                  onClick={() => {
+                    setIsPublic(pub);
+                    setPendingCode(false);
+                  }}
+                  className="flex items-center gap-2 px-4 py-3 rounded-[14px] border transition-all"
+                  style={
+                    isPublic === pub
+                      ? pub
+                        ? {
+                            backgroundColor: "#E8F8EE",
+                            borderColor: "#34C759",
+                            color: "#1C7A3A",
+                          }
+                        : {
+                            backgroundColor: "#EEF0FF",
+                            borderColor: "#6366F1",
+                            color: "#4F46E5",
+                          }
+                      : {
+                          backgroundColor: "#F9F9FB",
+                          borderColor: "#E5E5EA",
+                          color: "#8E8E93",
+                        }
+                  }
+                >
+                  {pub ? <Globe size={15} /> : <Lock size={15} />}
+                  <div className="text-left">
+                    <p className="text-[13px] font-bold leading-none">
+                      {pub ? "Public" : "Private"}
+                    </p>
+                    <p className="text-[11px] mt-0.5 opacity-70">
+                      {pub ? "Anyone can join" : "Invite code only"}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Invite code note (private room preview) */}
+          {pendingCode && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-start gap-2.5 px-4 py-3 rounded-[14px]"
+              style={{
+                backgroundColor: "#EEF0FF",
+                border: "1px solid #C7C7FF",
+              }}
+            >
+              <KeyRound size={15} className="text-[#6366F1] mt-0.5 shrink-0" />
+              <p className="text-[13px] text-[#4F46E5] leading-snug">
+                An invite code will be generated for you automatically. Share it
+                with friends after creation.
+              </p>
+            </motion.div>
+          )}
         </div>
 
         {/* Footer */}
@@ -491,12 +798,28 @@ function CreateRoomModal({ onClose }: { onClose: () => void }) {
             whileTap={{ scale: 0.97 }}
             onClick={handleCreate}
             className="flex-[2] py-3.5 rounded-[16px] text-[16px] font-bold text-white flex items-center justify-center gap-2"
+            disabled={loading}
             style={{
-              background: "linear-gradient(135deg, #1A7AFF, #0057D9)",
-              boxShadow: "0 6px 20px rgba(0,122,255,0.32)",
+              background: pendingCode
+                ? "linear-gradient(135deg, #34C759, #1FAD45)"
+                : "linear-gradient(135deg, #1A7AFF, #0057D9)",
+              boxShadow: pendingCode
+                ? "0 6px 20px rgba(52,199,89,0.32)"
+                : "0 6px 20px rgba(0,122,255,0.32)",
+              opacity: loading ? 0.7 : 1,
             }}
           >
-            <Save size={16} /> Create Room
+            {loading ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : pendingCode ? (
+              <>
+                <Check size={16} /> Confirm & Create
+              </>
+            ) : (
+              <>
+                <Save size={16} /> Create Room
+              </>
+            )}
           </motion.button>
         </div>
       </motion.div>
@@ -512,23 +835,51 @@ export default function GroupRoomsPage() {
   const [activeCategory, setActiveCategory] = useState<LobbyCategory | "All">(
     "All",
   );
+  const [rooms, setRooms] = useState<LobbyData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [selectedLobby, setSelectedLobby] = useState<LobbyData | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showJoinByCode, setShowJoinByCode] = useState(false);
+
+  const fetchRooms = useCallback(async () => {
+    setLoading(true);
+    setFetchError(null);
+    try {
+      const data = await apiGet<{ items: ApiRoom[] }>(
+        "/api/v1/groups/?status=active&limit=50&public_only=false",
+      );
+      setRooms(data.items.map(mapApiRoom));
+    } catch (err: unknown) {
+      setFetchError(
+        err instanceof Error ? err.message : "Failed to load rooms.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchRooms();
+  }, [fetchRooms]);
+
+  const handleRoomCreated = (room: LobbyData) => {
+    setRooms((prev) => [room, ...prev]);
+  };
 
   const counts = useMemo(
     () => ({
-      All: MOCK_LOBBIES.length,
-      Waiting: MOCK_LOBBIES.filter((l) => (l.status ?? "waiting") === "waiting")
+      All: rooms.length,
+      Waiting: rooms.filter((l) => (l.status ?? "waiting") === "waiting")
         .length,
-      "In Progress": MOCK_LOBBIES.filter((l) => l.status === "in-progress")
-        .length,
-      Full: MOCK_LOBBIES.filter((l) => l.status === "full").length,
+      "In Progress": rooms.filter((l) => l.status === "in-progress").length,
+      Full: rooms.filter((l) => l.status === "full").length,
     }),
-    [],
+    [rooms],
   );
 
   const filtered = useMemo(() => {
-    return MOCK_LOBBIES.filter((l) => {
+    return rooms.filter((l) => {
       const s = l.status ?? "waiting";
       const matchStatus =
         statusTab === "All" ||
@@ -545,10 +896,10 @@ export default function GroupRoomsPage() {
         (l.description ?? "").toLowerCase().includes(q);
       return matchStatus && matchCat && matchSearch;
     });
-  }, [statusTab, activeCategory, search]);
+  }, [rooms, statusTab, activeCategory, search]);
 
-  const totalMembers = MOCK_LOBBIES.reduce((s, l) => s + l.members.length, 0);
-  const inProgressCount = MOCK_LOBBIES.filter(
+  const totalMembers = rooms.reduce((s, l) => s + l.members.length, 0);
+  const inProgressCount = rooms.filter(
     (l) => l.status === "in-progress",
   ).length;
 
@@ -601,18 +952,34 @@ export default function GroupRoomsPage() {
             </div>
           </div>
 
-          <motion.button
-            whileHover={{ scale: 1.04 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-[14px] text-[14px] font-bold text-white"
-            style={{
-              background: "linear-gradient(135deg, #1A7AFF, #0057D9)",
-              boxShadow: "0 4px 14px rgba(0,122,255,0.3)",
-            }}
-          >
-            <Plus size={16} /> Create Room
-          </motion.button>
+          <div className="flex items-center gap-2">
+            <motion.button
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowJoinByCode(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] text-[14px] font-semibold"
+              style={{
+                backgroundColor: "#fff",
+                border: "1px solid rgba(0,0,0,0.08)",
+                color: "#3C3C43",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+              }}
+            >
+              <KeyRound size={15} /> Join with Code
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowCreate(true)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-[14px] text-[14px] font-bold text-white"
+              style={{
+                background: "linear-gradient(135deg, #1A7AFF, #0057D9)",
+                boxShadow: "0 4px 14px rgba(0,122,255,0.3)",
+              }}
+            >
+              <Plus size={16} /> Create Room
+            </motion.button>
+          </div>
         </div>
       </div>
 
@@ -768,7 +1135,59 @@ export default function GroupRoomsPage() {
 
         {/* ── ROOM GRID ── */}
         <AnimatePresence mode="wait">
-          {filtered.length === 0 ? (
+          {loading ? (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="grid gap-5"
+              style={{
+                gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+              }}
+            >
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-white rounded-[24px] overflow-hidden animate-pulse"
+                  style={{ height: 260, border: "1px solid rgba(0,0,0,0.05)" }}
+                >
+                  <div className="h-[120px] bg-[#E5E5EA]" />
+                  <div className="p-4 flex flex-col gap-3">
+                    <div className="h-4 bg-[#E5E5EA] rounded-full w-3/4" />
+                    <div className="h-3 bg-[#F2F2F7] rounded-full w-1/2" />
+                    <div className="h-3 bg-[#F2F2F7] rounded-full w-2/3" />
+                  </div>
+                </div>
+              ))}
+            </motion.div>
+          ) : fetchError ? (
+            <motion.div
+              key="error"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center justify-center py-24 text-center"
+            >
+              <div className="text-5xl mb-4">⚠️</div>
+              <p className="text-[18px] font-bold text-[#1C1C1E]">
+                Could not load rooms
+              </p>
+              <p className="text-[14px] text-[#8E8E93] mt-1">{fetchError}</p>
+              <motion.button
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={fetchRooms}
+                className="mt-5 flex items-center gap-2 px-5 py-2.5 rounded-[14px] text-[14px] font-bold text-white"
+                style={{
+                  background: "linear-gradient(135deg, #1A7AFF, #0057D9)",
+                  boxShadow: "0 4px 14px rgba(0,122,255,0.28)",
+                }}
+              >
+                Retry
+              </motion.button>
+            </motion.div>
+          ) : filtered.length === 0 ? (
             <motion.div
               key="empty"
               initial={{ opacity: 0 }}
@@ -838,7 +1257,15 @@ export default function GroupRoomsPage() {
             onClose={() => setSelectedLobby(null)}
           />
         )}
-        {showCreate && <CreateRoomModal onClose={() => setShowCreate(false)} />}
+        {showCreate && (
+          <CreateRoomModal
+            onClose={() => setShowCreate(false)}
+            onCreated={handleRoomCreated}
+          />
+        )}
+        {showJoinByCode && (
+          <JoinByCodeModal onClose={() => setShowJoinByCode(false)} />
+        )}
       </AnimatePresence>
     </div>
   );

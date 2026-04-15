@@ -21,6 +21,8 @@ Implementation:
 """
 import asyncio
 import json
+import random
+import string
 import numpy as np
 from numpy.typing import NDArray
 from fastapi import HTTPException
@@ -38,9 +40,27 @@ from src.recommendations.service import _cosine_sim
 
 # ─── Lobby Management ────────────────────────────────────────────────────
 
+def _generate_invite_code() -> str:
+    """Generate a human-friendly invite code like FEAST-4X2K."""
+    words = ["FEAST", "TASTE", "YUMMY", "SPICY", "SQUAD", "NOMAD", "BITES", "CRISP"]
+    suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    return f"{random.choice(words)}-{suffix}"
+
+
 async def create_group(db: AsyncSession, data, creator_id: int) -> dict:
     """Tạo phòng nhóm mới. Creator tự động join với is_host=True."""
-    group = Group(**data.model_dump())
+    payload = data.model_dump()
+    if not payload.get("is_public", True):
+        # Generate unique invite code for private rooms
+        for _ in range(10):
+            code = _generate_invite_code()
+            exists = await db.scalar(select(Group).where(Group.invite_code == code))
+            if not exists:
+                payload["invite_code"] = code
+                break
+        else:
+            raise HTTPException(status_code=500, detail="Failed to generate unique invite code")
+    group = Group(**payload)
     db.add(group)
     await db.flush()
 
@@ -69,12 +89,24 @@ async def create_group(db: AsyncSession, data, creator_id: int) -> dict:
     return await _group_to_dict(db, group)
 
 
-async def list_groups(db: AsyncSession, status: str = "active", limit: int = 10) -> List[dict]:
-    result = await db.execute(
-        select(Group).where(Group.status == status).order_by(Group.created_at.desc()).limit(limit)
-    )
+async def list_groups(db: AsyncSession, status: str = "active", limit: int = 10, public_only: bool = True) -> List[dict]:
+    query = select(Group).where(Group.status == status)
+    if public_only:
+        query = query.where(Group.is_public == True)
+    query = query.order_by(Group.created_at.desc()).limit(limit)
+    result = await db.execute(query)
     groups = result.scalars().all()
     return [await _group_to_dict(db, g) for g in groups]
+
+
+async def join_by_code(db: AsyncSession, invite_code: str, user_id: int) -> dict:
+    """Join a private room using its invite code."""
+    group = await db.scalar(select(Group).where(Group.invite_code == invite_code.upper().strip()))
+    if not group:
+        raise HTTPException(status_code=404, detail="Invalid invite code")
+    if group.status != "active":
+        raise HTTPException(status_code=400, detail="This room has ended")
+    return await join_group(db, group.id, user_id)
 
 
 async def get_group(db: AsyncSession, group_id: int) -> dict:
@@ -651,6 +683,8 @@ async def _group_to_dict(db: AsyncSession, group: Group) -> dict:
         "route_description": group.route_description,
         "scheduled_time": group.scheduled_time, "max_spots": group.max_spots,
         "cover_image_url": group.cover_image_url, "accent_color": group.accent_color,
+        "is_public": group.is_public,
+        "invite_code": group.invite_code,
         "created_at": group.created_at,
         "members": members,
         "spots_remaining": max(0, group.max_spots - len(members)),

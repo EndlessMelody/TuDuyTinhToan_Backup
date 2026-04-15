@@ -2,10 +2,168 @@
 
 import React, { useState, useMemo } from "react";
 import { Column, Row, Heading, Text, Avatar } from "@/components/OnceUI";
-import { Search, Users, Wifi, Flame, X, TrendingUp } from "lucide-react";
+import {
+  Search,
+  Users,
+  Wifi,
+  Flame,
+  X,
+  TrendingUp,
+  UserPlus,
+} from "lucide-react";
 import { FriendRow, Friend } from "@/components/features/foodies/FriendRow";
 import { useChat } from "@/context/ChatContext";
-import { MOCK_FRIENDS } from "@/constants/foodies-data";
+import { useFoodies } from "@/hooks/useFoodies";
+import type { PendingRequest } from "@/hooks/useFoodies";
+import { AddFriendSearch } from "@/components/features/foodies/AddFriendSearch";
+
+// ── Pending Request Card ──────────────────────────────────────────────────────
+function PendingRequestCard({
+  req,
+  onAccept,
+  onDecline,
+}: {
+  req: PendingRequest;
+  onAccept: () => void;
+  onDecline: () => void;
+}) {
+  const [busy, setBusy] = React.useState(false);
+
+  const handle = async (fn: () => Promise<void> | void) => {
+    setBusy(true);
+    try {
+      await fn();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const matchColor =
+    req.match_score >= 80
+      ? "#34C759"
+      : req.match_score >= 55
+        ? "#FF9500"
+        : "#8E8E93";
+
+  return (
+    <div
+      style={{
+        backgroundColor: "white",
+        borderRadius: 20,
+        overflow: "hidden",
+        border: "1px solid rgba(255,149,0,0.15)",
+        boxShadow: "0 2px 12px rgba(255,149,0,0.06)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* Cover strip */}
+      <div
+        style={{
+          height: 64,
+          background: req.cover_url
+            ? `url(${req.cover_url}) center/cover`
+            : "linear-gradient(135deg, #FF9500 0%, #FF6B6B 100%)",
+          position: "relative",
+        }}
+      >
+        {/* Match badge */}
+        <div
+          style={{
+            position: "absolute",
+            top: 10,
+            right: 12,
+            padding: "3px 9px",
+            borderRadius: 20,
+            backgroundColor: "rgba(0,0,0,0.45)",
+            backdropFilter: "blur(8px)",
+            fontSize: 11,
+            fontWeight: 700,
+            color: matchColor,
+          }}
+        >
+          {req.match_score}% match
+        </div>
+      </div>
+
+      {/* Body */}
+      <div style={{ padding: "0 16px 16px", marginTop: -22 }}>
+        <Avatar
+          src={req.avatar_url}
+          name={req.display_name || req.username}
+          size="l"
+          style={{
+            border: "3px solid white",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
+          }}
+        />
+        <div style={{ marginTop: 8 }}>
+          <Text style={{ fontSize: 15, fontWeight: 700, color: "#1C1C1E" }}>
+            {req.display_name || req.username}
+          </Text>
+          <Text style={{ fontSize: 12, color: "#8E8E93", marginTop: 1 }}>
+            @{req.username}
+          </Text>
+          {(req.title || req.bio) && (
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#6C6C70",
+                marginTop: 5,
+                lineHeight: 1.4,
+                overflow: "hidden",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+              }}
+            >
+              {req.title || req.bio}
+            </Text>
+          )}
+        </div>
+
+        {/* Buttons */}
+        <Row style={{ gap: 8, marginTop: 14 }}>
+          <button
+            disabled={busy}
+            onClick={() => handle(onAccept)}
+            style={{
+              flex: 1,
+              padding: "9px 0",
+              borderRadius: 12,
+              border: "none",
+              backgroundColor: busy ? "#A8C7FA" : "#007AFF",
+              color: "white",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: busy ? "default" : "pointer",
+              transition: "background 0.15s",
+            }}
+          >
+            Accept
+          </button>
+          <button
+            disabled={busy}
+            onClick={() => handle(onDecline)}
+            style={{
+              flex: 1,
+              padding: "9px 0",
+              borderRadius: 12,
+              border: "1.5px solid #E5E5EA",
+              backgroundColor: "transparent",
+              color: "#8E8E93",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: busy ? "default" : "pointer",
+            }}
+          >
+            Decline
+          </button>
+        </Row>
+      </div>
+    </div>
+  );
+}
 
 type FilterTab = "all" | "online" | "high-match";
 
@@ -19,16 +177,26 @@ export default function FoodiesPage() {
   const { isChatOpen, setIsChatOpen, setActiveFriend } = useChat();
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
+  const {
+    friends,
+    discover,
+    pendingRequests,
+    loading,
+    error,
+    sendRequest,
+    acceptRequest,
+    declineRequest,
+  } = useFoodies();
 
   const handleMessageUser = (friend: Friend) => {
     setActiveFriend(friend);
     setIsChatOpen(true);
   };
 
-  const onlineCount = MOCK_FRIENDS.filter((f) => f.isOnline).length;
+  const onlineCount = friends.filter((f) => f.isOnline).length;
 
   const filtered = useMemo(() => {
-    let list = MOCK_FRIENDS;
+    let list = friends;
     if (activeTab === "online") list = list.filter((f) => f.isOnline);
     if (activeTab === "high-match")
       list = list.filter((f) => (f.match ?? 0) >= 80);
@@ -39,7 +207,7 @@ export default function FoodiesPage() {
           f.status.toLowerCase().includes(query.toLowerCase()),
       );
     return list;
-  }, [query, activeTab]);
+  }, [query, activeTab, friends]);
 
   /* ── Compact (chat-open) mode keeps the old behaviour ── */
   if (isChatOpen) {
@@ -133,19 +301,70 @@ export default function FoodiesPage() {
   }
 
   /* ── Full (expanded) mode ── */
-  const onlineFriends = MOCK_FRIENDS.filter((f) => f.isOnline);
-  const highMatchCount = MOCK_FRIENDS.filter(
-    (f) => (f.match ?? 0) >= 80,
-  ).length;
-  const avgMatch = Math.round(
-    MOCK_FRIENDS.reduce((s, f) => s + (f.match ?? 0), 0) / MOCK_FRIENDS.length,
-  );
+  const onlineFriends = friends.filter((f) => f.isOnline);
+  const highMatchCount = friends.filter((f) => (f.match ?? 0) >= 80).length;
+  const avgMatch =
+    friends.length > 0
+      ? Math.round(
+          friends.reduce((s, f) => s + (f.match ?? 0), 0) / friends.length,
+        )
+      : 0;
+
+  if (loading) {
+    return (
+      <Column
+        fillHeight
+        className="no-scrollbar"
+        style={{ width: "100%", overflowY: "auto", backgroundColor: "#F2F2F7" }}
+      >
+        <Column style={{ padding: "40px", gap: 16 }}>
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div
+              key={i}
+              style={{
+                height: 120,
+                borderRadius: 20,
+                backgroundColor: "rgba(0,0,0,0.05)",
+                animation: "pulse 1.5s ease-in-out infinite",
+              }}
+            />
+          ))}
+        </Column>
+      </Column>
+    );
+  }
+
+  if (error) {
+    return (
+      <Column
+        fillHeight
+        style={{
+          width: "100%",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 12,
+          backgroundColor: "#F2F2F7",
+        }}
+      >
+        <Text style={{ fontSize: "2rem" }}>⚠️</Text>
+        <Heading variant="heading-strong-s" style={{ color: "#1C1C1E" }}>
+          Could not load foodies
+        </Heading>
+        <Text
+          variant="body-default-s"
+          style={{ color: "rgba(0,0,0,0.4)", textAlign: "center" }}
+        >
+          {error}
+        </Text>
+      </Column>
+    );
+  }
 
   const STATS = [
     {
       icon: <Users size={14} />,
       label: "Total Foodies",
-      value: MOCK_FRIENDS.length,
+      value: friends.length,
       color: "#007AFF",
     },
     {
@@ -281,9 +500,64 @@ export default function FoodiesPage() {
             </Row>
           ))}
         </Row>
+
+        {/* ── Add friend by username ── */}
+        <div style={{ marginTop: 20, maxWidth: 480 }}>
+          <AddFriendSearch onRequestSent={() => {}} />
+        </div>
       </div>
 
       <Column style={{ padding: "28px 40px 48px", gap: 28 }}>
+        {/* ── Friend Requests section ── */}
+        {pendingRequests.length > 0 && (
+          <Column style={{ gap: 14 }}>
+            <Row style={{ alignItems: "center", gap: 10 }}>
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  backgroundColor: "#FF9500",
+                  boxShadow: "0 0 0 3px rgba(255,149,0,0.2)",
+                }}
+              />
+              <Heading variant="heading-strong-s" style={{ color: "#1C1C1E" }}>
+                Friend Requests
+              </Heading>
+              <div
+                style={{
+                  padding: "2px 10px",
+                  borderRadius: 20,
+                  backgroundColor: "rgba(255,149,0,0.1)",
+                  border: "1px solid rgba(255,149,0,0.25)",
+                }}
+              >
+                <Text
+                  style={{ fontSize: 12, fontWeight: 700, color: "#D97706" }}
+                >
+                  {pendingRequests.length}
+                </Text>
+              </div>
+            </Row>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                gap: 14,
+              }}
+            >
+              {pendingRequests.map((req: PendingRequest) => (
+                <PendingRequestCard
+                  key={req.friendship_id}
+                  req={req}
+                  onAccept={() => acceptRequest(req.friendship_id)}
+                  onDecline={() => declineRequest(req.friendship_id)}
+                />
+              ))}
+            </div>
+          </Column>
+        )}
+
         {/* ── Online Now spotlight strip ── */}
         {onlineFriends.length > 0 && (
           <Column style={{ gap: 12 }}>
@@ -335,6 +609,7 @@ export default function FoodiesPage() {
                   <div style={{ position: "relative" }}>
                     <Avatar
                       src={f.avatar}
+                      name={f.name}
                       size="l"
                       style={{
                         border: "2px solid rgba(52,199,89,0.3)",
@@ -444,10 +719,10 @@ export default function FoodiesPage() {
               const isActive = activeTab === tab.id;
               const count =
                 tab.id === "all"
-                  ? MOCK_FRIENDS.length
+                  ? friends.length
                   : tab.id === "online"
-                    ? MOCK_FRIENDS.filter((f) => f.isOnline).length
-                    : MOCK_FRIENDS.filter((f) => (f.match ?? 0) >= 80).length;
+                    ? friends.filter((f) => f.isOnline).length
+                    : friends.filter((f) => (f.match ?? 0) >= 80).length;
               return (
                 <button
                   key={tab.id}
@@ -541,6 +816,64 @@ export default function FoodiesPage() {
             >
               Try a different search term or filter.
             </Text>
+          </Column>
+        )}
+
+        {/* ── Discover Section ── */}
+        {discover.length > 0 && (
+          <Column style={{ gap: 16 }}>
+            <Row style={{ alignItems: "center", gap: 8 }}>
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 8,
+                  backgroundColor: "rgba(175,82,222,0.1)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#AF52DE",
+                }}
+              >
+                <UserPlus size={14} />
+              </div>
+              <Column style={{ gap: 0 }}>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: "#1C1C1E",
+                    letterSpacing: "-0.2px",
+                  }}
+                >
+                  Discover Foodies
+                </Text>
+                <Text
+                  variant="body-default-xs"
+                  style={{ color: "rgba(0,0,0,0.4)" }}
+                >
+                  People with matching taste vectors you haven’t connected with
+                  yet
+                </Text>
+              </Column>
+            </Row>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                gap: 16,
+              }}
+            >
+              {discover.map((person) => (
+                <FriendRow
+                  key={person.id}
+                  friend={person}
+                  isCompact={false}
+                  onMessage={() => handleMessageUser(person)}
+                  onInvite={(f) => sendRequest(f.id)}
+                />
+              ))}
+            </div>
           </Column>
         )}
       </Column>

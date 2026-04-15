@@ -10,7 +10,7 @@ Chạy từ thư mục backend/:
     .\.venv\Scripts\python.exe scripts\seed_locations.py
 
 Chỉ cần thêm vào .env:
-    GEMINI_API_KEY=<your_key>   ← lấy miễn phí tại aistudio.google.com
+    GROQ_API_KEY=<your_key>    ← lấy miễn phí tại console.groq.com
 """
 
 import asyncio
@@ -37,7 +37,8 @@ from src.locations.models import Location
 #  CONFIGURATION
 # ══════════════════════════════════════════════════════════════════════
 
-GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 # 15 latent features — ĐÚNG THỨ TỰ, không được đổi
 LATENT_FEATURES: list[str] = [
@@ -62,34 +63,97 @@ LATENT_FEATURES: list[str] = [
 # Mỗi entry là một bounding box: (south, west, north, east)
 # và nhãn khu vực để log. Thêm/bớt tuỳ ý.
 # Gợi ý: dùng https://boundingbox.klokantech.com để vẽ bbox
-SEARCH_AREAS: list[dict[str, Any]] = [
-    {
-        "label": "Khu vực Bãi Trước - Bãi Sau, Vũng Tàu",
-        # Bbox bao trọn mũi Vũng Tàu (Từ Tượng Chúa Kito đến Quảng trường)
-        "bbox": (10.335, 107.065, 10.365, 107.105),
-        "amenities": [
-            "restaurant", "cafe", "fast_food", "food_court", 
-            "bar", "pub", "biergarten", "ice_cream", "bakery"
-        ],
-    }
+_FOOD_AMENITIES = [
+    "restaurant", "cafe", "fast_food", "food_court",
+    "bar", "pub", "biergarten", "ice_cream", "bakery",
+]
 
-    # {
-    #     "label": "Làng Đại Học Thủ Đức, HCM",
-    #     # bbox bao quanh khu Làng ĐH Thủ Đức & khu vực lân cận
-    #     "bbox": (10.840, 106.760, 10.885, 106.810),
-    #     # OSM amenity tags cần lấy
-    #     "amenities": ["restaurant", "cafe", "fast_food", "food_court", "bar"],
-    # },
-    # {
-    #     "label": "Quận 1, HCM",
-    #     "bbox": (10.765, 106.690, 10.790, 106.710),
-    #     "amenities": ["restaurant", "cafe", "fast_food"],
-    # },
-    # {
-    #     "label": "Quận 3, HCM",
-    #     "bbox": (10.773, 106.676, 10.793, 106.693),
-    #     "amenities": ["restaurant", "cafe", "bar"],
-    # },
+SEARCH_AREAS: list[dict[str, Any]] = [
+    # ── Vũng Tàu ─────────────────────────────────────────────────────
+    {
+        "label": "Bãi Trước - Bãi Sau, Vũng Tàu",
+        "city": "Vũng Tàu",
+        "bbox": (10.335, 107.065, 10.365, 107.105),
+        "amenities": _FOOD_AMENITIES,
+    },
+    {
+        "label": "Trung tâm thành phố Vũng Tàu",
+        "city": "Vũng Tàu",
+        "bbox": (10.340, 107.080, 10.370, 107.100),
+        "amenities": _FOOD_AMENITIES,
+    },
+
+    # ── Hồ Chí Minh ──────────────────────────────────────────────────
+    {
+        "label": "Quận 1, HCM",
+        "city": "Hồ Chí Minh",
+        "bbox": (10.765, 106.690, 10.790, 106.712),
+        "amenities": _FOOD_AMENITIES,
+    },
+    {
+        "label": "Quận 3, HCM",
+        "city": "Hồ Chí Minh",
+        "bbox": (10.773, 106.676, 10.793, 106.695),
+        "amenities": _FOOD_AMENITIES,
+    },
+    {
+        "label": "Quận 7 / Phú Mỹ Hưng, HCM",
+        "city": "Hồ Chí Minh",
+        "bbox": (10.718, 106.695, 10.748, 106.725),
+        "amenities": _FOOD_AMENITIES,
+    },
+    {
+        "label": "Bình Thạnh / Thảo Điền, HCM",
+        "city": "Hồ Chí Minh",
+        "bbox": (10.793, 106.710, 10.822, 106.742),
+        "amenities": _FOOD_AMENITIES,
+    },
+    {
+        "label": "Phú Nhuận / Gò Vấp, HCM",
+        "city": "Hồ Chí Minh",
+        "bbox": (10.793, 106.655, 10.820, 106.680),
+        "amenities": _FOOD_AMENITIES,
+    },
+    {
+        "label": "Làng Đại Học Thủ Đức, HCM",
+        "city": "Hồ Chí Minh",
+        "bbox": (10.840, 106.760, 10.885, 106.810),
+        "amenities": _FOOD_AMENITIES,
+    },
+
+    # ── Đà Nẵng ──────────────────────────────────────────────────────
+    {
+        "label": "Trung tâm Đà Nẵng (Hải Châu)",
+        "city": "Đà Nẵng",
+        "bbox": (16.040, 108.190, 16.070, 108.225),
+        "amenities": _FOOD_AMENITIES,
+    },
+    {
+        "label": "Mỹ Khê - An Thượng, Đà Nẵng",
+        "city": "Đà Nẵng",
+        "bbox": (16.040, 108.238, 16.068, 108.258),
+        "amenities": _FOOD_AMENITIES,
+    },
+
+    # ── Hà Nội ───────────────────────────────────────────────────────
+    {
+        "label": "Hoàn Kiếm, Hà Nội",
+        "city": "Hà Nội",
+        "bbox": (21.020, 105.840, 21.040, 105.865),
+        "amenities": _FOOD_AMENITIES,
+    },
+    {
+        "label": "Tây Hồ / Trúc Bạch, Hà Nội",
+        "city": "Hà Nội",
+        "bbox": (21.045, 105.820, 21.075, 105.852),
+        "amenities": _FOOD_AMENITIES,
+    },
+    {
+        "label": "Đống Đa / Cầu Giấy, Hà Nội",
+        "city": "Hà Nội",
+        "bbox": (21.018, 105.790, 21.045, 105.825),
+        "amenities": _FOOD_AMENITIES,
+    },
 ]
 
 # Số địa điểm tối đa lấy từ OSM cho mỗi khu vực
@@ -246,7 +310,7 @@ def parse_osm_element(elem: dict[str, Any], city: str) -> dict[str, Any] | None:
 
 def _build_llm_prompt(name: str, category: str, osm_context: list[str]) -> str:
     """
-    Xây dựng prompt cho Gemini. Vì OSM không có reviews,
+    Xây dựng prompt cho Groq LLM. Vì OSM không có reviews,
     dùng thông tin tags (cuisine, opening_hours, ...) + tên để LLM suy luận.
     """
     features_str = json.dumps(LATENT_FEATURES, ensure_ascii=False)
@@ -284,35 +348,33 @@ async def transform_with_llm(
     client: httpx.AsyncClient,
 ) -> tuple[dict[str, float], list[float]]:
     """
-    Gọi Gemini REST API → sinh characteristics (dict) và vector (list[float]).
+    Gọi Groq REST API → sinh characteristics (dict) và vector (list[float]).
     Vector shape: (15,) — đúng thứ tự LATENT_FEATURES
     Fallback về 0.5 nếu LLM lỗi (graceful degradation).
     """
     prompt = _build_llm_prompt(name, category, osm_context)
 
-    gemini_url = (
-        f"https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
-    )
+    groq_url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json",
+    }
     body = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": 0.2,      # thấp → deterministic, ít hallucinate
-            "maxOutputTokens": 512,
-        },
+        "model": GROQ_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.2,      # thấp → deterministic, ít hallucinate
+        "max_tokens": 512,
     }
 
-    log.info(f"[TRANSFORM] Gọi Gemini LLM cho: '{name}'")
+    log.info(f"[TRANSFORM] Gọi Groq LLM ({GROQ_MODEL}) cho: '{name}'")
     try:
-        resp = await client.post(gemini_url, json=body, timeout=30)
+        resp = await client.post(groq_url, headers=headers, json=body, timeout=30)
         resp.raise_for_status()
         result = resp.json()
 
-        raw_text: str = (
-            result["candidates"][0]["content"]["parts"][0]["text"].strip()
-        )
+        raw_text: str = result["choices"][0]["message"]["content"].strip()
 
-        # Strip markdown code fences nếu Gemini trả về ```json ... ```
+        # Strip markdown code fences nếu Groq trả về ```json ... ```
         if raw_text.startswith("```"):
             raw_text = raw_text.split("```")[1]
             if raw_text.startswith("json"):
@@ -343,19 +405,37 @@ async def transform_with_llm(
 #  STEP 3: LOAD — Insert vào PostgreSQL
 # ══════════════════════════════════════════════════════════════════════
 
+_FALLBACK_VECTOR = [0.5] * 15
+
+
+def _is_fallback_vector(vec: list[float] | None) -> bool:
+    """True nếu vector là fallback 0.5 (chưa được LLM chấm điểm thực sự)."""
+    if vec is None or len(vec) != 15:
+        return True
+    return all(abs(v - 0.5) < 1e-3 for v in vec)
+
+
 async def load_location(session, place: dict[str, Any]) -> bool:
     """
-    Insert một location vào DB. Skip nếu tên đã tồn tại (idempotent).
-    Trả về True nếu insert thành công, False nếu skip.
+    Upsert một location vào DB:
+    - Nếu chưa tồn tại → insert mới.
+    - Nếu đã tồn tại với vector fallback (0.5) → cập nhật characteristics + vector.
+    - Nếu đã tồn tại với vector thực → skip.
+    Trả về True nếu insert/update, False nếu skip.
     """
     stmt = select(Location).where(Location.name == place["name"])
     result = await session.execute(stmt)
-    if result.scalars().first():
+    existing = result.scalars().first()
+
+    if existing:
+        if _is_fallback_vector(existing.vector) and not _is_fallback_vector(place["vector"]):
+            existing.characteristics = place["characteristics"]
+            existing.vector = place["vector"]
+            log.info(f"[LOAD] 🔄 Cập nhật vector: '{place['name']}'")
+            return True
         log.info(f"[LOAD] ⏭️  Skip (đã tồn tại): '{place['name']}'")
         return False
 
-    # Rating OSM = 0 → base_score = 0. Để tự nhiên, không normalize.
-    # Khi có review thực từ user app sẽ update dần qua interaction vector.
     location = Location(
         name=place["name"],
         lat=place["lat"],
@@ -380,8 +460,8 @@ async def load_location(session, place: dict[str, Any]) -> bool:
 # ══════════════════════════════════════════════════════════════════════
 
 async def run_pipeline() -> None:
-    if not GEMINI_API_KEY:
-        log.error("❌ Thiếu GEMINI_API_KEY trong .env — lấy miễn phí tại aistudio.google.com")
+    if not GROQ_API_KEY:
+        log.error("❌ Thiếu GROQ_API_KEY trong .env — lấy miễn phí tại console.groq.com")
         return
 
     inserted_count = 0
@@ -407,7 +487,7 @@ async def run_pipeline() -> None:
                     error_count += 1
                     continue
 
-                city_label: str = area["label"].split(",")[-1].strip()
+                city_label: str = area["city"]
 
                 for elem in elements:
                     parsed = parse_osm_element(elem, city_label)
@@ -416,10 +496,8 @@ async def run_pipeline() -> None:
 
                     # ── TRANSFORM ─────────────────────────────────────
                     try:
-                        # Gemini Free Tier bị giới hạn 15 Request / Phút
-                        # Phải sleep 4.5s để không bị dính lỗi 429 Too Many Requests
-                        log.info(f"⏳ Đang đợi 4.5s để tránh vượt giới hạn API Gemini (Rate Limit)...")
-                        await asyncio.sleep(4.5)
+                        # Groq free tier: ~30 RPM → cần ≥ 2s giữa các request
+                        await asyncio.sleep(2.5)
                         
                         characteristics, vector = await transform_with_llm(
                             name=parsed["name"],

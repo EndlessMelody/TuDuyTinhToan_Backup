@@ -6,8 +6,6 @@ from src.recommendations.router import router as recommendations_router
 from src.sessions.router import router as sessions_router
 from src.feed.router import router as feed_router
 from src.interactions.router import router as interactions_router
-from src.api.auth_router import router as auth_router
-
 # ─── Auth ────────────────────────────────────────────────────────────────
 from src.auth.router import router as auth_router
 
@@ -40,6 +38,9 @@ from src.users.settings_router import router as settings_router
 # ─── Media ───────────────────────────────────────────────────────────────
 from src.media.router import router as media_router
 
+# ─── Messages ────────────────────────────────────────────────────────────────
+from src.messages.router import router as messages_router
+
 # ─── Health ──────────────────────────────────────────────────────────────
 from src.health.router import router as health_router
 
@@ -67,3 +68,4 @@ api_router.include_router(deals_router,            prefix="/deals",            t
 api_router.include_router(badges_router,           prefix="/badges",           tags=["gamification"])
 api_router.include_router(settings_router,         prefix="/settings",         tags=["settings"])
 api_router.include_router(media_router,            prefix="/media",            tags=["media"])
+api_router.include_router(messages_router,         prefix="/messages",         tags=["messages"])

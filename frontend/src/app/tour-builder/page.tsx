@@ -68,6 +68,7 @@ import ClientOnly from "@/components/common/ClientOnly";
 import { useAuth } from "@/hooks/useAuth";
 import { apiGet } from "@/lib/api";
 import { toast } from "sonner";
+import { useTourBuilderStore, TourNode } from "@/store/useTourBuilderStore";
 
 const MapWidget = dynamic(() => import("@/components/MapWidget"), {
   ssr: false,
@@ -98,13 +99,31 @@ const MapWidget = dynamic(() => import("@/components/MapWidget"), {
 
 const TOTAL_NODES = 4;
 
+type CardData = TourNode;
+
+const PARTICLES = Array.from({ length: 20 }, () => ({
+  x0: Math.random() * 1200 - 600,
+  y0: Math.random() * 800 - 400,
+  x1: Math.random() * 1200 - 600,
+  y1: Math.random() * 800 - 400,
+  dur: 3 + Math.random() * 4,
+}));
+
+const LOADING_MESSAGES = [
+  "Mapping your taste profile...",
+  "Finding hidden gems nearby...",
+  "Curating the perfect route...",
+  "Calculating travel times...",
+  "Personalizing your tour...",
+  "Almost ready to launch!",
+];
+
 // ═══════════ CARD DATA ═══════════ //
-import { useTourBuilderStore, TourNode } from "@/store/useTourBuilderStore";
 // Note: Initial deck queue is populated in the store (Phase 1)
 
 export default function TourBuilderPage() {
   const pathname = usePathname();
-  
+
   const {
     deckQueue: deck,
     selectedNodes: filledNodes,
@@ -115,7 +134,7 @@ export default function TourBuilderPage() {
     setLastDiscarded,
     undoDiscard,
     status,
-    setStatus
+    setStatus,
   } = useTourBuilderStore();
 
   const [isTourReady, setIsTourReady] = useState(false);
@@ -132,40 +151,48 @@ export default function TourBuilderPage() {
   useEffect(() => {
     async function fetchVenues() {
       // Prevent running if we already have cards or we're not idle
-      if (deck.length > 0 || status !== 'idle') return;
+      if (deck.length > 0 || status !== "idle") return;
 
       try {
-        setStatus('loading');
+        setStatus("loading");
         // We use GET /api/v1/locations/ as our base for Phase 2 implementation.
         // It brings back LocationResponse[] which satisfies our TourNode requirements.
-        const res = await apiGet<{ items: any[] }>("/api/v1/locations/?limit=15&offset=0");
-        
+        const res = await apiGet<{ items: any[] }>(
+          "/api/v1/locations/?limit=15&offset=0",
+        );
+
         const mappedNodes: TourNode[] = res.items.map((loc, i) => ({
           id: String(loc.id),
           venue_id: loc.id,
           title: loc.name,
           subtitle: `${loc.category || "Place"} • ${loc.city || "HCM City"}`,
-          tags: loc.characteristics ? Object.keys(loc.characteristics).slice(0, 3) : ["Trending"],
-          match: Math.floor(80 + Math.random() * 19), 
+          tags: loc.characteristics
+            ? Object.keys(loc.characteristics).slice(0, 3)
+            : ["Trending"],
+          match: Math.floor(80 + Math.random() * 19),
           distance: `${(Math.random() * 5 + 0.5).toFixed(1)}km`,
           price: loc.price_range || "$$",
-          img: loc.image_url || "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=600&h=900&fit=crop",
-          color: i % 2 === 0 ? "#FF6B35" : "#2A9D8F", 
+          img:
+            loc.image_url ||
+            "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=600&h=900&fit=crop",
+          color: i % 2 === 0 ? "#FF6B35" : "#2A9D8F",
           location: [loc.lat, loc.lng],
           time_spent: 45,
-          order_index: i
+          order_index: i,
         }));
 
         setDeckQueue(mappedNodes);
-        setStatus('idle');
+        setStatus("idle");
       } catch (error: any) {
-        setStatus('error');
-        toast.error("Failed to fetch venues: " + (error.message || "Unknown error"));
+        setStatus("error");
+        toast.error(
+          "Failed to fetch venues: " + (error.message || "Unknown error"),
+        );
       }
     }
 
     fetchVenues();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -184,12 +211,15 @@ export default function TourBuilderPage() {
 
   // Dynamic Tour DNA calculation
   const getTourDNA = useCallback(() => {
-    const selectedFoods = filledNodes.filter((n) => n !== null) as NonNullable<typeof filledNodes[0]>[];
-    if (selectedFoods.length === 0) return [{ label: "Empty", value: 100, color: 'rgba(0,0,0,0.05)' }];
-    
+    const selectedFoods = filledNodes.filter((n) => n !== null) as NonNullable<
+      (typeof filledNodes)[0]
+    >[];
+    if (selectedFoods.length === 0)
+      return [{ label: "Empty", value: 100, color: "rgba(0,0,0,0.05)" }];
+
     const tagCounts: Record<string, number> = {};
-    selectedFoods.forEach(food => {
-      food.tags?.forEach(tag => {
+    selectedFoods.forEach((food) => {
+      food.tags?.forEach((tag) => {
         tagCounts[tag] = (tagCounts[tag] || 0) + 1;
       });
     });
@@ -235,24 +265,33 @@ export default function TourBuilderPage() {
       if (!activeCard) return;
       const card = activeCard;
 
-    if (direction === "select" && nextEmptyIndex !== -1) {
-      updateVector(card.venue_id, card.tags || [], "select");
-      setDiscardDir("right");
-      addSelectedNode(card, nextEmptyIndex);
-      setTimeout(() => {
-        popDeckQueue();
-        setDiscardDir(null);
-      }, 300);
-    } else if (direction === "skip") {
-      updateVector(card.venue_id, card.tags || [], "skip");
-      setDiscardDir("left");
-      setTimeout(() => {
-        popDeckQueue();
-        setDiscardDir(null);
-        setLastDiscarded(card);
-      }, 300);
-    }
-  }, [activeCard, nextEmptyIndex, updateVector, addSelectedNode, popDeckQueue, setLastDiscarded]);
+      if (direction === "select" && nextEmptyIndex !== -1) {
+        updateVector(card.venue_id, card.tags || [], "select");
+        setDiscardDir("right");
+        addSelectedNode(card, nextEmptyIndex);
+        setTimeout(() => {
+          popDeckQueue();
+          setDiscardDir(null);
+        }, 300);
+      } else if (direction === "skip") {
+        updateVector(card.venue_id, card.tags || [], "skip");
+        setDiscardDir("left");
+        setTimeout(() => {
+          popDeckQueue();
+          setDiscardDir(null);
+          setLastDiscarded(card);
+        }, 300);
+      }
+    },
+    [
+      activeCard,
+      nextEmptyIndex,
+      updateVector,
+      addSelectedNode,
+      popDeckQueue,
+      setLastDiscarded,
+    ],
+  );
 
   // ─── Drag Logic ─── //
   const handleDragEnd = useCallback(
@@ -307,13 +346,25 @@ export default function TourBuilderPage() {
     const totalXP = stops.reduce((sum, s) => sum + s.match, 0);
 
     return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ width: "100%", height: "100%", position: "relative", backgroundColor: surface.page }}>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        style={{
+          width: "100%",
+          height: "100%",
+          position: "relative",
+          backgroundColor: surface.page,
+        }}
+      >
         <ClientOnly>
           <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
-            <MapWidget 
+            <MapWidget
               mapId="tour-final-background"
-              points={filledNodes.filter((n) => n !== null).map(n => n!.location as [number, number])}
-              center={[10.897, 106.772]} zoom={13}
+              points={filledNodes
+                .filter((n) => n !== null)
+                .map((n) => n!.location as [number, number])}
+              center={[10.897, 106.772]}
+              zoom={13}
             />
           </div>
           <div style={{ display: "flex", gap: 10 }}>
@@ -353,8 +404,7 @@ export default function TourBuilderPage() {
               <Navigation2 size={14} /> Start Tour
             </button>
           </div>
-        </div>
-
+        </ClientOnly>
         {/* ── Split Body ── */}
         <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
           {/* LEFT: Map */}
@@ -981,14 +1031,40 @@ export default function TourBuilderPage() {
           </Row>
 
           {/* RIGHT: ELITE PROFILE INFO */}
-          <Row horizontal="end" style={{ flex: 1, alignItems: 'center', gap: '16px' }}>
-            <Column style={{ gap: '2px', alignItems: 'flex-end', hide: 's' }}>
-              <Text style={{ color: text.primary, fontSize: "0.9rem", fontWeight: 900, letterSpacing: '-0.3px' }}>
+          <Row
+            horizontal="end"
+            style={{ flex: 1, alignItems: "center", gap: "16px" }}
+          >
+            <Column style={{ gap: "2px", alignItems: "flex-end", hide: "s" }}>
+              <Text
+                style={{
+                  color: text.primary,
+                  fontSize: "0.9rem",
+                  fontWeight: 900,
+                  letterSpacing: "-0.3px",
+                }}
+              >
                 {user?.display_name || user?.username || "Explorer"}
               </Text>
-              <Row vertical="center" style={{ gap: '6px' }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#00D1B2', boxShadow: '0 0 8px #00D1B2' }} />
-                <Text style={{ color: "rgba(0,0,0,0.45)", fontSize: "0.7rem", fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <Row vertical="center" style={{ gap: "6px" }}>
+                <div
+                  style={{
+                    width: "6px",
+                    height: "6px",
+                    borderRadius: "50%",
+                    backgroundColor: "#00D1B2",
+                    boxShadow: "0 0 8px #00D1B2",
+                  }}
+                />
+                <Text
+                  style={{
+                    color: "rgba(0,0,0,0.45)",
+                    fontSize: "0.7rem",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                  }}
+                >
                   {user?.title || "Taste Explorer"}
                 </Text>
               </Row>
@@ -998,18 +1074,41 @@ export default function TourBuilderPage() {
               <motion.div
                 animate={{ rotate: -360 }}
                 transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-                style={{ position: 'absolute', inset: -4, borderRadius: '50%', border: '1px dashed rgba(0, 122, 255, 0.2)' }}
+                style={{
+                  position: "absolute",
+                  inset: -4,
+                  borderRadius: "50%",
+                  border: "1px dashed rgba(0, 122, 255, 0.2)",
+                }}
               />
-              <div style={{ 
-                width: '46px', 
-                height: '46px', 
-                borderRadius: '50%', 
-                padding: '2px', 
-                background: `linear-gradient(135deg, ${accent.primary}, ${accent.secondary})`,
-                boxShadow: '0 4px 12px rgba(0, 122, 255, 0.2)'
-              }}>
-                <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', border: '2px solid white' }}>
-                  <img src={user?.avatar_url || ""} alt={user?.display_name || "User Avatar"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <div
+                style={{
+                  width: "46px",
+                  height: "46px",
+                  borderRadius: "50%",
+                  padding: "2px",
+                  background: `linear-gradient(135deg, ${accent.primary}, ${accent.secondary})`,
+                  boxShadow: "0 4px 12px rgba(0, 122, 255, 0.2)",
+                }}
+              >
+                <div
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    borderRadius: "50%",
+                    overflow: "hidden",
+                    border: "2px solid white",
+                  }}
+                >
+                  <img
+                    src={user?.avatar_url || ""}
+                    alt={user?.display_name || "User Avatar"}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
                 </div>
               </div>
             </div>
@@ -1134,12 +1233,34 @@ export default function TourBuilderPage() {
           onDragEnd={handleDragEnd}
         >
           <AnimatePresence>
-            {status === 'loading' ? (
-              <motion.div key="skeleton" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ width: "100%", height: "100%", position: "absolute", top: 0, left: 0 }}>
+            {status === "loading" ? (
+              <motion.div
+                key="skeleton"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                }}
+              >
                 <TourSkeleton />
               </motion.div>
             ) : deck.length > 0 ? (
-              <div key="cards" style={{ width: "100%", height: "100%", position: "relative", display: "flex", justifyContent: "center", alignItems: "center" }}>
+              <div
+                key="cards"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  position: "relative",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
                 {deck[1] && (
                   <motion.div
                     key={`bg-${deck[1].id}`}
@@ -1184,8 +1305,24 @@ export default function TourBuilderPage() {
                 </div>
               </div>
             ) : (
-              <motion.div key="empty" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                <EmptyState filledCount={filledNodes.filter(Boolean).length} totalCount={TOTAL_NODES} />
+              <motion.div
+                key="empty"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <EmptyState
+                  filledCount={filledNodes.filter(Boolean).length}
+                  totalCount={TOTAL_NODES}
+                />
               </motion.div>
             )}
           </AnimatePresence>
@@ -1193,64 +1330,70 @@ export default function TourBuilderPage() {
       </div>
 
       {/* 3. FUNCTIONAL FOOTER - FLEX SHRINK 0 */}
-      <div style={{ width: '100%', zIndex: 100, flexShrink: 0, paddingTop: '8px', paddingBottom: '8px', paddingLeft: '60px', paddingRight: '60px', backgroundColor: 'white', backdropFilter: 'blur(40px)', borderTopWidth: '1px', borderTopStyle: 'solid', borderTopColor: 'rgba(0,0,0,0.08)', borderRadius: '24px 24px 0 0', boxShadow: '0 -10px 40px rgba(0,0,0,0.04)' }}>
-        <Row fillWidth horizontal="between" vertical="center" style={{ height: '100px', gap: '48px' }}>
-            {/* LEFT: STATUS */}
-            <Row style={{ gap: '20px', alignItems: 'center', width: '380px' }}>
-            <motion.div whileHover={{ scale: 1.05 }} style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingTop: '8px', paddingBottom: '8px', paddingLeft: '20px', paddingRight: '20px', backgroundColor: '#F0F9FF', borderRadius: '16px', border: `1px solid ${accent.primary}20` }}>
-                <Row vertical="center" style={{ gap: '8px' }}>
-                   <Users size={16} color={accent.primary} />
-                   <Text style={{ fontSize: '0.85rem', fontWeight: 900, color: accent.primary }}>1 MEMBER</Text>
-                </Row>
-                <Text style={{ fontSize: '0.65rem', fontWeight: 600, color: 'rgba(0,0,0,0.4)', textAlign: 'center' }}>ACTIVE GROUP</Text>
-              </motion.div>
-              <div style={{ width: '1px', height: '32px', backgroundColor: 'rgba(0,0,0,0.08)' }} />
-              <Column style={{ gap: '4px' }}>
-                <Text style={{ fontSize: '0.85rem', fontWeight: 900, color: text.primary }}>{filledNodes.filter(Boolean).length} FOODS SELECTED</Text>
-                <Text style={{ fontSize: '0.6rem', fontWeight: 600, color: 'rgba(0,0,0,0.4)', textTransform: 'uppercase' }}>Open-ended Exploration</Text>
-              </Column>
-            </Row>
-
-            {/* CENTER: ACTIONS */}
-            <div style={{ display: "flex", alignItems: "center", gap: "16px", paddingTop: "8px", paddingBottom: "8px", paddingLeft: "16px", paddingRight: "16px", backgroundColor: "rgba(0,0,0,0.03)", borderRadius: "100px", border: `2px solid rgba(0,0,0,0.05)` }}>
-              <IconButton icon={<Undo2 size={22} color="white" />} onClick={handleUndo} style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: "#64748B", paddingTop: "0", paddingBottom: "0", paddingLeft: "0", paddingRight: "0" }} />
-              <Button onClick={() => handleManualAction('skip')} style={{ borderRadius: '30px', backgroundColor: '#F3E8FF', color: '#7E22CE', border: 'none', fontWeight: 900, paddingTop: '0', paddingBottom: '0', paddingLeft: '28px', paddingRight: '28px', height: '48px' }}>SKIP</Button>
-              <Button onClick={() => handleManualAction('select')} style={{ borderRadius: '30px', backgroundColor: accent.primary, color: 'white', fontWeight: 900, paddingTop: '0', paddingBottom: '0', paddingLeft: '32px', paddingRight: '32px', height: '48px' }}>CHOOSE</Button>
-              <IconButton 
-                 icon={<Star size={24} color="white" fill={filledNodes.some(n => n !== null) ? "white" : "none"} />} 
-                 onClick={() => {
-                    if (filledNodes.some(n => n !== null)) {
-                      setIsGenerating(true);
-                      setTimeout(() => { setIsGenerating(false); setIsTourReady(true); }, 3000);
-                    }
-                 }}
-                 style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: filledNodes.some(n => n !== null) ? '#10B981' : 'rgba(0,0,0,0.1)' }} 
-              />
-            </div>
-
-            {/* RIGHT: MAP & DNA */}
-            <Row style={{ gap: '24px', alignItems: 'center', width: '380px', justifyContent: 'flex-end' }}>
-              <Column style={{ gap: '8px', width: '180px' }}>
-                <Row horizontal="between" vertical="center" style={{ width: '100%' }}>
-                  <Text style={{ fontSize: '0.65rem', fontWeight: 850 }}>TOUR DNA PROFILE</Text>
-                  <Text style={{ fontSize: '0.6rem', color: accent.secondary, fontWeight: 800 }}>LIVE</Text>
-                </Row>
-                <div style={{ width: '100%', height: '12px', backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: '6px', overflow: 'hidden', display: 'flex' }}>
-                   {tourDNA.map((segment) => (
-                      <motion.div key={segment.label} initial={{ width: 0 }} animate={{ width: `${segment.value}%` }} style={{ height: '100%', backgroundColor: segment.color }} />
-                   ))}
-                </div>
-              </Column>
-              <div style={{ width: '150px', height: '80px', borderRadius: '16px', backgroundColor: '#F8FAFF', border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden', position: 'relative' }}>
-                 <ClientOnly>
-                    <MapWidget 
-                      mapId="tour-curation-footer"
-                      points={filledNodes.filter((n) => n !== null).map(n => n!.location as [number, number])}
-                      center={activeCard ? activeCard.location : [10.897, 106.772]} zoom={14} showBanner={false}
-                    />
-                 </ClientOnly>
-              </div>
-            </div>
+      <div
+        style={{
+          width: "100%",
+          zIndex: 100,
+          flexShrink: 0,
+          paddingTop: "8px",
+          paddingBottom: "8px",
+          paddingLeft: "60px",
+          paddingRight: "60px",
+          backgroundColor: "white",
+          backdropFilter: "blur(40px)",
+          borderTopWidth: "1px",
+          borderTopStyle: "solid",
+          borderTopColor: "rgba(0,0,0,0.08)",
+          borderRadius: "24px 24px 0 0",
+          boxShadow: "0 -10px 40px rgba(0,0,0,0.04)",
+        }}
+      >
+        <Row
+          fillWidth
+          horizontal="between"
+          vertical="center"
+          style={{ height: "100px", gap: "48px" }}
+        >
+          {/* LEFT: STATUS */}
+          <Row style={{ gap: "20px", alignItems: "center", width: "380px" }}>
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "2px",
+                paddingTop: "8px",
+                paddingBottom: "8px",
+                paddingLeft: "20px",
+                paddingRight: "20px",
+                backgroundColor: "#F0F9FF",
+                borderRadius: "16px",
+                border: `1px solid ${accent.primary}20`,
+              }}
+            >
+              <Row vertical="center" style={{ gap: "8px" }}>
+                <Users size={16} color={accent.primary} />
+                <Text
+                  style={{
+                    fontSize: "0.85rem",
+                    fontWeight: 900,
+                    color: accent.primary,
+                  }}
+                >
+                  1 MEMBER
+                </Text>
+              </Row>
+              <Text
+                style={{
+                  fontSize: "0.65rem",
+                  fontWeight: 600,
+                  color: "rgba(0,0,0,0.4)",
+                  textAlign: "center",
+                }}
+              >
+                ACTIVE GROUP
+              </Text>
+            </motion.div>
             <div
               style={{
                 width: "1px",
@@ -1266,7 +1409,7 @@ export default function TourBuilderPage() {
                   color: text.primary,
                 }}
               >
-                {filledNodes.filter(Boolean).length} / {stopCount} STOPS
+                {filledNodes.filter(Boolean).length} FOODS SELECTED
               </Text>
               <Text
                 style={{
@@ -1276,9 +1419,7 @@ export default function TourBuilderPage() {
                   textTransform: "uppercase",
                 }}
               >
-                {filledNodes.filter(Boolean).length >= stopCount
-                  ? "Route Complete — Ready to Launch!"
-                  : `${stopCount - filledNodes.filter(Boolean).length} more to go`}
+                Open-ended Exploration
               </Text>
             </Column>
           </Row>
@@ -1602,7 +1743,15 @@ export default function TourBuilderPage() {
   );
 }
 
-function DraggableCard({ card, onDragEnd, x }: { card: TourNode; onDragEnd: (e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => void; x: any; }) {
+function DraggableCard({
+  card,
+  onDragEnd,
+  x,
+}: {
+  card: TourNode;
+  onDragEnd: (e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => void;
+  x: any;
+}) {
   const y = useMotionValue(0);
   const rotate = useTransform(x, [-400, 400], [-8, 8]);
   const rotateX = useTransform(y, [-300, 300], [10, -10]);

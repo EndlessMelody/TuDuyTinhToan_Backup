@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { apiGet, ApiError } from "@/lib/api";
+import { normalizeMediaUrl } from "@/lib/media";
 import type { LobbyData } from "@/components/features/lobby/types";
 
 // ─── API Response Types ───────────────────────────────────────────────────────
@@ -48,13 +49,13 @@ function adaptGroup(g: ApiGroup): LobbyData {
       : "Thời gian TBD",
     spots: g.max_spots,
     bg:
-      g.cover_image_url ??
+      normalizeMediaUrl(g.cover_image_url) ??
       "https://images.unsplash.com/photo-1552611052-33e04de081de?w=600&h=320&fit=crop",
     accent: g.accent_color ?? "#007AFF",
     members: (g.members ?? []).map((m) => ({
       name: m.display_name,
       avatar:
-        m.avatar_url ??
+        normalizeMediaUrl(m.avatar_url) ??
         `https://ui-avatars.com/api/?name=${encodeURIComponent(m.display_name)}&background=random`,
       ready: m.is_ready,
     })),
@@ -80,7 +81,7 @@ export function useGroups(status: string = "active"): UseGroupsResult {
     setError(null);
     try {
       const data = await apiGet<GroupsResponse>(
-        `/api/v1/groups?status=${status}&limit=10`
+        `/api/v1/groups?status=${status}&limit=10`,
       );
       setLobbies((data.items ?? []).map(adaptGroup));
     } catch (err) {

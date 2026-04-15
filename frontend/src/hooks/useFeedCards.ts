@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { apiGet, ApiError } from "@/lib/api";
+import { normalizeMediaUrl } from "@/lib/media";
 
 // ─── API Response Types ───────────────────────────────────────────────────────
 
@@ -69,11 +70,21 @@ export function useFeedCards({
       if (lng !== undefined) params.set("lng", String(lng));
       if (userId) params.set("user_id", userId);
 
-      const data = await apiGet<FeedCardsResponse>(`/api/v1/feed/cards?${params}`);
+      const data = await apiGet<FeedCardsResponse>(
+        `/api/v1/feed/cards?${params}`,
+      );
 
       // Ignore stale responses
       if (currentFetch !== fetchCount.current) return;
-      setCards(data.cards ?? []);
+      setCards(
+        (data.cards ?? []).map((card) => ({
+          ...card,
+          image_url: normalizeMediaUrl(card.image_url),
+          photos: (card.photos ?? [])
+            .map((photo) => normalizeMediaUrl(photo))
+            .filter((photo): photo is string => !!photo),
+        })),
+      );
     } catch (err) {
       if (currentFetch !== fetchCount.current) return;
       if (err instanceof ApiError) {

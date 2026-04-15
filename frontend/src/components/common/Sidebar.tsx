@@ -23,8 +23,8 @@ import {
   PanelLeftOpen,
   BadgeCheck,
 } from "lucide-react";
-import { MOCK_USER } from "@/constants/mock-data";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
 
 // ─── Design tokens ───
 const LIGHT_C = {
@@ -280,6 +280,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const router = useRouter();
   const { user } = useAuth();
+  const C = useThemeColors();
   const sidebarWidth = isFullScreen ? 0 : isOpen ? 240 : 72;
 
   return (
@@ -334,9 +335,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               paddingRight: "12px",
             }}
           >
-            <Heading
-              variant="heading-strong-l"
-              onClick={() => router.push("/")}
+            <span
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push("/");
+              }}
               style={{
                 color: C.logo,
                 fontWeight: 900,
@@ -344,13 +347,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 cursor: "pointer",
                 lineHeight: 1,
                 userSelect: "none",
-                paddingLeft: "4px",
-                paddingRight: "12px",
               }}
             >
               TasteMap.
-            </Heading>
-          </motion.div>
+            </span>
+          </Heading>
         )}
         <IconButton
           icon={
@@ -442,77 +443,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* ─── Spacer ─── */}
       <div style={{ flex: 1 }} />
 
-      {/* ─── Discovery Stats Widget (expanded only) ─── */}
-      {isOpen && (
-        <Column
-          style={{
-            backgroundColor: C.widgetBg,
-            border: `1px solid ${C.widgetBorder}`,
-            borderRadius: "12px",
-            padding: "14px 16px",
-            gap: "12px",
-            flexShrink: 0,
-          }}
-        >
-          <Row style={{ alignItems: "center", gap: "8px" }}>
-            <div
-              style={{
-                width: "7px",
-                height: "7px",
-                borderRadius: "50%",
-                backgroundColor: C.progressFill,
-                boxShadow: "0 0 6px rgba(125,170,255,0.6)",
-              }}
-            />
-            <Text
-              variant="body-default-xs"
-              style={{
-                color: C.itemActive,
-                fontWeight: 700,
-                letterSpacing: "1px",
-                fontSize: "0.65rem",
-                textTransform: "uppercase",
-              }}
-            >
-              Discovery Stats
-            </Text>
-          </Row>
-          <Column style={{ gap: "8px" }}>
-            <Row
-              style={{ justifyContent: "space-between", alignItems: "center" }}
-            >
-              <Text variant="body-default-xs" style={{ color: C.sectionLabel }}>
-                Foodies Found
-              </Text>
-              <Text
-                variant="body-default-xs"
-                style={{ color: "rgba(255,255,255,0.7)", fontWeight: 600 }}
-              >
-                12/20
-              </Text>
-            </Row>
-            <div
-              style={{
-                width: "100%",
-                height: "4px",
-                backgroundColor: C.progressBg,
-                borderRadius: "4px",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  width: "60%",
-                  height: "100%",
-                  background: `linear-gradient(90deg, ${C.progressFill}, rgba(125,170,255,0.6))`,
-                  borderRadius: "4px",
-                }}
-              />
-            </div>
-          </Column>
-        </Column>
-      )}
-
       {/* ─── Profile Footer ─── */}
       <SidebarProfileFooter isOpen={isOpen} />
     </Column>
@@ -521,7 +451,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
 // ─── Profile footer: auth-aware ───
 function SidebarProfileFooter({ isOpen }: { isOpen: boolean }) {
-  const { user, loading, signOut } = useAuth();
+  const { user, isInitializing: loading, logout: signOut } = useAuth();
   const router = useRouter();
   const C = useThemeColors();
   const [mounted, setMounted] = React.useState(false);
@@ -576,7 +506,14 @@ function SidebarProfileFooter({ isOpen }: { isOpen: boolean }) {
             }}
           />
           {isOpen && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1 }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "6px",
+                flex: 1,
+              }}
+            >
               {/* Name line skeleton */}
               <div
                 style={{
@@ -697,7 +634,7 @@ function SidebarProfileFooter({ isOpen }: { isOpen: boolean }) {
     >
       <div style={{ position: "relative", flexShrink: 0 }}>
         <Avatar
-          src={user?.avatar_url || MOCK_USER.avatar}
+          src={user?.avatar_url || ""}
           size="s"
           style={{
             border: "2px solid rgba(79,142,247,0.25)",
@@ -731,12 +668,12 @@ function SidebarProfileFooter({ isOpen }: { isOpen: boolean }) {
                   textOverflow: "ellipsis",
                 }}
               >
-                {user?.display_name || user?.username || MOCK_USER.name}
+                {user?.display_name || user?.username || ""}
               </Text>
               <BadgeCheck size={12} color="#4F8EF7" />
             </Row>
             <Text variant="body-default-xs" style={{ color: C.profileSub }}>
-              Level {user?.level ?? MOCK_USER.level}
+              Level {user?.level ?? 1}
             </Text>
           </Column>
           <button

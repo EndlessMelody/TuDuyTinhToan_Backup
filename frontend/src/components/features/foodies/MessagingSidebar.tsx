@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Column,
@@ -25,7 +25,7 @@ import {
   CheckCheck,
 } from "lucide-react";
 import { Friend } from "./FriendRow";
-import { MOCK_CHATS } from "@/constants/foodies-data";
+import { useMessages } from "@/hooks/useMessages";
 
 interface MessagingSidebarProps {
   isOpen: boolean;
@@ -94,11 +94,18 @@ export const MessagingSidebar: React.FC<MessagingSidebarProps> = ({
 }) => {
   const [message, setMessage] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const {
+    messages: chatHistory,
+    sending,
+    sendMessage,
+  } = useMessages(activeUser?.id ?? null);
 
-  const chatHistory = useMemo(
-    () => (activeUser ? MOCK_CHATS[activeUser.id] || [] : []),
-    [activeUser],
-  );
+  const handleSend = async () => {
+    const text = message.trim();
+    if (!text || sending) return;
+    setMessage("");
+    await sendMessage(text);
+  };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -490,6 +497,12 @@ export const MessagingSidebar: React.FC<MessagingSidebarProps> = ({
             onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
               setMessage(e.target.value)
             }
+            onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
             style={{
               flex: 1,
               backgroundColor: "transparent",
@@ -523,6 +536,7 @@ export const MessagingSidebar: React.FC<MessagingSidebarProps> = ({
         >
           <IconButton
             icon={message.trim() ? <Send size={17} /> : <Mic size={17} />}
+            onClick={handleSend}
             style={{
               width: 38,
               height: 38,
@@ -535,6 +549,8 @@ export const MessagingSidebar: React.FC<MessagingSidebarProps> = ({
                 ? "0 4px 12px rgba(0,100,255,0.3)"
                 : "none",
               transition: "background 0.2s, box-shadow 0.2s",
+              cursor: message.trim() && !sending ? "pointer" : "default",
+              opacity: sending ? 0.6 : 1,
             }}
           />
         </motion.div>

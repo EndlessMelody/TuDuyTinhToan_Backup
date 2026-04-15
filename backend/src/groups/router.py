@@ -6,6 +6,7 @@ from src.groups.schemas import (
     GroupCreate, ReadyUpdate,
     GroupRecommendRequest,
     FinishRequest,
+    JoinByCodeRequest,
 )
 from src.core.dependencies import get_current_user_id
 from typing import Optional
@@ -26,9 +27,19 @@ async def create_group(
 async def list_groups(
     status: str = Query("active"),
     limit: int = Query(10, ge=1, le=50),
+    public_only: bool = Query(True, description="Only return public rooms"),
     db: AsyncSession = Depends(get_db)
 ):
-    return {"items": await service.list_groups(db, status, limit)}
+    return {"items": await service.list_groups(db, status, limit, public_only)}
+
+
+@router.post("/join-by-code", summary="Join a private room using invite code", status_code=200)
+async def join_by_code(
+    body: JoinByCodeRequest,
+    user_id: int = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    return await service.join_by_code(db, body.invite_code, user_id)
 
 
 @router.get("/{group_id}", summary="Chi tiết lobby")

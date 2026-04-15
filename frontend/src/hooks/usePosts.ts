@@ -6,19 +6,20 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { apiGet, ApiError } from "@/lib/api";
+import { normalizeMediaUrl } from "@/lib/media";
 import type { PostData } from "@/types/dashboard";
 
 // ─── API Response Types ───────────────────────────────────────────────────────
 
 interface ApiPost {
   id: number;
-  content: string;           // actual field name from backend
-  review?: string;           // fallback alias some backends use
+  content: string; // actual field name from backend
+  review?: string; // fallback alias some backends use
   image_url: string | null;
   likes_count: number;
   comments_count: number;
   is_liked: boolean;
-  rating?: number;           // direct field on post
+  rating?: number; // direct field on post
   created_at: string;
   location: {
     id: number;
@@ -29,7 +30,7 @@ interface ApiPost {
   user: {
     id: number;
     display_name: string | null;
-    username?: string;       // may not always be present
+    username?: string; // may not always be present
     avatar_url: string | null;
   };
   tags: string[] | null;
@@ -51,10 +52,11 @@ function adaptPost(p: ApiPost): PostData {
     diffH < 1
       ? `${Math.floor(diffMs / 60000)}m`
       : diffH < 24
-      ? `${diffH}h`
-      : `${Math.floor(diffH / 24)}d`;
+        ? `${diffH}h`
+        : `${Math.floor(diffH / 24)}d`;
 
-  const authorName = p.user.display_name ?? p.user.username ?? `User ${p.user.id}`;
+  const authorName =
+    p.user.display_name ?? p.user.username ?? `User ${p.user.id}`;
   const reviewText = p.content ?? p.review ?? "";
   const postRating = p.rating ?? p.location?.rating ?? 4.0;
 
@@ -62,7 +64,7 @@ function adaptPost(p: ApiPost): PostData {
     id: p.id,
     name: authorName,
     avatar:
-      p.user.avatar_url ??
+      normalizeMediaUrl(p.user.avatar_url) ??
       `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=random&size=128`,
     time: timeLabel,
     location: p.location?.city ?? "Vietnam",
@@ -70,7 +72,7 @@ function adaptPost(p: ApiPost): PostData {
     rating: postRating,
     review: reviewText,
     img:
-      p.image_url ??
+      normalizeMediaUrl(p.image_url) ??
       "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=680&h=480&fit=crop",
     tags: p.tags ?? [],
     likes: p.likes_count ?? 0,
@@ -97,7 +99,7 @@ export function usePosts(limit: number = 8): UsePostsResult {
     setError(null);
     try {
       const data = await apiGet<PostsResponse>(
-        `/api/v1/posts?limit=${limit}&offset=0`
+        `/api/v1/posts?limit=${limit}&offset=0`,
       );
       setPosts((data.items ?? []).map(adaptPost));
     } catch (err) {

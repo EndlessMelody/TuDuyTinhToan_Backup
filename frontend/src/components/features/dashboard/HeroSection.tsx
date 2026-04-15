@@ -71,12 +71,16 @@ export const HeroSection = () => {
   const router = useRouter();
   const { picks, loading } = useRecommendations(1, undefined, "place");
   const heroData = picks && picks.length > 0 ? picks[0] : null;
+  const weather = useLiveWeather();
+  const WeatherIcon = weather.icon;
 
-  const bgImage = heroData?.image_url || "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&h=600&fit=crop";
+  const bgImage =
+    heroData?.image_url ||
+    "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&h=600&fit=crop";
   const title = heroData?.name || "Weekend Street Food Tour";
-  const titleWords = title.split(' ');
-  const titleLine1 = titleWords.slice(0, 2).join(' ');
-  const titleLine2 = titleWords.slice(2).join(' ');
+  const titleWords = title.split(" ");
+  const titleLine1 = titleWords.slice(0, 2).join(" ");
+  const titleLine2 = titleWords.slice(2).join(" ");
 
   return (
     <motion.div
@@ -269,8 +273,8 @@ export const HeroSection = () => {
                   }}
                 >
                   {heroData?.price_range || "Light Rain • 1.2km"}
-                </Text>
-              </Row>
+                </span>
+              </motion.div>
             </Row>
 
             {/* Title */}
@@ -290,15 +294,17 @@ export const HeroSection = () => {
 
             {/* Description */}
             <Text
-                style={{
-                    color: "#636366",
-                    fontSize: "0.95rem",
-                    fontWeight: 500,
-                    maxWidth: "380px",
-                    lineHeight: 1.4
-                }}
+              style={{
+                color: "#636366",
+                fontSize: "0.95rem",
+                fontWeight: 500,
+                maxWidth: "380px",
+                lineHeight: 1.4,
+              }}
             >
-                {loading ? "Loading recommended tour..." : "Discover hidden gems and earn massive rewards this weekend."}
+              {loading
+                ? "Loading recommended tour..."
+                : "Discover hidden gems and earn massive rewards this weekend."}
             </Text>
 
             {/* Bottom Row: Social + CTA */}
@@ -346,62 +352,64 @@ export const HeroSection = () => {
                 </Text>
               </Row>
 
-                <Row style={{ gap: "10px", alignItems: "center" }}>
-                    <IconButton
-                        icon={<Navigation size={18} color="#007AFF" />}
-                        onClick={() => {}}
-                        style={{
-                        backgroundColor: "rgba(0, 122, 255, 0.05)",
-                        width: "42px",
-                        height: "42px",
-                        borderRadius: "12px",
-                        borderTopWidth: "1px",
-                        borderBottomWidth: "1px",
-                        borderLeftWidth: "1px",
-                        borderRightWidth: "1px",
-                        borderStyle: "solid",
-                        borderColor: "rgba(0, 122, 255, 0.1)"
-                        }}
-                    />
-                    <Button
-                        size="m" // Scale down button size
-                        variant="primary"
-                        onClick={() => router.push("/tour-builder")}
-                        style={{
-                        position: "relative",
-                        overflow: "hidden",
-                        paddingTop: "12px",
-                        paddingBottom: "12px",
-                        paddingLeft: "28px",
-                        paddingRight: "28px",
-                        borderRadius: "14px",
-                        boxShadow: "0 8px 20px rgba(0, 122, 255, 0.2)",
-                        }}
-                    >
-                        <span style={{ position: "relative", zIndex: 1, fontWeight: 700 }}>
-                        Book Now
-                        </span>
-                        <motion.div
-                        initial={{ x: "-200%", rotate: "-20deg" }}
-                        animate={{ x: "200%" }}
-                        transition={{
-                            repeat: Infinity,
-                            duration: 3,
-                            ease: "linear",
-                            repeatDelay: 2,
-                        }}
-                        style={{
-                            position: "absolute",
-                            top: -20,
-                            bottom: -20,
-                            width: "50px",
-                            background:
-                            "linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)",
-                            zIndex: 0,
-                        }}
-                        />
-                    </Button>
-                </Row>
+              <Row style={{ gap: "10px", alignItems: "center" }}>
+                <IconButton
+                  icon={<Navigation size={18} color="#007AFF" />}
+                  onClick={() => {}}
+                  style={{
+                    backgroundColor: "rgba(0, 122, 255, 0.05)",
+                    width: "42px",
+                    height: "42px",
+                    borderRadius: "12px",
+                    borderTopWidth: "1px",
+                    borderBottomWidth: "1px",
+                    borderLeftWidth: "1px",
+                    borderRightWidth: "1px",
+                    borderStyle: "solid",
+                    borderColor: "rgba(0, 122, 255, 0.1)",
+                  }}
+                />
+                <Button
+                  size="m" // Scale down button size
+                  variant="primary"
+                  onClick={() => router.push("/tour-builder")}
+                  style={{
+                    position: "relative",
+                    overflow: "hidden",
+                    paddingTop: "12px",
+                    paddingBottom: "12px",
+                    paddingLeft: "28px",
+                    paddingRight: "28px",
+                    borderRadius: "14px",
+                    boxShadow: "0 8px 20px rgba(0, 122, 255, 0.2)",
+                  }}
+                >
+                  <span
+                    style={{ position: "relative", zIndex: 1, fontWeight: 700 }}
+                  >
+                    Book Now
+                  </span>
+                  <motion.div
+                    initial={{ x: "-200%", rotate: "-20deg" }}
+                    animate={{ x: "200%" }}
+                    transition={{
+                      repeat: Infinity,
+                      duration: 3,
+                      ease: "linear",
+                      repeatDelay: 2,
+                    }}
+                    style={{
+                      position: "absolute",
+                      top: -20,
+                      bottom: -20,
+                      width: "50px",
+                      background:
+                        "linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)",
+                      zIndex: 0,
+                    }}
+                  />
+                </Button>
+              </Row>
             </Row>
           </Column>
         </motion.div>

@@ -25,6 +25,10 @@ class Group(Base):
     cover_image_url = Column(String, nullable=True)
     accent_color = Column(String, nullable=True)  # Mã màu Hex cho UI lobby
 
+    # Visibility & access control
+    is_public = Column(Boolean, nullable=False, default=True)
+    invite_code = Column(String(16), nullable=True, unique=True)  # Only set for private rooms
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
