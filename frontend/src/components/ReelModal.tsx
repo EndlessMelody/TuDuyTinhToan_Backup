@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ReelData } from "@/types/dashboard";
 import { apiGet, apiPost } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
+import { useSocialStore } from "@/store/socialStore";
 
 interface ReelModalProps {
   isOpen: boolean;
@@ -15,14 +16,14 @@ interface ReelModalProps {
   onClose: () => void;
 }
 
-export default function ReelModal({ isOpen, data, onClose }: ReelModalProps) {
+export default function ReelModal({ isOpen, data: initialData, onClose }: ReelModalProps) {
   const { user: currentUser } = useAuth();
-  const [isLiked, setIsLiked] = React.useState(false);
+  const updateReel = useSocialStore((state) => state.updateReel);
+  const data = useSocialStore((state) => state.reels.find((r) => r.id === initialData.id)) || initialData;
   const [isSaved, setIsSaved] = React.useState(false);
   const [comments, setComments] = React.useState<any[]>([]);
   const [newComment, setNewComment] = React.useState("");
   const [isLoadingComments, setIsLoadingComments] = React.useState(false);
-  const [likesCount, setLikesCount] = React.useState(data?.likes || 0);
 
   React.useEffect(() => {
     if (isOpen && data?.id) {
@@ -43,6 +44,7 @@ export default function ReelModal({ isOpen, data, onClose }: ReelModalProps) {
       const res = await apiPost(`/api/v1/reels/${data.id}/comments`, { content: newComment });
       setComments([res, ...comments]);
       setNewComment("");
+      updateReel(data.id, { comments: (data.comments || 0) + 1 });
     } catch (err) {
       console.error(err);
     }
@@ -316,22 +318,26 @@ export default function ReelModal({ isOpen, data, onClose }: ReelModalProps) {
                       vertical="center"
                       style={{ cursor: "pointer" }}
                       onClick={async () => {
-                        if (!isLiked && data?.id) {
-                          try {
-                            const res: any = await apiPost(`/api/v1/reels/${data.id}/like`, {});
-                            setLikesCount(res.likes_count || likesCount + 1);
-                          } catch (err) { console.error(err); }
+                        if (!data?.id) return;
+                        const newIsLiked = !data.isLiked;
+                        const newLikes = newIsLiked ? (data.likes || 0) + 1 : Math.max(0, (data.likes || 0) - 1);
+                        
+                        updateReel(data.id, { isLiked: newIsLiked, likes: newLikes });
+                        try {
+                          await apiPost(`/api/v1/reels/${data.id}/like`, {});
+                        } catch (err) {
+                          updateReel(data.id, { isLiked: data.isLiked, likes: data.likes });
+                          console.error(err);
                         }
-                        setIsLiked(!isLiked);
                       }}
                     >
                       <Heart
                         size={24}
-                        color={isLiked ? "var(--brand-solid-strong)" : "var(--neutral-alpha-medium)"}
-                        fill={isLiked ? "var(--brand-solid-strong)" : "none"}
+                        color={data.isLiked ? "var(--brand-solid-strong)" : "var(--neutral-alpha-medium)"}
+                        fill={data.isLiked ? "var(--brand-solid-strong)" : "none"}
                       />
                       <Text variant="label-default-l" weight="strong" onBackground="neutral-strong">
-                        {likesCount}
+                        {data.likes || 0}
                       </Text>
                     </Row>
                     <Row gap="8" vertical="center" style={{ cursor: "pointer" }}>

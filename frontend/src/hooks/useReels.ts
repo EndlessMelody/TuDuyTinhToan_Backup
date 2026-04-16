@@ -18,6 +18,8 @@ interface ApiReel {
   thumbnail_url: string | null;
   views_count: number;
   likes_count: number;
+  comments_count: number;
+  is_liked?: boolean;
   created_at: string;
   user: {
     id: number;
@@ -61,10 +63,11 @@ function adaptReel(r: ApiReel): ReelData {
     videoUrl: normalizeMediaUrl(r.video_url) || undefined,
     likes: r.likes_count,
     comments: r.comments_count,
+    isLiked: r.is_liked ?? false,
   };
 }
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
+import { useSocialStore } from "@/store/socialStore";
 
 interface UseReelsResult {
   reels: ReelData[];
@@ -73,7 +76,8 @@ interface UseReelsResult {
 }
 
 export function useReels(limit: number = 8): UseReelsResult {
-  const [reels, setReels] = useState<ReelData[]>([]);
+  const reels = useSocialStore((state) => state.reels);
+  const setReels = useSocialStore((state) => state.setReels);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

@@ -53,6 +53,7 @@ class User(Base):
     posts = relationship("Post", back_populates="user", lazy="selectin")
     reels = relationship("Reel", back_populates="user", lazy="selectin")
     post_likes = relationship("PostLike", back_populates="user", lazy="selectin")
+    reel_likes = relationship("ReelLike", back_populates="user", lazy="selectin")
     comments = relationship("Comment", back_populates="user", lazy="selectin")
     friendships_sent = relationship("Friendship", foreign_keys="Friendship.user_id", back_populates="user", lazy="selectin")
     friendships_received = relationship("Friendship", foreign_keys="Friendship.friend_id", back_populates="friend", lazy="selectin")

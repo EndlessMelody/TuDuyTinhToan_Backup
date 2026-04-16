@@ -10,6 +10,7 @@ export interface ReelData {
   videoUrl?: string;
   likes?: number;
   comments?: number;
+  isLiked?: boolean;
 }
 
 export interface PostData {
@@ -25,6 +26,7 @@ export interface PostData {
   tags: string[];
   likes: number;
   comments: number;
+  isLiked?: boolean;
 }
 
 export interface AIPickData {

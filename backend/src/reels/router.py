@@ -5,14 +5,15 @@ from src.reels import service
 from src.reels.schemas import ReelCreate
 from src.posts.service import list_reel_comments, add_comment
 from src.posts.schemas import CommentCreate
-from src.core.dependencies import get_current_user_id
+from src.core.dependencies import get_current_user_id, get_optional_user_id
+from typing import Optional
 
 router = APIRouter()
 
 
 @router.get("/", summary="Danh sách reels")
-async def list_reels(sort: str = Query("trending"), limit: int = Query(10, ge=1, le=50), db: AsyncSession = Depends(get_db)):
-    return await service.list_reels(db, sort, limit)
+async def list_reels(sort: str = Query("trending"), limit: int = Query(10, ge=1, le=50), viewer_id: Optional[int] = Depends(get_optional_user_id), db: AsyncSession = Depends(get_db)):
+    return await service.list_reels(db, sort, limit, viewer_id)
 
 
 @router.post("/", summary="Upload reel mới", status_code=201)
@@ -21,8 +22,8 @@ async def create_reel(body: ReelCreate, user_id: int = Depends(get_current_user_
 
 
 @router.get("/{reel_id}", summary="Chi tiết reel (tự tăng views)")
-async def get_reel(reel_id: int, db: AsyncSession = Depends(get_db)):
-    return await service.get_reel(db, reel_id)
+async def get_reel(reel_id: int, viewer_id: Optional[int] = Depends(get_optional_user_id), db: AsyncSession = Depends(get_db)):
+    return await service.get_reel(db, reel_id, viewer_id)
 
 
 @router.post("/{reel_id}/like", summary="Like reel (toggle)")

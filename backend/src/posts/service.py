@@ -19,6 +19,8 @@ async def create_post(db: AsyncSession, user_id: int, data: PostCreate) -> dict:
     return await _post_to_dict(db, post, user_id)
 
 
+from sqlalchemy.orm import selectinload
+
 async def list_posts(
     db: AsyncSession,
     viewer_id: Optional[int],
@@ -36,10 +38,46 @@ async def list_posts(
     count_result = await db.execute(select(func.count()).select_from(q.subquery()))
     total = count_result.scalar_one() or 0
 
+    # Eager load relationships to avoid N+1
+    q = q.options(selectinload(Post.user), selectinload(Post.location))
     q = q.order_by(Post.created_at.desc()).offset(offset).limit(limit)
     result = await db.execute(q)
     posts = result.scalars().all()
-    items = [await _post_to_dict(db, p, viewer_id) for p in posts]
+
+    # Batch fetch likes
+    liked_post_ids = set()
+    if viewer_id and posts:
+        post_ids = [p.id for p in posts]
+        likes_result = await db.execute(
+            select(PostLike.post_id)
+            .where(PostLike.user_id == viewer_id, PostLike.post_id.in_(post_ids))
+        )
+        liked_post_ids = {row[0] for row in likes_result.all()}
+
+    items = []
+    for p in posts:
+        location_data = None
+        if p.location:
+            location_data = {"id": p.location.id, "name": p.location.name}
+
+        user_data = None
+        if p.user:
+            user_data = {"id": p.user.id, "display_name": p.user.display_name, "avatar_url": p.user.avatar_url}
+
+        items.append({
+            "id": p.id,
+            "user": user_data,
+            "location": location_data,
+            "review": p.review,
+            "rating": p.rating,
+            "image_url": p.image_url,
+            "tags": p.tags,
+            "likes_count": p.likes_count,
+            "comments_count": p.comments_count,
+            "is_liked": p.id in liked_post_ids,
+            "created_at": p.created_at,
+        })
+
     return {"items": items, "total": total}
 
 

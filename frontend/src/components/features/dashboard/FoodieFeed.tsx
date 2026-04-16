@@ -13,8 +13,25 @@ interface FoodieFeedProps {
   isLoading?: boolean;
 }
 
+import { useSocialStore } from "@/store/socialStore";
+import { apiPost } from "@/lib/api";
+
 export const FoodieFeed: React.FC<FoodieFeedProps> = ({ onPostClick }) => {
   const { posts, loading, error } = usePosts(8);
+  const updatePost = useSocialStore((state) => state.updatePost);
+
+  const handleToggleLike = async (id: number) => {
+    const post = posts.find((p) => p.id === id);
+    if (!post) return;
+    const newIsLiked = !post.isLiked;
+    const newLikes = newIsLiked ? post.likes + 1 : Math.max(0, post.likes - 1);
+    updatePost(id, { isLiked: newIsLiked, likes: newLikes });
+    try {
+      await apiPost(`/api/v1/posts/${id}/like`, {});
+    } catch (e) {
+      updatePost(id, { isLiked: post.isLiked, likes: post.likes });
+    }
+  };
 
   const renderContent = () => {
     if (loading) {
@@ -63,7 +80,7 @@ export const FoodieFeed: React.FC<FoodieFeedProps> = ({ onPostClick }) => {
         {posts.map((post, idx) => (
           <StaggerItem key={idx}>
             <div onClick={() => onPostClick(post)}>
-              <PostCard {...post} delay={0} />
+              <PostCard {...post} delay={0} onToggleLike={handleToggleLike} />
             </div>
           </StaggerItem>
         ))}

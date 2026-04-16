@@ -6,6 +6,7 @@ import { Column, Row, Text, Avatar } from "../OnceUI";
 import { Heart, MessageCircle, Bookmark, Star, MapPin } from "lucide-react";
 
 export function PostCard({
+  id,
   name,
   avatar,
   time,
@@ -18,7 +19,10 @@ export function PostCard({
   likes,
   comments,
   delay,
+  isLiked = false,
+  onToggleLike,
 }: {
+  id: number;
   name: string;
   avatar: string;
   time: string;
@@ -31,9 +35,10 @@ export function PostCard({
   likes: number;
   comments: number;
   delay: number;
+  isLiked?: boolean;
+  onToggleLike?: (id: number) => void;
 }) {
   const [isExpanded, setIsExpanded] = React.useState(false);
-  const [isLiked, setIsLiked] = React.useState(false);
   const [isSaved, setIsSaved] = React.useState(false);
 
   return (
@@ -248,7 +253,7 @@ export function PostCard({
                 style={{ cursor: "pointer" }}
                 onClick={(e: React.MouseEvent) => {
                   e.stopPropagation();
-                  setIsLiked(!isLiked);
+                  onToggleLike?.(id);
                 }}
               >
                 <Heart
@@ -257,7 +262,7 @@ export function PostCard({
                   fill={isLiked ? "#ED1B24" : "none"}
                 />
                 <Text variant="label-default-m" weight="strong" style={{ color: "var(--neutral-strong)" }}>
-                  {isLiked ? (likes || 0) + 1 : (likes || 0)}
+                  {likes || 0}
                 </Text>
               </Row>
               <Row gap="8" vertical="center" style={{ cursor: "pointer" }}>

@@ -2,20 +2,49 @@
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from src.reels.models import Reel
+from sqlalchemy.orm import selectinload
+from typing import Optional
+
+from src.reels.models import Reel, ReelLike
 from src.users.models import User
 from src.reels.schemas import ReelCreate
 
 
-async def list_reels(db: AsyncSession, sort: str = "trending", limit: int = 10) -> dict:
-    q = select(Reel)
+async def list_reels(db: AsyncSession, sort: str = "trending", limit: int = 10, viewer_id: Optional[int] = None) -> dict:
+    q = select(Reel).options(selectinload(Reel.user))
     if sort == "trending":
         q = q.order_by(Reel.views_count.desc())
     else:
         q = q.order_by(Reel.created_at.desc())
     result = await db.execute(q.limit(limit))
     reels = result.scalars().all()
-    return {"items": [await _reel_to_dict(db, r) for r in reels]}
+
+    # Batch fetch likes to avoid N+1
+    liked_reel_ids = set()
+    if viewer_id and reels:
+        reel_ids = [r.id for r in reels]
+        likes_result = await db.execute(
+            select(ReelLike.reel_id)
+            .where(ReelLike.user_id == viewer_id, ReelLike.reel_id.in_(reel_ids))
+        )
+        liked_reel_ids = {row[0] for row in likes_result.all()}
+
+    items = []
+    for r in reels:
+        user_data = None
+        if r.user:
+            user_data = {"id": r.user.id, "display_name": r.user.display_name, "avatar_url": r.user.avatar_url}
+            
+        items.append({
+            "id": r.id, "title": r.title,
+            "user": user_data,
+            "video_url": r.video_url, "thumbnail_url": r.thumbnail_url,
+            "views_count": r.views_count, "likes_count": r.likes_count, "comments_count": r.comments_count,
+            "is_liked": r.id in liked_reel_ids,
+            "created_at": r.created_at,
+        })
+
+    return {"items": items}
 
 
 async def create_reel(db: AsyncSession, user_id: int, data: ReelCreate) -> dict:
@@ -26,34 +55,54 @@ async def create_reel(db: AsyncSession, user_id: int, data: ReelCreate) -> dict:
     return await _reel_to_dict(db, reel)
 
 
-async def get_reel(db: AsyncSession, reel_id: int) -> dict:
-    result = await db.execute(select(Reel).where(Reel.id == reel_id))
+async def get_reel(db: AsyncSession, reel_id: int, viewer_id: Optional[int] = None) -> dict:
+    result = await db.execute(select(Reel).options(selectinload(Reel.user)).where(Reel.id == reel_id))
     reel = result.scalars().first()
     if not reel:
         raise HTTPException(status_code=404, detail="Reel không tồn tại")
     reel.views_count += 1
     await db.commit()
-    return await _reel_to_dict(db, reel)
+    return await _reel_to_dict(db, reel, viewer_id)
 
 
 async def toggle_like(db: AsyncSession, reel_id: int, user_id: int) -> dict:
-    result = await db.execute(select(Reel).where(Reel.id == reel_id))
-    reel = result.scalars().first()
+    result = await db.execute(select(ReelLike).where(ReelLike.reel_id == reel_id, ReelLike.user_id == user_id))
+    like = result.scalars().first()
+    reel_q = await db.execute(select(Reel).where(Reel.id == reel_id))
+    reel = reel_q.scalars().first()
     if not reel:
         raise HTTPException(status_code=404, detail="Reel không tồn tại")
-    # Simplified toggle (no separate like table for reels)
-    reel.likes_count += 1
+
+    if like:
+        await db.delete(like)
+        reel.likes_count = max(0, reel.likes_count - 1)
+        liked = False
+    else:
+        db.add(ReelLike(reel_id=reel_id, user_id=user_id))
+        reel.likes_count += 1
+        liked = True
+        
     await db.commit()
-    return {"likes_count": reel.likes_count}
+    return {"liked": liked, "likes_count": reel.likes_count}
 
 
-async def _reel_to_dict(db: AsyncSession, reel: Reel) -> dict:
-    user_q = await db.execute(select(User).where(User.id == reel.user_id))
-    user = user_q.scalars().first()
+async def _reel_to_dict(db: AsyncSession, reel: Reel, viewer_id: Optional[int] = None) -> dict:
+    # Fallback function for create_reel and get_reel, manually query user if not eager loaded
+    user = reel.user
+    if not user:
+        user_q = await db.execute(select(User).where(User.id == reel.user_id))
+        user = user_q.scalars().first()
+        
+    is_liked = False
+    if viewer_id:
+        like_q = await db.execute(select(ReelLike).where(ReelLike.reel_id == reel.id, ReelLike.user_id == viewer_id))
+        is_liked = like_q.scalars().first() is not None
+
     return {
         "id": reel.id, "title": reel.title,
-        "user": {"id": user.id, "username": user.username, "avatar_url": user.avatar_url} if user else None,
+        "user": {"id": user.id, "display_name": user.display_name, "avatar_url": user.avatar_url} if user else None,
         "video_url": reel.video_url, "thumbnail_url": reel.thumbnail_url,
         "views_count": reel.views_count, "likes_count": reel.likes_count, "comments_count": reel.comments_count,
+        "is_liked": is_liked,
         "created_at": reel.created_at,
     }

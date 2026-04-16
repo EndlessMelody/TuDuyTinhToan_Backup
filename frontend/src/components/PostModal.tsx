@@ -19,22 +19,9 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import BottomSheet from "@/components/BottomSheet";
-import { apiGet } from "@/lib/api";
-
-export interface PostData {
-  id: number;
-  name: string;
-  avatar: string;
-  time: string;
-  location: string;
-  spotName: string;
-  rating: number;
-  review: string;
-  img: string;
-  tags: string[];
-  likes: number;
-  comments: number;
-}
+import { apiGet, apiPost } from "@/lib/api";
+import { useSocialStore } from "@/store/socialStore";
+import { PostData } from "@/types/dashboard";
 
 interface PostModalProps {
   isOpen: boolean;
@@ -42,11 +29,13 @@ interface PostModalProps {
   onClose: () => void;
 }
 
-export default function PostModal({ isOpen, data, onClose }: PostModalProps) {
-  const [isLiked, setIsLiked] = React.useState(false);
+export default function PostModal({ isOpen, data: initialData, onClose }: PostModalProps) {
+  const updatePost = useSocialStore((state) => state.updatePost);
+  const data = useSocialStore((state) => state.posts.find((p) => p.id === initialData.id)) || initialData;
   const [isSaved, setIsSaved] = React.useState(false);
   const [commentsList, setCommentsList] = React.useState<any[]>([]);
   const [loadingComments, setLoadingComments] = React.useState(false);
+  const [newComment, setNewComment] = React.useState("");
 
   React.useEffect(() => {
     if (isOpen && data.id) {
@@ -63,6 +52,18 @@ export default function PostModal({ isOpen, data, onClose }: PostModalProps) {
       setCommentsList([]);
     }
   }, [isOpen, data.id]);
+
+  const handlePostComment = async () => {
+    if (!newComment.trim() || !data.id) return;
+    try {
+      const res = await apiPost(`/api/v1/posts/${data.id}/comments`, { content: newComment });
+      setCommentsList((prev) => [res, ...prev]);
+      setNewComment("");
+      updatePost(data.id, { comments: (data.comments || 0) + 1 });
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const adaptTime = (dateStr: string) => {
     if (!dateStr) return "Just now";
@@ -315,15 +316,24 @@ export default function PostModal({ isOpen, data, onClose }: PostModalProps) {
                       gap="8"
                       vertical="center"
                       style={{ cursor: "pointer" }}
-                      onClick={() => setIsLiked(!isLiked)}
+                      onClick={async () => {
+                        const newIsLiked = !data.isLiked;
+                        const newLikes = newIsLiked ? data.likes + 1 : Math.max(0, data.likes - 1);
+                        updatePost(data.id, { isLiked: newIsLiked, likes: newLikes });
+                        try {
+                          await apiPost(`/api/v1/posts/${data.id}/like`, {});
+                        } catch (e) {
+                          updatePost(data.id, { isLiked: data.isLiked, likes: data.likes });
+                        }
+                      }}
                     >
                       <Heart
                         size={24}
-                        color={isLiked ? "var(--brand-solid-strong)" : "var(--neutral-alpha-medium)"}
-                        fill={isLiked ? "var(--brand-solid-strong)" : "none"}
+                        color={data.isLiked ? "var(--brand-solid-strong)" : "var(--neutral-alpha-medium)"}
+                        fill={data.isLiked ? "var(--brand-solid-strong)" : "none"}
                       />
                       <Text variant="label-default-l" weight="strong" onBackground="neutral-strong">
-                        {isLiked ? (data.likes || 0) + 1 : (data.likes || 0)}
+                        {data.likes || 0}
                       </Text>
                     </Row>
                     <Row gap="8" vertical="center" style={{ cursor: "pointer" }}>
@@ -354,6 +364,11 @@ export default function PostModal({ isOpen, data, onClose }: PostModalProps) {
                 }}
               >
                 <Input
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handlePostComment();
+                  }}
                   placeholder="Add a comment..."
                   style={{
                     flex: 1,
@@ -364,11 +379,12 @@ export default function PostModal({ isOpen, data, onClose }: PostModalProps) {
                   }}
                 />
                 <Text
+                  onClick={handlePostComment}
                   style={{
-                    color: "#007AFF",
+                    color: newComment.trim() ? "#007AFF" : "#AEAEB2",
                     fontWeight: 600,
                     fontSize: "0.85rem",
-                    cursor: "pointer",
+                    cursor: newComment.trim() ? "pointer" : "default",
                   }}
                 >
                   Post

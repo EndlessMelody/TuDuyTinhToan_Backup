@@ -77,10 +77,11 @@ function adaptPost(p: ApiPost): PostData {
     tags: p.tags ?? [],
     likes: p.likes_count ?? 0,
     comments: p.comments_count ?? 0,
+    isLiked: p.is_liked ?? false,
   };
 }
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
+import { useSocialStore } from "@/store/socialStore";
 
 interface UsePostsResult {
   posts: PostData[];
@@ -90,7 +91,8 @@ interface UsePostsResult {
 }
 
 export function usePosts(limit: number = 8): UsePostsResult {
-  const [posts, setPosts] = useState<PostData[]>([]);
+  const posts = useSocialStore((state) => state.posts);
+  const setPosts = useSocialStore((state) => state.setPosts);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
