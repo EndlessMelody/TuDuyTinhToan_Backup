@@ -356,6 +356,75 @@ function LeaderboardRow({
   );
 }
 
+function BadgeCard() {
+  return (
+    <div
+      className="bg-white rounded-[32px] p-6 flex flex-col gap-5 shadow-xl shadow-black/5"
+      style={{ border: "1px solid rgba(0,0,0,0.04)" }}
+    >
+      <div className="flex items-center gap-2">
+        <Star size={18} className="text-[#FBBF24]" fill="#FBBF24" />
+        <h3 className="text-[17px] font-black text-[#1C1C1E]">My Badges</h3>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {[
+          { label: "Spice Master", icon: <Flame size={16} />, color: "#E63946" },
+          { label: "Night Owl", icon: <Moon size={16} />, color: "#7B2FF7" },
+          { label: "Photo Pro", icon: <Camera size={16} />, color: "#2A9D8F" },
+          { label: "Top Reviewer", icon: <Crown size={16} />, color: "#FBBF24" },
+        ].map((b) => (
+          <div
+            key={b.label}
+            className="flex items-center gap-2.5 px-3 py-2.5 rounded-[18px] transition-all hover:scale-[1.02]"
+            style={{ backgroundColor: `${b.color}12`, border: `1px solid ${b.color}22` }}
+          >
+            <span style={{ color: b.color }}>{b.icon}</span>
+            <span className="text-[11px] font-bold leading-tight" style={{ color: b.color }}>
+              {b.label}
+            </span>
+          </div>
+        ))}
+        <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-[18px] bg-[#F2F2F7] border border-dashed border-[#D1D1D6] opacity-50">
+          <Lock size={14} className="text-[#8E8E93]" />
+          <span className="text-[11px] font-bold text-[#8E8E93]">Locked</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CompactLevelCard({ user, stats }: { user: any; stats: UserGamificationInfo | null }) {
+  const pct = stats ? (stats.xp / stats.next_level_xp) * 100 : 0;
+  return (
+    <div
+      className="bg-white rounded-[32px] p-6 shadow-xl shadow-black/5 flex flex-col gap-4"
+      style={{ border: "1px solid rgba(0,0,0,0.04)" }}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Zap size={18} className="text-[#007AFF]" fill="#007AFF" />
+          <h3 className="text-[17px] font-black text-[#1C1C1E]">Level {user?.level || 1}</h3>
+        </div>
+        <span className="text-[13px] font-bold text-[#8E8E93] tabular-nums">
+          {stats?.xp || 0} / {stats?.next_level_xp || 1000} XP
+        </span>
+      </div>
+      <div className="h-3 bg-[#F2F2F7] rounded-full overflow-hidden">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          className="h-full rounded-full"
+          style={{ background: "linear-gradient(90deg, #007AFF, #0057D9)" }}
+        />
+      </div>
+      <p className="text-[12px] text-[#8E8E93] font-medium">
+        {stats ? stats.next_level_xp - stats.xp : 1000} XP to Level {(user?.level || 1) + 1} ·{" "}
+        <span className="font-extrabold text-[#1C1C1E]">Teenage Syndrome</span>
+      </p>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ChallengesPage() {
@@ -648,9 +717,6 @@ export default function ChallengesPage() {
                 </button>
               ))}
             </div>
-            <div className="text-[13px] text-[#8E8E93] font-semibold flex items-center gap-2">
-              <Target size={15} /> All progress is synced across devices
-            </div>
           </div>
 
           <AnimatePresence mode="wait">
@@ -678,7 +744,8 @@ export default function ChallengesPage() {
         </div>
 
         <div className="w-[360px] flex-shrink-0 flex flex-col gap-6">
-          <div className="bg-white rounded-[32px] p-6 shadow-xl shadow-black/5 flex flex-col gap-6"
+          <div
+            className="bg-white rounded-[32px] p-6 shadow-xl shadow-black/5 flex flex-col gap-6"
             style={{ border: "1px solid rgba(0,0,0,0.04)" }}
           >
             <div className="flex flex-col gap-5">
@@ -723,6 +790,11 @@ export default function ChallengesPage() {
             </button>
           </div>
 
+          <BadgeCard />
+
+
+          <CompactLevelCard user={user} stats={userStats} />
+
           {/* Daily Streak Card */}
           <div className="bg-white rounded-[32px] p-6 flex flex-col gap-4" style={{ border: "1px solid rgba(0,0,0,0.04)" }}>
             <div className="flex items-center gap-3">
@@ -744,8 +816,8 @@ export default function ChallengesPage() {
               }}
               disabled={streakInfo?.is_active_today}
               className={`w-full py-4 rounded-2xl text-[14px] font-black transition-all ${streakInfo?.is_active_today
-                  ? "bg-[#F2F2F7] text-[#8E8E93] cursor-default"
-                  : "bg-[#FF6B35] text-white shadow-lg shadow-[#FF6B35]/20 hover:scale-[1.02]"
+                ? "bg-[#F2F2F7] text-[#8E8E93] cursor-default"
+                : "bg-[#FF6B35] text-white shadow-lg shadow-[#FF6B35]/20 hover:scale-[1.02]"
                 }`}
             >
               {streakInfo?.is_active_today ? "Already Checked In" : "Daily Check-in"}
