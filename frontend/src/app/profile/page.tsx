@@ -225,7 +225,7 @@ export default function ProfilePage() {
         try {
           const errJson = await res.json();
           errMessage = errJson.detail || errMessage;
-        } catch {}
+        } catch { }
         throw new Error(errMessage);
       }
 
@@ -661,7 +661,8 @@ export default function ProfilePage() {
                   fontWeight: 700,
                 }}
               >
-                {user?.xp || 0} / {(user?.level || 1) * 1000} XP
+                {/* user.xp = XP trong level này (relative), user.next_level_xp = XP cần cho level này */}
+                {user?.xp ?? 0} / {user?.next_level_xp ?? 100} XP
               </Text>
             </Row>
             <div
@@ -676,7 +677,8 @@ export default function ProfilePage() {
               <motion.div
                 initial={{ width: 0 }}
                 animate={{
-                  width: `${((user?.xp || 0) / ((user?.level || 1) * 1000)) * 100}%`,
+                  // Backend trả về giá trị tương đối — công thức này luôn đúng
+                  width: `${Math.min(((user?.xp ?? 0) / (user?.next_level_xp || 1)) * 100, 100)}%`,
                 }}
                 transition={{ duration: 1, delay: 0.5 }}
                 style={{

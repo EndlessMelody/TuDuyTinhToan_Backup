@@ -7,6 +7,7 @@ from src.bookmarks.models import Bookmark
 from src.locations.models import Location
 from src.users.models import User
 from src.bookmarks.schemas import BookmarkCreate
+from src.challenges.xp_service import award_xp
 
 XP_PER_BOOKMARK = 10
 
@@ -33,14 +34,14 @@ async def add_bookmark(db: AsyncSession, user_id: int, data: BookmarkCreate) -> 
     db.add(bm)
 
     # Award XP to user
+    await award_xp(db, user_id, XP_PER_BOOKMARK, "bookmark", str(bm.id), f"Bookmarked location {data.location_id}")
+
+    await db.refresh(bm)
+    # Fetch updated user to get accurate total_xp_earned
     user_q = await db.execute(select(User).where(User.id == user_id))
     user = user_q.scalars().first()
-    if user:
-        user.xp = (user.xp or 0) + XP_PER_BOOKMARK
-
-    await db.commit()
-    await db.refresh(bm)
-    return {"id": bm.id, "xp_earned": XP_PER_BOOKMARK, "total_xp": user.xp if user else XP_PER_BOOKMARK}
+    
+    return {"id": bm.id, "xp_earned": XP_PER_BOOKMARK, "total_xp": user.total_xp_earned if user else XP_PER_BOOKMARK}
 
 
 async def delete_bookmark(db: AsyncSession, bookmark_id: int, user_id: int) -> dict:

@@ -16,12 +16,10 @@ export default function LobbyCard({ lobby, onClick }: LobbyCardProps) {
   const spotsLeft = lobby.spots - lobby.members.length;
   const isJoined = Boolean(
     user &&
-      lobby.members.some(
-        (m) =>
-          m.user_id === user.id ||
-          m.name === user.username ||
-          m.name === user.display_name
-      )
+    lobby.members.some(
+      (m) =>
+        m.user_id === user.id
+    )
   );
 
   return (
@@ -35,12 +33,12 @@ export default function LobbyCard({ lobby, onClick }: LobbyCardProps) {
         transition: "box-shadow 0.3s",
       }}
       onMouseEnter={(e) =>
-        (e.currentTarget.style.boxShadow =
-          "0 12px 40px rgb(0 122 255 / 0.08)")
+      (e.currentTarget.style.boxShadow =
+        "0 12px 40px rgb(0 122 255 / 0.08)")
       }
       onMouseLeave={(e) =>
-        (e.currentTarget.style.boxShadow =
-          "0 8px 30px rgb(0 0 0 / 0.04)")
+      (e.currentTarget.style.boxShadow =
+        "0 8px 30px rgb(0 0 0 / 0.04)")
       }
     >
       {/* Top Bar — Live Status */}
@@ -64,11 +62,10 @@ export default function LobbyCard({ lobby, onClick }: LobbyCardProps) {
       <div className="mt-5 flex justify-between items-end">
         <AvatarStack members={lobby.members} spotsLeft={spotsLeft} />
         <button
-          className={`${
-            isJoined
+          className={`${isJoined
               ? "bg-[#34C759] hover:bg-[#28A745] text-white"
               : "bg-[#EAF2FF] hover:bg-[#D6E6FF] text-[#007AFF]"
-          } text-[14px] font-semibold py-2 px-4 rounded-full transition-colors`}
+            } text-[14px] font-semibold py-2 px-4 rounded-full transition-colors`}
         >
           {isJoined ? "Vào phòng" : "Join"}
         </button>

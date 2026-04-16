@@ -394,7 +394,7 @@ function BadgeCard() {
 }
 
 function CompactLevelCard({ user, stats }: { user: any; stats: UserGamificationInfo | null }) {
-  const pct = stats ? (stats.xp / stats.next_level_xp) * 100 : 0;
+  const pct = stats?.progress_percentage || 0;
   return (
     <div
       className="bg-white rounded-[32px] p-6 shadow-xl shadow-black/5 flex flex-col gap-4"
@@ -406,7 +406,7 @@ function CompactLevelCard({ user, stats }: { user: any; stats: UserGamificationI
           <h3 className="text-[17px] font-black text-[#1C1C1E]">Level {user?.level || 1}</h3>
         </div>
         <span className="text-[13px] font-bold text-[#8E8E93] tabular-nums">
-          {stats?.xp || 0} / {stats?.next_level_xp || 1000} XP
+          {stats?.current_xp ?? 0} / {stats?.next_level_xp ?? 100} XP
         </span>
       </div>
       <div className="h-3 bg-[#F2F2F7] rounded-full overflow-hidden">
@@ -418,7 +418,7 @@ function CompactLevelCard({ user, stats }: { user: any; stats: UserGamificationI
         />
       </div>
       <p className="text-[12px] text-[#8E8E93] font-medium">
-        {stats ? stats.next_level_xp - stats.xp : 1000} XP to Level {(user?.level || 1) + 1} ·{" "}
+        {stats ? Math.max(0, stats.next_level_xp - stats.current_xp) : 100} XP to Level {(user?.level || 1) + 1} ·{" "}
         <span className="font-extrabold text-[#1C1C1E]">Teenage Syndrome</span>
       </p>
     </div>
@@ -622,7 +622,7 @@ export default function ChallengesPage() {
                     LEVEL
                   </p>
                   <div className="mt-1.5 w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                    <div className="h-full bg-[#007AFF] rounded-full" style={{ width: `${(userStats?.xp || 0) / (userStats?.next_level_xp || 1000) * 100}%` }} />
+                    <div className="h-full bg-[#007AFF] rounded-full" style={{ width: `${userStats?.progress_percentage || 0}%` }} />
                   </div>
                 </div>
               </div>
@@ -808,10 +808,27 @@ export default function ChallengesPage() {
             </p>
             <button
               onClick={async () => {
-                const res = await apiPost<{ success: boolean; data: any }>("/api/v1/challenges/streaks/checkin", {});
-                if (res.success) {
+                try {
+                  // 1. Bắn API không cần check res.success (nếu lỗi nó tự văng xuống catch)
+                  await apiPost("/api/v1/challenges/streaks/checkin", {});
+
+                  // 2. Cập nhật State Streak ngay lập tức để nút xám lại liền
                   toast.success("Checked in for today!");
-                  fetchData();
+                  setStreakInfo((prev) => prev ? {
+                    ...prev,
+                    is_active_today: true,
+                    current_streak: prev.current_streak + 1
+                  } : null);
+
+                  // 3. Chỉ gọi API lấy lại điểm XP (nếu check-in có thưởng điểm) 
+                  // Tuyệt đối KHÔNG gọi lại fetchData() ở đây để tránh đè data cũ
+                  const statsRes = await apiGet<{ success: boolean; data: UserGamificationInfo }>("/api/v1/challenges/xp/me");
+                  if (statsRes.success) {
+                    setUserStats(statsRes.data);
+                  }
+
+                } catch (err: any) {
+                  toast.error(err.message || "Check-in thất bại!");
                 }
               }}
               disabled={streakInfo?.is_active_today}

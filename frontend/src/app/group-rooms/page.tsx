@@ -98,6 +98,7 @@ function mapApiRoom(r: ApiRoom): LobbyData {
     invite_code: r.invite_code ?? undefined,
     status,
     members: r.members.map((m) => ({
+      user_id: m.user_id,
       name: m.display_name ?? "Member",
       avatar:
         m.avatar_url ??
@@ -289,13 +290,7 @@ function RoomCard({
 }) {
   const { user } = useAuth();
   const isJoined = Boolean(
-    user &&
-    lobby.members.some(
-      (m) =>
-        m.user_id === user.id ||
-        m.name === user.username ||
-        m.name === user.display_name
-    )
+    user && lobby.members.some((m) => m.user_id === user.id)
   );
   const router = useRouter();
   const spotsLeft = lobby.spots - lobby.members.length;
@@ -864,13 +859,7 @@ export default function GroupRoomsPage() {
 
   const handleLobbyClick = (lobby: LobbyData) => {
     const isJoined = Boolean(
-      user &&
-      lobby.members.some(
-        (m) =>
-          m.user_id === user.id ||
-          m.name === user.username ||
-          m.name === user.display_name
-      )
+      user && lobby.members.some((m) => m.user_id === user.id)
     );
     if (isJoined && lobby.id) {
       router.push(`/group-rooms/${lobby.id}`);

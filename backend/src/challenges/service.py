@@ -10,30 +10,32 @@ from src.challenges.tracker import ChallengeTracker
 from src.challenges import xp_service
 
 async def get_user_xp_info(db: AsyncSession, user_id: int) -> dict:
-    """Get current user's XP, level and progress towards next level."""
+    """Get current user's XP, level and progress towards next level.
+    
+    Delegates to xp_service.compute_level_progress — single source of truth.
+    """
     res = await db.execute(select(User).where(User.id == user_id))
     user = res.scalar_one_or_none()
-    
+
     if not user:
         return {
             "current_xp": 0,
+            "xp": 0,
             "level": 1,
             "next_level_xp": 100,
             "total_xp_earned": 0,
-            "progress_percentage": 0
+            "progress_percentage": 0,
         }
 
-    current_xp = user.xp if user.xp is not None else 0
-    current_level = user.level if user.level is not None else 1
-    next_threshold = user.next_level_xp if user.next_level_xp is not None else 100
-    total_xp = user.total_xp_earned if user.total_xp_earned is not None else 0
+    progress = await xp_service.compute_level_progress(db, user)
 
     return {
-        "current_xp": current_xp,
-        "level": current_level,
-        "next_level_xp": next_threshold,
-        "total_xp_earned": total_xp,
-        "progress_percentage": min(int((current_xp / next_threshold) * 100), 100) if next_threshold > 0 else 0
+        "current_xp": progress["xp_in_level"],
+        "xp": progress["xp_in_level"],  # backward compat
+        "level": user.level or 1,
+        "next_level_xp": progress["xp_for_level"],
+        "total_xp_earned": user.total_xp_earned or 0,
+        "progress_percentage": progress["progress_pct"],
     }
 
 async def join_challenge(db: AsyncSession, user_id: int, challenge_id: int) -> dict:

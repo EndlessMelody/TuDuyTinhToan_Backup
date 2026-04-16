@@ -12,8 +12,9 @@ from sqlalchemy.future import select
 
 from src.db.database import get_db
 from src.users.models import User
-from src.users.schemas import UserMe
+from src.users.schemas import UserMe, UserStats
 from src.challenges.models import LevelConfig
+from src.challenges.xp_service import compute_level_progress
 from src.core.dependencies import get_token_payload
 from src.auth.schemas import (
     SendOTPRequest, SendOTPResponse, VerifyOTPRequest, VerifyOTPResponse,
@@ -73,11 +74,35 @@ async def sync_user(
     level1 = level1_res.scalar_one_or_none()
     default_xp_req = level1.xp_required if level1 else 100
 
+    async def build_user_me(u: User) -> UserMe:
+        """Build UserMe response with correctly computed relative XP."""
+        progress = await compute_level_progress(db, u)
+        return UserMe(
+            id=u.id,
+            username=u.username,
+            email=u.email,
+            display_name=u.display_name,
+            avatar_url=u.avatar_url,
+            bio=u.bio,
+            cover_url=u.cover_url,
+            location=u.location,
+            title=u.title,
+            phone=u.phone,
+            xp=progress["xp_in_level"],
+            level=u.level or 1,
+            next_level_xp=progress["xp_for_level"],
+            total_xp_earned=u.total_xp_earned or 0,
+            food_vector=list(u.food_vector) if u.food_vector is not None else None,
+            place_vector=list(u.place_vector) if u.place_vector is not None else None,
+            role=u.role or "user",
+            settings=u.settings or {},
+            created_at=u.created_at,
+            stats=UserStats(),
+            badges=[],
+        )
+
     async def repair_stats(u: User):
         changed = False
-        if u.xp is None: 
-            u.xp = 0
-            changed = True
         if u.level is None: 
             u.level = 1
             changed = True
@@ -94,7 +119,7 @@ async def sync_user(
         if await repair_stats(user):
             await db.commit()
             await db.refresh(user)
-        return UserMe.model_validate(user)
+        return await build_user_me(user)
 
     # ── 4b. Chưa tồn tại theo supabase_uid → kiểm tra orphaned row theo email ─
     orphaned_result = await db.execute(select(User).where(User.email == email))
@@ -127,7 +152,7 @@ async def sync_user(
         
         await db.commit()
         await db.refresh(orphaned_user)
-        return UserMe.model_validate(orphaned_user)
+        return await build_user_me(orphaned_user)
 
     new_user = User(
         supabase_uid=supabase_uid,
@@ -137,7 +162,6 @@ async def sync_user(
         avatar_url=avatar_url,
         food_vector=_DEFAULT_VECTOR,
         place_vector=_DEFAULT_VECTOR,
-        xp=0,
         level=1,
         next_level_xp=default_xp_req,
         total_xp_earned=0,
@@ -147,7 +171,7 @@ async def sync_user(
     await db.commit()
     await db.refresh(new_user)
 
-    return UserMe.model_validate(new_user)
+    return await build_user_me(new_user)
 
 
 @router.post(

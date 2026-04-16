@@ -60,12 +60,14 @@ export interface LeaderboardEntry {
 }
 
 export interface UserGamificationInfo {
-  xp: number;
+  current_xp: number;
+  xp: number; // For backward compatibility
   level: number;
   next_level_xp: number;
   xp_to_next_level: number;
   title: string;
   total_xp_earned: number;
+  progress_percentage: number;
   rank?: number;
 }
 

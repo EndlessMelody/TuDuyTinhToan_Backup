@@ -34,10 +34,11 @@ class User(Base):
     place_vector = Column(Vector(15), nullable=False, default=[0.5] * 15)
 
     # Gamification
-    xp = Column(Integer, default=0)
+    # xp column đã bị xóa — dùng total_xp_earned làm nguồn sự thật duy nhất.
+    # compute_level_progress() tính xp_in_level và xp_for_level on-the-fly khi API trả về.
     level = Column(Integer, default=1)
-    next_level_xp = Column(Integer, default=1000)
-    total_xp_earned = Column(Integer, default=0)
+    next_level_xp = Column(Integer, default=100)   # Cumulative threshold để lên level tiếp (từ LevelConfig)
+    total_xp_earned = Column(Integer, default=0)   # Tổng XP tuyệt đối, nguồn sự thật duy nhất
 
     # User settings — JSONB cho linh hoạt, không cần table riêng
     # VD: {"theme": "dark", "language": "vi", "notif_friends": true, "notif_deals": true, ...}
