@@ -5,13 +5,24 @@ import { motion } from "framer-motion";
 import { Users, MapPin, Clock } from "lucide-react";
 import type { LobbyCardProps } from "./types";
 import { AvatarStack, StatusBadge } from "./LobbyUI";
+import { useAuth } from "@/context/AuthContext";
 
 /**
  * A single lobby card rendered in the iOS Light Mode style.
  * Features spring hover animation, pulsing live status, and avatar stack.
  */
 export default function LobbyCard({ lobby, onClick }: LobbyCardProps) {
+  const { user } = useAuth();
   const spotsLeft = lobby.spots - lobby.members.length;
+  const isJoined = Boolean(
+    user &&
+      lobby.members.some(
+        (m) =>
+          m.user_id === user.id ||
+          m.name === user.username ||
+          m.name === user.display_name
+      )
+  );
 
   return (
     <motion.div
@@ -52,8 +63,14 @@ export default function LobbyCard({ lobby, onClick }: LobbyCardProps) {
       {/* Bottom Bar — Avatars & CTA */}
       <div className="mt-5 flex justify-between items-end">
         <AvatarStack members={lobby.members} spotsLeft={spotsLeft} />
-        <button className="bg-[#EAF2FF] hover:bg-[#D6E6FF] text-[#007AFF] text-[14px] font-semibold py-2 px-4 rounded-full transition-colors">
-          Join
+        <button
+          className={`${
+            isJoined
+              ? "bg-[#34C759] hover:bg-[#28A745] text-white"
+              : "bg-[#EAF2FF] hover:bg-[#D6E6FF] text-[#007AFF]"
+          } text-[14px] font-semibold py-2 px-4 rounded-full transition-colors`}
+        >
+          {isJoined ? "Vào phòng" : "Join"}
         </button>
       </div>
     </motion.div>

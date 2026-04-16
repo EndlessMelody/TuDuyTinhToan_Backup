@@ -383,25 +383,47 @@ export default function GroupRoomPage() {
   const voice = useVoiceRoom(roomId);
 
   // ── Fetch room + join on mount ──
+  // ── Fetch room + join on mount ──
   useEffect(() => {
-    if (!roomId) return;
+    // Đợi đến khi load xong thông tin user từ AuthContext
+    if (!roomId || !user) return;
     let cancelled = false;
+
     (async () => {
       try {
-        // Join the room (idempotent — server ignores duplicate joins)
-        await apiPost(`/api/v1/groups/${roomId}/join`);
-        const data = await apiGet<RoomData>(`/api/v1/groups/${roomId}`);
+        // 1. Gọi API lấy thông tin phòng TRƯỚC
+        let data = await apiGet<RoomData>(`/api/v1/groups/${roomId}`);
         if (cancelled) return;
+
+        // 2. Kiểm tra xem mình đã có trong danh sách thành viên chưa
+        const isAlreadyMember = data.members.some((m) => m.user_id === user.id);
+
+        // 3. Nếu CHƯA tham gia, lúc này mới gửi lệnh Join
+        if (!isAlreadyMember) {
+          try {
+            await apiPost(`/api/v1/groups/${roomId}/join`);
+            // Tham gia thành công thì lấy lại data để cập nhật danh sách
+            data = await apiGet<RoomData>(`/api/v1/groups/${roomId}`);
+          } catch (joinErr: unknown) {
+            // Lỡ có lỗi Join (như phòng đầy, sai mã) thì dừng luôn
+            console.warn("Bỏ qua lỗi Join:", joinErr);
+          }
+        }
+
+        if (cancelled) return;
+
+        // 4. Gắn dữ liệu lên giao diện
         setRoom(data);
         const mapped = data.members.map(mapMember);
         setMembers(mapped);
-        myUserIdRef.current = user?.id ?? null;
-        const myMember = data.members.find((m) => m.user_id === user?.id);
+        myUserIdRef.current = user.id;
+
+        const myMember = data.members.find((m) => m.user_id === user.id);
         if (myMember) setMeReady(myMember.is_ready);
 
-        // Fetch messages
+        // Fetch tin nhắn
         try {
-          const msgs = await apiGet<{items: any[]}>(`/api/v1/groups/${roomId}/messages`);
+          const msgs = await apiGet<{ items: any[] }>(`/api/v1/groups/${roomId}/messages`);
           setMessages(msgs.items.map(m => ({
             id: String(m.id),
             user: m.username,
@@ -410,13 +432,11 @@ export default function GroupRoomPage() {
             ts: new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           })));
         } catch (err) {
-          // Ignore if messages fail
+          // Ignore tin nhắn nếu lỗi
         }
       } catch (err: unknown) {
         if (!cancelled)
-          toast.error(
-            err instanceof Error ? err.message : "Failed to load room.",
-          );
+          toast.error(err instanceof Error ? err.message : "Failed to load room.");
       } finally {
         if (!cancelled) setLoadingRoom(false);
       }
@@ -424,7 +444,7 @@ export default function GroupRoomPage() {
     return () => {
       cancelled = true;
     };
-  }, [roomId]);
+  }, [roomId, user]); // Bắt buộc phải đưa biến `user` vào mảng này
 
   // ── Real polling every 5s for member updates ──
   useEffect(() => {
@@ -435,7 +455,7 @@ export default function GroupRoomPage() {
         setRoom(data);
         setMembers(data.members.map(mapMember));
 
-        const msgs = await apiGet<{items: any[]}>(`/api/v1/groups/${roomId}/messages`);
+        const msgs = await apiGet<{ items: any[] }>(`/api/v1/groups/${roomId}/messages`);
         setMessages(msgs.items.map(m => ({
           id: String(m.id),
           user: m.username,
@@ -680,15 +700,15 @@ export default function GroupRoomPage() {
                 style={
                   meReady
                     ? {
-                        backgroundColor: "rgba(52,199,89,0.1)",
-                        borderColor: "#34C759",
-                        color: "#1FAD45",
-                      }
+                      backgroundColor: "rgba(52,199,89,0.1)",
+                      borderColor: "#34C759",
+                      color: "#1FAD45",
+                    }
                     : {
-                        backgroundColor: "#F9F9FB",
-                        borderColor: "#E5E5EA",
-                        color: "#3C3C43",
-                      }
+                      backgroundColor: "#F9F9FB",
+                      borderColor: "#E5E5EA",
+                      color: "#3C3C43",
+                    }
                 }
               >
                 {meReady ? (
@@ -749,7 +769,7 @@ export default function GroupRoomPage() {
             <h3 className="text-[20px] font-extrabold text-[#1C1C1E] tracking-tight mb-2">
               Waiting to Launch
             </h3>
-            <p className="text-[14px] text-[#8E8E93] max-w-xs leading-relaxed">
+            <p className="text-[14px] text-[#8E8E93] max-full leading-relaxed">
               Once everyone marks ready and the host launches, you&apos;ll all
               enter the Tour Builder together to swipe and vote on spots.
             </p>
@@ -774,7 +794,7 @@ export default function GroupRoomPage() {
         {/* ── RIGHT SIDEBAR ── */}
         <div
           className="flex flex-col shrink-0 overflow-hidden"
-          style={{ width: 300, backgroundColor: "#FAFAFA" }}
+          style={{ width: 500, backgroundColor: "#FAFAFA" }}
         >
           {/* Tab switcher */}
           <div className="flex border-b border-[#E5E5EA] shrink-0">
@@ -831,10 +851,10 @@ export default function GroupRoomPage() {
                       member={{
                         ...m,
                         is_speaking: voice.speakingUsers.has(
-                          m.id === 1 ? 0 : m.id,
+                          m.id === myUserIdRef.current ? 0 : m.id,
                         ),
                       }}
-                      isMe={m.id === 1}
+                      isMe={m.id === myUserIdRef.current}
                     />
                   ))}
 

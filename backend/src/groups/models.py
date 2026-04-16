@@ -51,10 +51,13 @@ class GroupMember(Base):
     """
     __tablename__ = "group_members"
 
+    __table_args__ = (
+        UniqueConstraint("group_id", "user_id", name="uq_group_user_membership"),
+    )
+
     id = Column(Integer, primary_key=True, index=True)
     group_id = Column(Integer, ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-
     # Host marker: Người tạo phòng, có quyền gọi POST /finish
     is_host = Column(Boolean, default=False)
 

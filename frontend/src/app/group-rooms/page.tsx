@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/context/AuthContext";
 import {
   ChevronLeft,
   Plus,
@@ -84,9 +85,9 @@ function mapApiRoom(r: ApiRoom): LobbyData {
     route: r.route_description ?? "—",
     time: r.scheduled_time
       ? new Date(r.scheduled_time).toLocaleString([], {
-          dateStyle: "short",
-          timeStyle: "short",
-        })
+        dateStyle: "short",
+        timeStyle: "short",
+      })
       : "TBD",
     spots: r.max_spots,
     bg:
@@ -105,11 +106,11 @@ function mapApiRoom(r: ApiRoom): LobbyData {
     })),
     host: host
       ? {
-          name: host.display_name ?? "Host",
-          avatar:
-            host.avatar_url ??
-            `https://api.dicebear.com/9.x/thumbs/svg?seed=${host.user_id}`,
-        }
+        name: host.display_name ?? "Host",
+        avatar:
+          host.avatar_url ??
+          `https://api.dicebear.com/9.x/thumbs/svg?seed=${host.user_id}`,
+      }
       : undefined,
   };
 }
@@ -286,6 +287,16 @@ function RoomCard({
   lobby: LobbyData;
   onClick: () => void;
 }) {
+  const { user } = useAuth();
+  const isJoined = Boolean(
+    user &&
+    lobby.members.some(
+      (m) =>
+        m.user_id === user.id ||
+        m.name === user.username ||
+        m.name === user.display_name
+    )
+  );
   const router = useRouter();
   const spotsLeft = lobby.spots - lobby.members.length;
   const status = lobby.status ?? "waiting";
@@ -491,20 +502,20 @@ function RoomCard({
                   ? { backgroundColor: "rgba(255,59,48,0.1)", color: "#FF3B30" }
                   : status === "in-progress"
                     ? {
-                        backgroundColor: "rgba(0,122,255,0.1)",
-                        color: "#007AFF",
-                      }
+                      backgroundColor: "rgba(0,122,255,0.1)",
+                      color: "#007AFF",
+                    }
                     : {
-                        backgroundColor: lobby.accent + "18",
-                        color: lobby.accent,
-                      }
+                      backgroundColor: lobby.accent + "18",
+                      color: lobby.accent,
+                    }
               }
             >
               {status === "full"
                 ? "Full"
                 : status === "in-progress"
                   ? "Watch"
-                  : "Join"}
+                  : isJoined ? "Vào phòng" : "Join"}
             </motion.button>
           </div>
         </div>
@@ -651,15 +662,15 @@ function CreateRoomModal({
                   style={
                     category === cat
                       ? {
-                          backgroundColor: "#007AFF",
-                          borderColor: "#007AFF",
-                          color: "#fff",
-                        }
+                        backgroundColor: "#007AFF",
+                        borderColor: "#007AFF",
+                        color: "#fff",
+                      }
                       : {
-                          backgroundColor: "#F2F2F7",
-                          borderColor: "transparent",
-                          color: "#3C3C43",
-                        }
+                        backgroundColor: "#F2F2F7",
+                        borderColor: "transparent",
+                        color: "#3C3C43",
+                      }
                   }
                 >
                   {CATEGORY_ICON[cat]} {cat}
@@ -748,20 +759,20 @@ function CreateRoomModal({
                     isPublic === pub
                       ? pub
                         ? {
-                            backgroundColor: "#E8F8EE",
-                            borderColor: "#34C759",
-                            color: "#1C7A3A",
-                          }
-                        : {
-                            backgroundColor: "#EEF0FF",
-                            borderColor: "#6366F1",
-                            color: "#4F46E5",
-                          }
-                      : {
-                          backgroundColor: "#F9F9FB",
-                          borderColor: "#E5E5EA",
-                          color: "#8E8E93",
+                          backgroundColor: "#E8F8EE",
+                          borderColor: "#34C759",
+                          color: "#1C7A3A",
                         }
+                        : {
+                          backgroundColor: "#EEF0FF",
+                          borderColor: "#6366F1",
+                          color: "#4F46E5",
+                        }
+                      : {
+                        backgroundColor: "#F9F9FB",
+                        borderColor: "#E5E5EA",
+                        color: "#8E8E93",
+                      }
                   }
                 >
                   {pub ? <Globe size={15} /> : <Lock size={15} />}
@@ -848,6 +859,25 @@ export default function GroupRoomsPage() {
   const [activeCategory, setActiveCategory] = useState<LobbyCategory | "All">(
     "All",
   );
+  const router = useRouter();
+  const { user } = useAuth();
+
+  const handleLobbyClick = (lobby: LobbyData) => {
+    const isJoined = Boolean(
+      user &&
+      lobby.members.some(
+        (m) =>
+          m.user_id === user.id ||
+          m.name === user.username ||
+          m.name === user.display_name
+      )
+    );
+    if (isJoined && lobby.id) {
+      router.push(`/group-rooms/${lobby.id}`);
+    } else {
+      setSelectedLobby(lobby);
+    }
+  };
   const [rooms, setRooms] = useState<LobbyData[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -1068,15 +1098,15 @@ export default function GroupRoomsPage() {
               style={
                 statusTab === tab
                   ? {
-                      backgroundColor: "#007AFF",
-                      color: "#fff",
-                      boxShadow: "0 4px 12px rgba(0,122,255,0.25)",
-                    }
+                    backgroundColor: "#007AFF",
+                    color: "#fff",
+                    boxShadow: "0 4px 12px rgba(0,122,255,0.25)",
+                  }
                   : {
-                      backgroundColor: "#fff",
-                      color: "#3C3C43",
-                      border: "1px solid rgba(0,0,0,0.06)",
-                    }
+                    backgroundColor: "#fff",
+                    color: "#3C3C43",
+                    border: "1px solid rgba(0,0,0,0.06)",
+                  }
               }
             >
               {tab}
@@ -1085,9 +1115,9 @@ export default function GroupRoomsPage() {
                 style={
                   statusTab === tab
                     ? {
-                        backgroundColor: "rgba(255,255,255,0.25)",
-                        color: "#fff",
-                      }
+                      backgroundColor: "rgba(255,255,255,0.25)",
+                      color: "#fff",
+                    }
                     : { backgroundColor: "#F2F2F7", color: "#8E8E93" }
                 }
               >
@@ -1132,15 +1162,15 @@ export default function GroupRoomsPage() {
               style={
                 activeCategory === cat
                   ? {
-                      backgroundColor: "#1C1C1E",
-                      borderColor: "#1C1C1E",
-                      color: "#fff",
-                    }
+                    backgroundColor: "#1C1C1E",
+                    borderColor: "#1C1C1E",
+                    color: "#fff",
+                  }
                   : {
-                      backgroundColor: "#fff",
-                      borderColor: "rgba(0,0,0,0.08)",
-                      color: "#3C3C43",
-                    }
+                    backgroundColor: "#fff",
+                    borderColor: "rgba(0,0,0,0.08)",
+                    color: "#3C3C43",
+                  }
               }
             >
               {CATEGORY_ICON[cat]}
@@ -1272,7 +1302,7 @@ export default function GroupRoomsPage() {
                 >
                   <RoomCard
                     lobby={lobby}
-                    onClick={() => setSelectedLobby(lobby)}
+                    onClick={() => handleLobbyClick(lobby)}
                   />
                 </motion.div>
               ))}

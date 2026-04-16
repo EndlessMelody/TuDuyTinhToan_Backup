@@ -2,10 +2,12 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 import { Users, ArrowRight } from "lucide-react";
 import type { LobbyData, LobbySectionProps } from "./types";
 import { useGroups } from "@/hooks/useGroups";
+import { useAuth } from "@/context/AuthContext";
 import LobbyCard from "./LobbyCard";
 import LobbyDetailModal from "./LobbyDetailModal";
 
@@ -19,6 +21,25 @@ export default function LobbySection({ lobbies }: LobbySectionProps) {
   // If lobbies prop is explicitly passed (e.g. from parent), use that; else use API
   const data = lobbies ?? apiLobbies;
   const [selectedLobby, setSelectedLobby] = useState<LobbyData | null>(null);
+  const router = useRouter();
+  const { user } = useAuth();
+
+  const handleLobbyClick = (lobby: LobbyData) => {
+    const isJoined = Boolean(
+      user &&
+        lobby.members.some(
+          (m) =>
+            m.user_id === user.id ||
+            m.name === user.username ||
+            m.name === user.display_name
+        )
+    );
+    if (isJoined && lobby.id) {
+      router.push(`/group-rooms/${lobby.id}`);
+    } else {
+      setSelectedLobby(lobby);
+    }
+  };
 
   return (
     <div
@@ -83,7 +104,7 @@ export default function LobbySection({ lobbies }: LobbySectionProps) {
               <LobbyCard
                 key={idx}
                 lobby={lobby}
-                onClick={() => setSelectedLobby(lobby)}
+                onClick={() => handleLobbyClick(lobby)}
               />
             ))
           )}

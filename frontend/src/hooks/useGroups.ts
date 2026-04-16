@@ -38,6 +38,7 @@ interface GroupsResponse {
 
 function adaptGroup(g: ApiGroup): LobbyData {
   return {
+    id: g.id,
     name: g.name,
     route: g.route_description ?? "Chưa có lộ trình",
     time: g.scheduled_time
@@ -58,6 +59,7 @@ function adaptGroup(g: ApiGroup): LobbyData {
         normalizeMediaUrl(m.avatar_url) ??
         `https://ui-avatars.com/api/?name=${encodeURIComponent(m.display_name)}&background=random`,
       ready: m.is_ready,
+      user_id: m.user_id,
     })),
   };
 }

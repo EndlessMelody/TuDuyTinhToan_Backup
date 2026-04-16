@@ -11,6 +11,8 @@ export interface LobbyMember {
   avatar: string;
   /** Whether the member has confirmed readiness */
   ready: boolean;
+  /** User ID from backend */
+  user_id?: number;
 }
 
 /** The readiness status of a lobby session. */
