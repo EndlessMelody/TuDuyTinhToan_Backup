@@ -13,6 +13,14 @@ class SendMessageBody(BaseModel):
     text: str
 
 
+@router.get("/inbox", summary="Get inbox - all conversations with last message")
+async def get_inbox(
+    user_id: int = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    return await service.get_inbox(db, user_id)
+
+
 @router.get("/{other_user_id}", summary="Get conversation with a user")
 async def get_conversation(
     other_user_id: int,

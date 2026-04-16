@@ -27,6 +27,10 @@ import {
   Soup,
   IceCreamCone,
   Fish,
+  Brain,
+  RefreshCw,
+  Trash2,
+  Send,
 } from "lucide-react";
 
 import Link from "next/link";
@@ -197,6 +201,258 @@ const THINKING_MSGS = [
   "Checking real-time open hours...",
   "Finalising your perfect itinerary...",
 ];
+
+// ─── Mood ambience ──────────────────────────────────────────────────────────
+const MOOD_AMBIENCE: Record<string, { from: string; accent: string }> = {
+  casual: { from: "rgba(0,122,255,0.07)", accent: "#007AFF" },
+  adventurous: { from: "rgba(255,107,53,0.09)", accent: "#FF6B35" },
+  romantic: { from: "rgba(255,45,120,0.07)", accent: "#FF2D78" },
+  family: { from: "rgba(52,199,89,0.07)", accent: "#34C759" },
+};
+
+// ─── Swap pool ───────────────────────────────────────────────────────────────
+const SWAP_POOL: ItineraryStop[] = [
+  {
+    time: "-",
+    name: "Cơm Tấm Thuận Kiều",
+    category: "Vietnamese",
+    emoji: "🍚",
+    address: "District 3",
+    img: "https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=480&h=320&fit=crop",
+    cost: "55,000đ",
+    xp: 70,
+    accent: "#FF6B35",
+    reason: "Iconic broken-rice platter, a Saigon institution since 1980.",
+  },
+  {
+    time: "-",
+    name: "Gỏi Cuốn Bà Năm",
+    category: "Street Food",
+    emoji: "🥟",
+    address: "District 1",
+    img: "https://images.unsplash.com/photo-1562802378-063ec186a863?w=480&h=320&fit=crop",
+    cost: "40,000đ",
+    xp: 50,
+    accent: "#34C759",
+    reason: "Fresh spring rolls with peanut dip — light and local.",
+  },
+  {
+    time: "-",
+    name: "Bún Bò Huế Mệ Tý",
+    category: "Vietnamese",
+    emoji: "🍜",
+    address: "Bình Thạnh",
+    img: "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=480&h=320&fit=crop",
+    cost: "65,000đ",
+    xp: 85,
+    accent: "#ED1B24",
+    reason: "Spicy lemongrass broth — central Vietnam's bold answer to phở.",
+  },
+  {
+    time: "-",
+    name: "Trà Sữa Phúc Long",
+    category: "Cafe",
+    emoji: "🧋",
+    address: "District 1",
+    img: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=480&h=320&fit=crop",
+    cost: "35,000đ",
+    xp: 45,
+    accent: "#A855F7",
+    reason: "The Vietnamese milk tea institution. Queue is worth it.",
+  },
+];
+
+// SVG map positions [x, y] for up to 5 stops
+const MAP_POS = [
+  [100, 118],
+  [205, 72],
+  [68, 162],
+  [160, 248],
+  [112, 318],
+];
+
+// Natural language prompt parser
+function parsePrompt(text: string): Record<string, string> {
+  const t = text.toLowerCase();
+  const r: Record<string, string> = {};
+  if (/romantic|date|couple/.test(t)) r.mood = "romantic";
+  else if (/adventur|bold|wild/.test(t)) r.mood = "adventurous";
+  else if (/family|kids/.test(t)) r.mood = "family";
+  else if (/casual|chill|relax/.test(t)) r.mood = "casual";
+  if (/\bsolo\b|just me|alone/.test(t)) r.group = "solo";
+  else if (/couple|two of us|just the two|partner/.test(t)) r.group = "duo";
+  else if (/small group/.test(t)) r.group = "small";
+  else if (/large|6\+|party/.test(t)) r.group = "large";
+  if (/full day|whole day/.test(t)) r.duration = "Full Day";
+  else if (/half day/.test(t)) r.duration = "Half Day";
+  else if (/4 hour/.test(t)) r.duration = "4 hours";
+  else if (/2 hour/.test(t)) r.duration = "2 hours";
+  const bm = t.match(/(\d+)\s*k/);
+  if (bm) {
+    const v = parseInt(bm[1]);
+    r.budget =
+      v < 100
+        ? "< 100k"
+        : v <= 300
+          ? "100–300k"
+          : v <= 500
+            ? "300–500k"
+            : "500k+";
+  }
+  if (/district 1|quận 1/.test(t)) r.location = "District 1";
+  else if (/bình thạnh|binh thanh/.test(t)) r.location = "Bình Thạnh";
+  else if (/phú nhuận|phu nhuan/.test(t)) r.location = "Phú Nhuận";
+  return r;
+}
+
+// ─── Route Map (SVG) ─────────────────────────────────────────────────────────
+function RouteMap({
+  stops,
+  activeStop,
+}: {
+  stops: ItineraryStop[];
+  activeStop: number | null;
+}) {
+  const pts = MAP_POS.slice(0, stops.length);
+  const pathD = pts
+    .map((p, i) => `${i === 0 ? "M" : "L"}${p[0]},${p[1]}`)
+    .join(" ");
+  return (
+    <div
+      style={{
+        position: "relative",
+        height: 320,
+        backgroundColor: "#F5F3EE",
+        borderRadius: 20,
+        overflow: "hidden",
+        border: "1px solid #E5E5EA",
+        flexShrink: 0,
+      }}
+    >
+      <svg
+        viewBox="0 0 300 400"
+        preserveAspectRatio="xMidYMid slice"
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+        }}
+      >
+        {[40, 80, 120, 160, 200, 240, 280, 320, 360].map((y) => (
+          <line
+            key={y}
+            x1="0"
+            y1={y}
+            x2="300"
+            y2={y}
+            stroke="#EAE7E0"
+            strokeWidth="1"
+          />
+        ))}
+        {[50, 100, 150, 200, 250].map((x) => (
+          <line
+            key={x}
+            x1={x}
+            y1="0"
+            x2={x}
+            y2="400"
+            stroke="#EAE7E0"
+            strokeWidth="1"
+          />
+        ))}
+        <line
+          x1="150"
+          y1="0"
+          x2="150"
+          y2="400"
+          stroke="#D8D3CA"
+          strokeWidth="2"
+        />
+        <line
+          x1="0"
+          y1="200"
+          x2="300"
+          y2="200"
+          stroke="#D8D3CA"
+          strokeWidth="2"
+        />
+        <ellipse
+          cx="248"
+          cy="55"
+          rx="44"
+          ry="26"
+          fill="#C8E9F5"
+          opacity="0.7"
+        />
+        <text x="230" y="58" fontSize="7" fill="#7BBDD4" fontWeight="600">
+          Sài Gòn River
+        </text>
+        <ellipse
+          cx="58"
+          cy="278"
+          rx="28"
+          ry="18"
+          fill="#C8E8C8"
+          opacity="0.6"
+        />
+        <path
+          d={pathD}
+          fill="none"
+          stroke="#007AFF"
+          strokeWidth="2.5"
+          strokeDasharray="6 3"
+          opacity="0.55"
+        />
+        {pts.map(([x, y], i) => {
+          const s = stops[i];
+          const a = activeStop === i;
+          return (
+            <g key={s.name}>
+              {a && (
+                <circle cx={x} cy={y} r={22} fill={s.accent} opacity={0.18} />
+              )}
+              <circle cx={x} cy={y} r={a ? 14 : 11} fill={s.accent} />
+              <text
+                x={x}
+                y={y + 0.5}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fill="white"
+                fontSize={a ? 9 : 7}
+                fontWeight="800"
+              >
+                {i + 1}
+              </text>
+              <text
+                x={x + (x > 150 ? -16 : 16)}
+                y={y - 15}
+                textAnchor={x > 150 ? "end" : "start"}
+                fill="#3C3C43"
+                fontSize="7"
+                fontWeight="700"
+              >
+                {s.name.split(" ").slice(0, 2).join(" ")}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <div
+        style={{
+          position: "absolute",
+          top: 8,
+          left: 12,
+          fontSize: 10,
+          color: "#8E8E93",
+          fontWeight: 700,
+        }}
+      >
+        HCMC Route Map
+      </div>
+    </div>
+  );
+}
 
 // ─── Step 1: Preferences ─────────────────────────────────────────────────────
 
@@ -556,54 +812,484 @@ function StepGenerating({ onDone }: { onDone: () => void }) {
   );
 }
 
-// ─── Step 4: Result ───────────────────────────────────────────────────────────
+// ─── Step 4: Stop Card ────────────────────────────────────────────────────────
+
+function StopCard({
+  stop,
+  index,
+  total,
+  active,
+  swapping,
+  onHover,
+  onLeave,
+  onSwap,
+  onRemove,
+}: {
+  stop: ItineraryStop;
+  index: number;
+  total: number;
+  active: boolean;
+  swapping: boolean;
+  onHover: () => void;
+  onLeave: () => void;
+  onSwap: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -12 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.08 }}
+      style={{ display: "flex", gap: 12 }}
+      onMouseEnter={onHover}
+      onMouseLeave={onLeave}
+    >
+      {/* Timeline dot */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          width: 36,
+          flexShrink: 0,
+        }}
+      >
+        <div
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: "50%",
+            backgroundColor: stop.accent,
+            boxShadow: active
+              ? `0 4px 16px ${stop.accent}55`
+              : `0 2px 8px ${stop.accent}33`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "white",
+            transition: "box-shadow 0.2s",
+            flexShrink: 0,
+          }}
+        >
+          {STOP_CATEGORY_ICON[stop.category] ?? <Utensils size={16} />}
+        </div>
+        {index < total - 1 && (
+          <div
+            style={{
+              width: 1,
+              flex: 1,
+              background: "#E5E5EA",
+              margin: "4px 0",
+              minHeight: 16,
+            }}
+          />
+        )}
+      </div>
+
+      {/* Card */}
+      <div style={{ flex: 1, paddingBottom: 12, minWidth: 0 }}>
+        <AnimatePresence mode="wait">
+          {swapping ? (
+            <motion.div
+              key="swapping"
+              initial={{ opacity: 0, scale: 0.97 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              style={{
+                borderRadius: 18,
+                overflow: "hidden",
+                border: "1px solid #E5E5EA",
+                backgroundColor: "#F9F9FB",
+                height: 120,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "column",
+                gap: 10,
+              }}
+            >
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              >
+                <RefreshCw size={22} color="#007AFF" />
+              </motion.div>
+              <p style={{ fontSize: 12, color: "#8E8E93", fontWeight: 600 }}>
+                Finding a better match...
+              </p>
+            </motion.div>
+          ) : (
+            <motion.div
+              key={stop.name}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                backgroundColor: "#fff",
+                borderRadius: 18,
+                overflow: "hidden",
+                border: active
+                  ? `1.5px solid ${stop.accent}55`
+                  : "1px solid rgba(0,0,0,0.05)",
+                boxShadow: active
+                  ? `0 8px 24px rgba(0,0,0,0.09)`
+                  : "0 2px 8px rgba(0,0,0,0.04)",
+                transition: "all 0.2s",
+              }}
+            >
+              {/* Image */}
+              <div
+                style={{
+                  height: 110,
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
+                <img
+                  src={stop.img}
+                  alt={stop.name}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background:
+                      "linear-gradient(to top, rgba(0,0,0,0.55), transparent 55%)",
+                  }}
+                />
+                <div style={{ position: "absolute", bottom: 10, left: 12 }}>
+                  <p
+                    style={{
+                      color: "white",
+                      fontWeight: 800,
+                      fontSize: 15,
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    {stop.name}
+                  </p>
+                  <p style={{ color: "rgba(255,255,255,0.65)", fontSize: 11 }}>
+                    {stop.category}
+                  </p>
+                </div>
+                <span
+                  style={{
+                    position: "absolute",
+                    top: 10,
+                    right: 10,
+                    backgroundColor: "rgba(0,0,0,0.35)",
+                    backdropFilter: "blur(8px)",
+                    color: "white",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: "3px 10px",
+                    borderRadius: 20,
+                  }}
+                >
+                  {stop.time}
+                </span>
+              </div>
+
+              {/* Body */}
+              <div style={{ padding: "10px 14px 12px" }}>
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: "#636366",
+                    fontStyle: "italic",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  &ldquo;{stop.reason}&rdquo;
+                </p>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginTop: 10,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      fontSize: 12,
+                      color: "#8E8E93",
+                    }}
+                  >
+                    <span
+                      style={{ display: "flex", alignItems: "center", gap: 3 }}
+                    >
+                      <MapPin size={11} />
+                      {stop.address.split(",")[0]}
+                    </span>
+                    <span style={{ fontWeight: 700, color: "#1C1C1E" }}>
+                      {stop.cost}
+                    </span>
+                  </div>
+                  <span
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 3,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      borderRadius: 20,
+                      backgroundColor: "#FFF3C4",
+                      color: "#CC8B00",
+                    }}
+                  >
+                    <Zap size={10} fill="currentColor" />+{stop.xp} XP
+                  </span>
+                </div>
+
+                {/* Hover actions + reasoning */}
+                <AnimatePresence>
+                  {active && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      style={{ overflow: "hidden" }}
+                    >
+                      {/* Action buttons */}
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 6,
+                          marginTop: 10,
+                          paddingTop: 10,
+                          borderTop: "1px solid #F2F2F7",
+                        }}
+                      >
+                        <button
+                          onClick={onSwap}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 5,
+                            padding: "5px 12px",
+                            borderRadius: 20,
+                            border: "1.5px solid #007AFF",
+                            backgroundColor: "rgba(0,122,255,0.06)",
+                            color: "#007AFF",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <RefreshCw size={11} /> Swap
+                        </button>
+                        <button
+                          onClick={onRemove}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 5,
+                            padding: "5px 12px",
+                            borderRadius: 20,
+                            border: "1.5px solid #FF3B30",
+                            backgroundColor: "rgba(255,59,48,0.05)",
+                            color: "#FF3B30",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <Trash2 size={11} /> Remove
+                        </button>
+                        <span
+                          style={{
+                            marginLeft: "auto",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: "#34C759",
+                          }}
+                        >
+                          <CheckCircle size={13} /> Keep
+                        </span>
+                      </div>
+                      {/* AI reasoning card */}
+                      <div
+                        style={{
+                          marginTop: 8,
+                          padding: "8px 12px",
+                          borderRadius: 12,
+                          backgroundColor: "rgba(0,122,255,0.04)",
+                          border: "1px solid rgba(0,122,255,0.12)",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 5,
+                            marginBottom: 4,
+                          }}
+                        >
+                          <Brain size={11} color="#007AFF" />
+                          <span
+                            style={{
+                              fontSize: 10,
+                              color: "#007AFF",
+                              fontWeight: 700,
+                            }}
+                          >
+                            Why this stop
+                          </span>
+                        </div>
+                        <p
+                          style={{
+                            fontSize: 11,
+                            color: "#636366",
+                            lineHeight: 1.6,
+                          }}
+                        >
+                          Matched:{" "}
+                          <b style={{ color: "#3C3C43" }}>{stop.category}</b>{" "}
+                          preference · budget fits at{" "}
+                          <b style={{ color: "#3C3C43" }}>{stop.cost}</b>
+                          {stop.travelToNext
+                            ? ` · ${stop.travelToNext} to next stop`
+                            : " · final stop of route"}
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Travel connector (outside hover) */}
+                {stop.travelToNext && !active && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      marginTop: 8,
+                      paddingTop: 8,
+                      borderTop: "1px solid #F2F2F7",
+                    }}
+                  >
+                    <ArrowRight size={11} color="#8E8E93" />
+                    <span style={{ fontSize: 11, color: "#8E8E93" }}>
+                      {stop.travelToNext} to next stop
+                    </span>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Step 4: Result (split-screen) ───────────────────────────────────────────
 
 function StepResult({
-  stops,
+  stops: initialStops,
   onRegen,
 }: {
   stops: ItineraryStop[];
   onRegen: () => void;
 }) {
-  const totalCost = "305,000đ";
+  const [stops, setStops] = useState<ItineraryStop[]>(initialStops);
+  const [activeStop, setActiveStop] = useState<number | null>(null);
+  const [swapping, setSwapping] = useState<number | null>(null);
+  const [pool, setPool] = useState([...SWAP_POOL]);
+
   const totalXp = stops.reduce((s, x) => s + x.xp, 0);
+
+  const handleSwap = async (i: number) => {
+    setSwapping(i);
+    await new Promise((r) => setTimeout(r, 1400));
+    const next = {
+      ...pool[0],
+      time: stops[i].time,
+      travelToNext: stops[i].travelToNext,
+    };
+    setPool((p) => [...p.slice(1), p[0]]);
+    setStops((prev) => prev.map((s, idx) => (idx === i ? next : s)));
+    setSwapping(null);
+  };
+
+  const handleRemove = (i: number) =>
+    setStops((prev) => prev.filter((_, idx) => idx !== i));
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col gap-5"
+      style={{ display: "flex", flexDirection: "column", gap: 16 }}
     >
       {/* Summary banner */}
       <div
-        className="rounded-[22px] p-5 flex items-center gap-5"
         style={{
+          borderRadius: 22,
+          padding: "16px 20px",
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
           background: "linear-gradient(135deg, #1C1C1E, #2C2C2E)",
           border: "1px solid rgba(255,255,255,0.06)",
         }}
       >
         <div
-          className="w-12 h-12 rounded-[16px] flex items-center justify-center"
-          style={{ background: "rgba(255,193,7,0.18)" }}
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: 14,
+            backgroundColor: "rgba(255,193,7,0.18)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
         >
-          <Map size={24} style={{ color: "rgba(255,193,7,0.9)" }} />
+          <Map size={22} color="rgba(255,193,7,0.9)" />
         </div>
-        <div className="flex-1">
-          <h3 className="text-[18px] font-extrabold text-white">
+        <div style={{ flex: 1 }}>
+          <h3
+            style={{
+              fontSize: 17,
+              fontWeight: 800,
+              color: "white",
+              lineHeight: 1.2,
+            }}
+          >
             Afternoon Street Food Sprint
           </h3>
           <p
-            className="text-[13px]"
-            style={{ color: "rgba(255,255,255,0.45)" }}
+            style={{
+              fontSize: 12,
+              color: "rgba(255,255,255,0.45)",
+              marginTop: 2,
+            }}
           >
-            5 stops · ~4.5 hours · Ho Chi Minh City
+            {stops.length} stops · ~4.5 hours · Ho Chi Minh City
           </p>
         </div>
-        <div className="text-right">
-          <p className="text-[14px] font-extrabold text-white">{totalCost}</p>
+        <div style={{ textAlign: "right" }}>
+          <p style={{ fontSize: 14, fontWeight: 800, color: "white" }}>
+            305,000đ
+          </p>
           <p
-            className="flex items-center gap-1 text-[12px] justify-end"
-            style={{ color: "rgba(255,193,7,0.9)" }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 3,
+              fontSize: 12,
+              justifyContent: "flex-end",
+              color: "rgba(255,193,7,0.9)",
+              marginTop: 2,
+            }}
           >
             <Zap size={11} fill="currentColor" />
             {totalXp} XP
@@ -611,134 +1297,132 @@ function StepResult({
         </div>
       </div>
 
-      {/* Timeline */}
-      <div className="flex flex-col">
-        {stops.map((stop, i) => (
-          <motion.div
-            key={stop.name}
-            initial={{ opacity: 0, x: -12 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.1 }}
-            className="flex gap-4"
-          >
-            {/* Timeline line */}
-            <div className="flex flex-col items-center w-10 flex-shrink-0">
-              <div
-                className="w-9 h-9 rounded-full flex items-center justify-center text-white flex-shrink-0"
-                style={{
-                  backgroundColor: stop.accent,
-                  boxShadow: `0 4px 12px ${stop.accent}44`,
-                }}
-              >
-                {STOP_CATEGORY_ICON[stop.category] ?? <Utensils size={16} />}
-              </div>
-              {i < stops.length - 1 && (
-                <div className="flex flex-col items-center gap-0.5 mt-1 mb-1">
-                  {Array.from({ length: 4 }).map((_, j) => (
-                    <div
-                      key={j}
-                      className="w-px h-1.5 rounded-full bg-[#D1D1D6]"
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
+      {/* Two-column layout */}
+      <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+        {/* LEFT: Interactive timeline */}
+        <div
+          style={{
+            flex: "0 0 460px",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          {stops.map((stop, i) => (
+            <StopCard
+              key={`${stop.name}-${i}`}
+              stop={stop}
+              index={i}
+              total={stops.length}
+              active={activeStop === i}
+              swapping={swapping === i}
+              onHover={() => setActiveStop(i)}
+              onLeave={() => setActiveStop(null)}
+              onSwap={() => handleSwap(i)}
+              onRemove={() => handleRemove(i)}
+            />
+          ))}
+        </div>
 
-            {/* Stop content */}
-            <div className="flex-1 min-w-0 pb-5">
+        {/* RIGHT: Map + quick stats */}
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+            position: "sticky",
+            top: 80,
+            minWidth: 0,
+          }}
+        >
+          <RouteMap stops={stops} activeStop={activeStop} />
+
+          {/* Mini stat grid */}
+          <div
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}
+          >
+            {[
+              {
+                label: "Total Stops",
+                value: `${stops.length} places`,
+                color: "#007AFF",
+              },
+              { label: "Est. Duration", value: "~4.5 hours", color: "#FF9500" },
+              { label: "Budget", value: "305,000đ", color: "#34C759" },
+              { label: "XP Earned", value: `+${totalXp} XP`, color: "#A855F7" },
+            ].map(({ label, value, color }) => (
               <div
-                className="bg-white rounded-[18px] overflow-hidden"
+                key={label}
                 style={{
+                  backgroundColor: "#fff",
+                  borderRadius: 14,
+                  padding: "12px 14px",
                   border: "1px solid rgba(0,0,0,0.05)",
-                  boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
                 }}
               >
-                <div className="h-[120px] relative overflow-hidden">
-                  <img
-                    src={stop.img}
-                    alt={stop.name}
-                    className="w-full h-full object-cover"
-                  />
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      background:
-                        "linear-gradient(to top, rgba(0,0,0,0.55), transparent 60%)",
-                    }}
-                  />
-                  <div className="absolute bottom-2 left-3">
-                    <p className="text-white font-extrabold text-[15px] leading-tight">
-                      {stop.name}
-                    </p>
-                    <p className="text-[rgba(255,255,255,0.7)] text-[11px]">
-                      {stop.category}
-                    </p>
-                  </div>
-                  <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
-                    <span
-                      className="text-[12px] font-bold px-2.5 py-1 rounded-full text-white"
-                      style={{
-                        backgroundColor: "rgba(0,0,0,0.35)",
-                        backdropFilter: "blur(8px)",
-                      }}
-                    >
-                      {stop.time}
-                    </span>
-                  </div>
-                </div>
-                <div className="p-3">
-                  <p className="text-[12px] text-[#636366] italic leading-relaxed">
-                    &ldquo;{stop.reason}&rdquo;
-                  </p>
-                  <div className="flex items-center justify-between mt-2.5">
-                    <div className="flex items-center gap-3 text-[12px] text-[#8E8E93]">
-                      <span className="flex items-center gap-1">
-                        <MapPin size={11} />
-                        {stop.address.split(",")[0]}
-                      </span>
-                      <span className="font-semibold text-[#1C1C1E]">
-                        {stop.cost}
-                      </span>
-                    </div>
-                    <span
-                      className="flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full"
-                      style={{ backgroundColor: "#FFF3C4", color: "#CC8B00" }}
-                    >
-                      <Zap size={10} fill="currentColor" />+{stop.xp} XP
-                    </span>
-                  </div>
-                  {stop.travelToNext && (
-                    <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-[#F2F2F7]">
-                      <ArrowRight size={11} className="text-[#8E8E93]" />
-                      <span className="text-[11px] text-[#8E8E93]">
-                        {stop.travelToNext} to next stop
-                      </span>
-                    </div>
-                  )}
-                </div>
+                <p
+                  style={{
+                    fontSize: 10,
+                    color: "#8E8E93",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  {label}
+                </p>
+                <p
+                  style={{ fontSize: 15, fontWeight: 800, color, marginTop: 2 }}
+                >
+                  {value}
+                </p>
               </div>
-            </div>
-          </motion.div>
-        ))}
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Actions */}
-      <div className="flex gap-3 pb-6">
+      <div style={{ display: "flex", gap: 10, paddingBottom: 24 }}>
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.97 }}
           onClick={onRegen}
-          className="flex items-center gap-2 px-5 py-3.5 rounded-[16px] text-[14px] font-bold text-[#1C1C1E] bg-[#F2F2F7] hover:bg-[#E5E5EA] transition"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "12px 20px",
+            borderRadius: 16,
+            fontSize: 14,
+            fontWeight: 700,
+            color: "#1C1C1E",
+            backgroundColor: "#F2F2F7",
+            border: "none",
+            cursor: "pointer",
+          }}
         >
           <RotateCcw size={15} /> Regenerate
         </motion.button>
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.97 }}
-          className="flex-1 flex items-center justify-center gap-2 px-5 py-3.5 rounded-[16px] text-[15px] font-extrabold text-white"
           style={{
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            padding: "12px 20px",
+            borderRadius: 16,
+            fontSize: 15,
+            fontWeight: 800,
+            color: "white",
             background: "linear-gradient(135deg, #1A7AFF, #0057D9)",
             boxShadow: "0 6px 20px rgba(0,122,255,0.32)",
+            border: "none",
+            cursor: "pointer",
           }}
         >
           <Star size={16} fill="currentColor" /> Save to Tour Builder
@@ -752,13 +1436,12 @@ function StepResult({
 
 export default function AIPlanner() {
   const [step, setStep] = useState(1);
+  const [prompt, setPrompt] = useState("");
+  const [parsedHints, setParsedHints] = useState<Record<string, string>>({});
 
-  // Step 1
   const [mood, setMood] = useState<string | null>(null);
   const [cuisines, setCuisines] = useState<string[]>([]);
   const [group, setGroup] = useState<string | null>(null);
-
-  // Step 2
   const [duration, setDuration] = useState("4 hours");
   const [budget, setBudget] = useState("100–300k");
   const [location, setLocation] = useState("District 1");
@@ -768,21 +1451,30 @@ export default function AIPlanner() {
       prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c],
     );
 
+  const handlePromptSubmit = () => {
+    if (!prompt.trim()) return;
+    const parsed = parsePrompt(prompt);
+    setParsedHints(parsed);
+    if (parsed.mood) setMood(parsed.mood);
+    if (parsed.group) setGroup(parsed.group);
+    if (parsed.duration) setDuration(parsed.duration);
+    if (parsed.budget) setBudget(parsed.budget);
+    if (parsed.location) setLocation(parsed.location);
+  };
+
+  const ambience = mood ? MOOD_AMBIENCE[mood] : null;
   const canProceed1 = !!mood && !!group;
   const canProceed2 = !!location.trim();
-
   const handleGenerate = () => setStep(3);
-  const handleRegen = () => {
-    setStep(3);
-  };
+  const handleRegen = () => setStep(3);
   const handleDone = () => setStep(4);
-
   const STEP_LABELS = ["Preferences", "Settings", "Generating", "Your Plan"];
 
   return (
     <div
       className="no-scrollbar"
       style={{
+        position: "relative",
         display: "flex",
         flexDirection: "column",
         width: "100%",
@@ -793,6 +1485,21 @@ export default function AIPlanner() {
           '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif',
       }}
     >
+      {/* ── Ambient mood gradient ── */}
+      <motion.div
+        animate={{ opacity: mood ? 1 : 0 }}
+        transition={{ duration: 0.6 }}
+        style={{
+          position: "fixed",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 0,
+          background: ambience
+            ? `radial-gradient(ellipse 90% 45% at 50% 0%, ${ambience.from}, transparent 70%)`
+            : "none",
+        }}
+      />
+
       {/* ── HEADER ── */}
       <div
         style={{
@@ -830,7 +1537,10 @@ export default function AIPlanner() {
               <div
                 className="w-8 h-8 rounded-[10px] flex items-center justify-center"
                 style={{
-                  background: "linear-gradient(135deg, #007AFF, #A855F7)",
+                  background: ambience
+                    ? `linear-gradient(135deg, ${ambience.accent}, #A855F7)`
+                    : "linear-gradient(135deg, #007AFF, #A855F7)",
+                  transition: "background 0.4s",
                 }}
               >
                 <Sparkles size={16} className="text-white" />
@@ -840,8 +1550,6 @@ export default function AIPlanner() {
               </h1>
             </div>
           </div>
-
-          {/* Step indicator */}
           {step < 3 && (
             <div className="flex items-center gap-2">
               {[1, 2].map((s) => (
@@ -851,7 +1559,10 @@ export default function AIPlanner() {
                       className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-extrabold transition-all"
                       style={
                         step >= s
-                          ? { backgroundColor: "#007AFF", color: "#fff" }
+                          ? {
+                              backgroundColor: ambience?.accent ?? "#007AFF",
+                              color: "#fff",
+                            }
                           : { backgroundColor: "#E5E5EA", color: "#8E8E93" }
                       }
                     >
@@ -872,12 +1583,14 @@ export default function AIPlanner() {
             </div>
           )}
         </div>
-        {/* Progress bar */}
         {step < 3 && (
           <div className="h-0.5 bg-[#E5E5EA]">
             <motion.div
-              className="h-full bg-[#007AFF]"
-              animate={{ width: `${(step / 2) * 100}%` }}
+              className="h-full"
+              animate={{
+                width: `${(step / 2) * 100}%`,
+                backgroundColor: ambience?.accent ?? "#007AFF",
+              }}
               transition={{ duration: 0.4 }}
             />
           </div>
@@ -885,14 +1598,170 @@ export default function AIPlanner() {
       </div>
 
       {/* ── CONTENT ── */}
-      <div className="flex-1 flex flex-col items-center px-8 py-8">
-        <div className="w-full max-w-[680px]">
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          padding: "32px",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        <div style={{ width: "100%", maxWidth: step === 4 ? 1100 : 680 }}>
+          {/* ── Natural Language Prompt Bar (steps 1–2) ── */}
           {step < 3 && (
-            <div className="mb-6">
-              <h2 className="text-[26px] font-extrabold text-[#1C1C1E] tracking-tight">
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{ marginBottom: 28 }}
+            >
+              <div style={{ position: "relative" }}>
+                <input
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handlePromptSubmit()}
+                  placeholder="Describe your ideal food adventure... e.g. 'A romantic evening in District 1, 200k budget'"
+                  style={{
+                    width: "100%",
+                    padding: "15px 56px 15px 18px",
+                    borderRadius: 20,
+                    fontSize: 15,
+                    outline: "none",
+                    fontFamily: "inherit",
+                    color: "#1C1C1E",
+                    backgroundColor: "#fff",
+                    transition: "all 0.25s",
+                    border: prompt
+                      ? `1.5px solid ${ambience?.accent ?? "#007AFF"}55`
+                      : "1.5px solid #E5E5EA",
+                    boxShadow: prompt
+                      ? `0 4px 20px ${ambience?.accent ?? "#007AFF"}18`
+                      : "0 2px 8px rgba(0,0,0,0.04)",
+                  }}
+                />
+                <button
+                  onClick={handlePromptSubmit}
+                  style={{
+                    position: "absolute",
+                    right: 8,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: 40,
+                    height: 40,
+                    borderRadius: 12,
+                    border: "none",
+                    cursor: "pointer",
+                    background: prompt
+                      ? `linear-gradient(135deg, ${ambience?.accent ?? "#007AFF"}, #A855F7)`
+                      : "#E5E5EA",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  <Send size={16} color={prompt ? "white" : "#8E8E93"} />
+                </button>
+              </div>
+
+              <AnimatePresence>
+                {Object.keys(parsedHints).length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 6,
+                      marginTop: 8,
+                      alignItems: "center",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: "#8E8E93",
+                        fontWeight: 600,
+                      }}
+                    >
+                      AI understood:
+                    </span>
+                    {Object.entries(parsedHints).map(([k, v]) => (
+                      <span
+                        key={k}
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: "3px 10px",
+                          borderRadius: 20,
+                          backgroundColor: `${ambience?.accent ?? "#007AFF"}15`,
+                          color: ambience?.accent ?? "#007AFF",
+                        }}
+                      >
+                        {v}
+                      </span>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {!prompt && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 6,
+                    marginTop: 8,
+                  }}
+                >
+                  {[
+                    "A romantic date night, 300k budget",
+                    "Solo street food adventure",
+                    "Family lunch in District 1",
+                  ].map((ex) => (
+                    <button
+                      key={ex}
+                      onClick={() => setPrompt(ex)}
+                      style={{
+                        fontSize: 12,
+                        padding: "4px 12px",
+                        borderRadius: 20,
+                        border: "1px solid #E5E5EA",
+                        backgroundColor: "#fff",
+                        color: "#636366",
+                        cursor: "pointer",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {ex}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div
+                style={{ height: 1, backgroundColor: "#E5E5EA", marginTop: 20 }}
+              />
+            </motion.div>
+          )}
+
+          {step < 3 && (
+            <div style={{ marginBottom: 24 }}>
+              <h2
+                style={{
+                  fontSize: 26,
+                  fontWeight: 800,
+                  color: "#1C1C1E",
+                  letterSpacing: -0.5,
+                  margin: 0,
+                }}
+              >
                 {step === 1 ? "Tell me about yourself" : "Set your parameters"}
               </h2>
-              <p className="text-[14px] text-[#8E8E93] mt-1">
+              <p style={{ fontSize: 14, color: "#8E8E93", marginTop: 4 }}>
                 {step === 1
                   ? "Your preferences help the AI craft the perfect food adventure."
                   : "Fine-tune your session details."}
@@ -933,35 +1802,54 @@ export default function AIPlanner() {
             )}
           </AnimatePresence>
 
-          {/* CTA button */}
           {(step === 1 || step === 2) && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mt-8"
+              style={{ marginTop: 32 }}
             >
               <motion.button
-                whileHover={{ scale: canProceed1 ? 1.02 : 1 }}
-                whileTap={{ scale: canProceed1 ? 0.97 : 1 }}
+                whileHover={{
+                  scale: (step === 1 ? canProceed1 : canProceed2) ? 1.02 : 1,
+                }}
+                whileTap={{
+                  scale: (step === 1 ? canProceed1 : canProceed2) ? 0.97 : 1,
+                }}
                 onClick={step === 1 ? () => setStep(2) : handleGenerate}
                 disabled={step === 1 ? !canProceed1 : !canProceed2}
-                className="w-full py-4 rounded-[18px] text-[16px] font-extrabold text-white flex items-center justify-center gap-2 transition-all"
-                style={
-                  (step === 1 ? canProceed1 : canProceed2)
+                style={{
+                  width: "100%",
+                  padding: "16px",
+                  borderRadius: 18,
+                  fontSize: 16,
+                  fontWeight: 800,
+                  color: "white",
+                  border: "none",
+                  cursor: (step === 1 ? canProceed1 : canProceed2)
+                    ? "pointer"
+                    : "default",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  ...((step === 1 ? canProceed1 : canProceed2)
                     ? {
-                        background: "linear-gradient(135deg, #1A7AFF, #0057D9)",
-                        boxShadow: "0 8px 24px rgba(0,122,255,0.32)",
+                        background: `linear-gradient(135deg, ${ambience?.accent ?? "#1A7AFF"}, ${ambience?.accent ? ambience.accent + "BB" : "#0057D9"})`,
+                        boxShadow: `0 8px 24px ${ambience?.accent ?? "#007AFF"}44`,
                       }
-                    : { background: "#E5E5EA", color: "#A8A8AD" }
-                }
+                    : { background: "#E5E5EA", color: "#A8A8AD" }),
+                  transition: "all 0.3s",
+                }}
               >
                 {step === 1 ? (
                   <>
-                    Continue <ChevronRight size={18} />
+                    <span>Continue</span>
+                    <ChevronRight size={18} />
                   </>
                 ) : (
                   <>
-                    <Sparkles size={16} /> Generate My Itinerary
+                    <Sparkles size={16} />
+                    <span>Generate My Itinerary</span>
                   </>
                 )}
               </motion.button>

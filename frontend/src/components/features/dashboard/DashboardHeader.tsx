@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useInbox } from "@/hooks/useInbox";
 
 interface DashboardHeaderProps {
   scrollY: MotionValue<number>;
@@ -39,6 +40,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
+  const [isMsgOpen, setIsMsgOpen] = useState(false);
+  const msgRef = useRef<HTMLDivElement>(null);
   const {
     notifications,
     unreadCount,
@@ -48,6 +51,12 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     acceptFriendRequest,
     declineFriendRequest,
   } = useNotifications();
+  const {
+    conversations,
+    loading: inboxLoading,
+    totalUnread: msgUnreadCount,
+    markRead: markMsgRead,
+  } = useInbox();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const headerWidth = useTransform(scrollY, [0, 80], ["100%", "80%"]);
@@ -87,6 +96,17 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     if (isNotifOpen) document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isNotifOpen]);
+
+  // Click-outside to close messages panel
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (msgRef.current && !msgRef.current.contains(e.target as Node)) {
+        setIsMsgOpen(false);
+      }
+    };
+    if (isMsgOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isMsgOpen]);
 
   // Click-outside to close profile menu
   useEffect(() => {
@@ -495,12 +515,197 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           </AnimatePresence>
         </div>
 
-        <IconButton
-          icon={<MessageSquare size={20} color="#8E8E93" />}
-          variant="tertiary"
-          onClick={handleComingSoon}
-          style={{ borderRadius: "10px" }}
-        />
+        {/* Messages */}
+        <div ref={msgRef} style={{ position: "relative" }}>
+          <IconButton
+            icon={
+              <MessageSquare
+                size={20}
+                color={isMsgOpen ? "#007AFF" : "#8E8E93"}
+              />
+            }
+            variant="tertiary"
+            onClick={() => setIsMsgOpen(!isMsgOpen)}
+            style={{ borderRadius: "10px" }}
+          />
+          {msgUnreadCount > 0 && (
+            <div
+              style={{
+                position: "absolute",
+                top: "4px",
+                right: "4px",
+                minWidth: msgUnreadCount > 9 ? "16px" : "14px",
+                height: "14px",
+                borderRadius: "9px",
+                backgroundColor: "#007AFF",
+                border: "2px solid #FFFFFF",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "8px",
+                fontWeight: 800,
+                color: "white",
+                lineHeight: 1,
+                padding: "0 2px",
+              }}
+            >
+              {msgUnreadCount > 9 ? "9+" : msgUnreadCount}
+            </div>
+          )}
+
+          <AnimatePresence>
+            {isMsgOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                style={{
+                  position: "absolute",
+                  top: "48px",
+                  right: 0,
+                  zIndex: 100,
+                  width: "380px",
+                  backgroundColor: "rgba(255,255,255,0.97)",
+                  backdropFilter: "blur(24px)",
+                  borderTopWidth: "1px",
+                  borderBottomWidth: "1px",
+                  borderLeftWidth: "1px",
+                  borderRightWidth: "1px",
+                  borderStyle: "solid",
+                  borderColor: "#E5E5EA",
+                  borderRadius: "20px",
+                  overflow: "hidden",
+                  boxShadow: "0 24px 64px rgba(0,0,0,0.12)",
+                }}
+              >
+                {/* Messages Header */}
+                <div
+                  style={{
+                    padding: "16px 20px 12px",
+                    borderBottom: "1px solid #F2F2F7",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Heading variant="heading-strong-s">Messages</Heading>
+                </div>
+
+                {/* Conversations List */}
+                <div style={{ maxHeight: 420, overflowY: "auto" }}>
+                  {inboxLoading ? (
+                    <div style={{ padding: "24px 20px", textAlign: "center" }}>
+                      <Text style={{ color: "#8E8E93", fontSize: "0.8rem" }}>
+                        Loading…
+                      </Text>
+                    </div>
+                  ) : conversations.length === 0 ? (
+                    <div style={{ padding: "32px 20px", textAlign: "center" }}>
+                      <div style={{ fontSize: "2rem", marginBottom: 8 }}>
+                        💬
+                      </div>
+                      <Text style={{ color: "#8E8E93", fontSize: "0.8rem" }}>
+                        No messages yet
+                      </Text>
+                    </div>
+                  ) : (
+                    conversations.map((c) => (
+                      <div
+                        key={c.partner_id}
+                        onClick={() => {
+                          if (c.unread_count > 0) markMsgRead(c.partner_id);
+                          setIsMsgOpen(false);
+                          router.push(`/foodies/${c.partner_id}`);
+                        }}
+                        style={{
+                          padding: "12px 20px",
+                          borderBottom: "1px solid #F2F2F7",
+                          backgroundColor:
+                            c.unread_count > 0
+                              ? "rgba(0,122,255,0.03)"
+                              : "transparent",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <Avatar src={c.partner_avatar || undefined} size="s" />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              marginBottom: 2,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 14,
+                                fontWeight: 600,
+                                color: "#1C1C1E",
+                              }}
+                            >
+                              {c.partner_name}
+                            </Text>
+                            <Text style={{ fontSize: 11, color: "#8E8E93" }}>
+                              {c.last_message_time}
+                            </Text>
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                color:
+                                  c.unread_count > 0 ? "#3C3C43" : "#8E8E93",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                flex: 1,
+                                fontWeight: c.unread_count > 0 ? 500 : 400,
+                              }}
+                            >
+                              {c.is_sent_by_me && (
+                                <span style={{ color: "#8E8E93" }}>You: </span>
+                              )}
+                              {c.last_message}
+                            </Text>
+                            {c.unread_count > 0 && (
+                              <div
+                                style={{
+                                  minWidth: 18,
+                                  height: 18,
+                                  borderRadius: "9px",
+                                  backgroundColor: "#007AFF",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  color: "white",
+                                  padding: "0 5px",
+                                }}
+                              >
+                                {c.unread_count}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         {/* Profile */}
         <div ref={profileMenuRef} style={{ position: "relative" }}>

@@ -59,3 +59,77 @@ async def mark_read(db: AsyncSession, user_id: int, other_id: int) -> None:
     for m in result.scalars().all():
         m.is_read = True
     await db.commit()
+
+
+async def get_inbox(db: AsyncSession, user_id: int) -> list:
+    """Return latest conversations with each partner, including last message and unread count."""
+    from src.users.models import User
+
+    # Find all partners user has chatted with (as sender or receiver)
+    partners_q = await db.execute(
+        select(
+            ChatMessage.sender_id.label("partner_id"),
+        )
+        .where(ChatMessage.receiver_id == user_id)
+        .distinct()
+    )
+    partners_q2 = await db.execute(
+        select(
+            ChatMessage.receiver_id.label("partner_id"),
+        )
+        .where(ChatMessage.sender_id == user_id)
+        .distinct()
+    )
+
+    partner_ids = {row[0] for row in partners_q.all()} | {row[0] for row in partners_q2.all()}
+
+    inbox = []
+    for partner_id in partner_ids:
+        if partner_id == user_id:
+            continue
+
+        # Get partner user info
+        partner_user = await db.get(User, partner_id)
+        if not partner_user:
+            continue
+
+        # Get last message between user and partner
+        last_msg_q = await db.execute(
+            select(ChatMessage)
+            .where(
+                or_(
+                    and_(ChatMessage.sender_id == user_id, ChatMessage.receiver_id == partner_id),
+                    and_(ChatMessage.sender_id == partner_id, ChatMessage.receiver_id == user_id),
+                )
+            )
+            .order_by(ChatMessage.created_at.desc())
+            .limit(1)
+        )
+        last_msg = last_msg_q.scalar_one_or_none()
+        if not last_msg:
+            continue
+
+        # Count unread messages from this partner
+        unread_q = await db.execute(
+            select(ChatMessage).where(
+                ChatMessage.sender_id == partner_id,
+                ChatMessage.receiver_id == user_id,
+                ChatMessage.is_read == False,  # noqa: E712
+            )
+        )
+        unread_count = len(unread_q.scalars().all())
+
+        inbox.append({
+            "partner_id": partner_id,
+            "partner_name": partner_user.display_name or partner_user.username or "Unknown",
+            "partner_avatar": partner_user.avatar_url,
+            "last_message": last_msg.text,
+            "last_message_time": _fmt_time(last_msg.created_at),
+            "last_message_at": last_msg.created_at.isoformat() if last_msg.created_at else None,
+            "unread_count": unread_count,
+            "is_sent_by_me": last_msg.sender_id == user_id,
+        })
+
+    # Sort by most recent message
+    inbox.sort(key=lambda x: x["last_message_at"] or "", reverse=True)
+    return inbox
