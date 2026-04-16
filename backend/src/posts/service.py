@@ -101,24 +101,39 @@ async def delete_post(db: AsyncSession, post_id: int, user_id: int):
     return {"status": "deleted"}
 
 
+from sqlalchemy import update
+
 async def toggle_like(db: AsyncSession, post_id: int, user_id: int) -> dict:
+    # Bắt đầu transaction
     result = await db.execute(select(PostLike).where(PostLike.post_id == post_id, PostLike.user_id == user_id))
     like = result.scalars().first()
-    post_q = await db.execute(select(Post).where(Post.id == post_id))
-    post = post_q.scalars().first()
+    
+    post_q = await db.execute(select(Post.id).where(Post.id == post_id))
+    post = post_q.first()
     if not post:
         raise HTTPException(status_code=404, detail="Post không tồn tại")
 
     if like:
         await db.delete(like)
-        post.likes_count = max(0, post.likes_count - 1)
+        # Atomic update để tránh race condition
+        update_stmt = update(Post).where(Post.id == post_id).values(
+            likes_count=func.greatest(0, Post.likes_count - 1)
+        ).returning(Post.likes_count)
+        result = await db.execute(update_stmt)
+        new_count = result.scalar_one()
         liked = False
     else:
         db.add(PostLike(post_id=post_id, user_id=user_id))
-        post.likes_count += 1
+        # Atomic update
+        update_stmt = update(Post).where(Post.id == post_id).values(
+            likes_count=Post.likes_count + 1
+        ).returning(Post.likes_count)
+        result = await db.execute(update_stmt)
+        new_count = result.scalar_one()
         liked = True
+        
     await db.commit()
-    return {"liked": liked, "likes_count": post.likes_count}
+    return {"liked": liked, "likes_count": new_count}
 
 
 async def list_comments(db: AsyncSession, post_id: int, limit: int, offset: int) -> dict:
@@ -145,19 +160,15 @@ async def add_comment(db: AsyncSession, user_id: int, data: CommentCreate, post_
     comment = Comment(user_id=user_id, content=data.content, post_id=post_id, reel_id=reel_id)
     db.add(comment)
 
-    # Update denormalized counter
+    # Atomic update denormalized counter
     if post_id:
-        post_q = await db.execute(select(Post).where(Post.id == post_id))
-        post = post_q.scalars().first()
-        if post:
-            post.comments_count += 1
+        update_stmt = update(Post).where(Post.id == post_id).values(comments_count=Post.comments_count + 1)
+        await db.execute(update_stmt)
 
     if reel_id:
         from src.reels.models import Reel
-        reel_q = await db.execute(select(Reel).where(Reel.id == reel_id))
-        reel = reel_q.scalars().first()
-        if reel:
-            reel.comments_count += 1
+        update_stmt = update(Reel).where(Reel.id == reel_id).values(comments_count=Reel.comments_count + 1)
+        await db.execute(update_stmt)
 
     await db.commit()
     await db.refresh(comment)
@@ -171,7 +182,22 @@ async def delete_comment(db: AsyncSession, comment_id: int, user_id: int):
         raise HTTPException(status_code=404, detail="Comment không tồn tại")
     if comment.user_id != user_id:
         raise HTTPException(status_code=403, detail="Không có quyền xóa comment này")
+        
+    post_id = comment.post_id
+    reel_id = comment.reel_id
+
     await db.delete(comment)
+    
+    # Atomic decrement
+    if post_id:
+        update_stmt = update(Post).where(Post.id == post_id).values(comments_count=func.greatest(0, Post.comments_count - 1))
+        await db.execute(update_stmt)
+        
+    if reel_id:
+        from src.reels.models import Reel
+        update_stmt = update(Reel).where(Reel.id == reel_id).values(comments_count=func.greatest(0, Reel.comments_count - 1))
+        await db.execute(update_stmt)
+
     await db.commit()
     return {"status": "deleted"}
 

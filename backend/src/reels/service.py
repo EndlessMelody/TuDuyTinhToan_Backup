@@ -65,25 +65,39 @@ async def get_reel(db: AsyncSession, reel_id: int, viewer_id: Optional[int] = No
     return await _reel_to_dict(db, reel, viewer_id)
 
 
+from sqlalchemy import update, func
+
 async def toggle_like(db: AsyncSession, reel_id: int, user_id: int) -> dict:
+    # Transaction starts inherently
     result = await db.execute(select(ReelLike).where(ReelLike.reel_id == reel_id, ReelLike.user_id == user_id))
     like = result.scalars().first()
-    reel_q = await db.execute(select(Reel).where(Reel.id == reel_id))
-    reel = reel_q.scalars().first()
+    
+    reel_q = await db.execute(select(Reel.id).where(Reel.id == reel_id))
+    reel = reel_q.first()
     if not reel:
         raise HTTPException(status_code=404, detail="Reel không tồn tại")
 
     if like:
         await db.delete(like)
-        reel.likes_count = max(0, reel.likes_count - 1)
+        # Atomic decrement
+        update_stmt = update(Reel).where(Reel.id == reel_id).values(
+            likes_count=func.greatest(0, Reel.likes_count - 1)
+        ).returning(Reel.likes_count)
+        result = await db.execute(update_stmt)
+        new_count = result.scalar_one()
         liked = False
     else:
         db.add(ReelLike(reel_id=reel_id, user_id=user_id))
-        reel.likes_count += 1
+        # Atomic increment
+        update_stmt = update(Reel).where(Reel.id == reel_id).values(
+            likes_count=Reel.likes_count + 1
+        ).returning(Reel.likes_count)
+        result = await db.execute(update_stmt)
+        new_count = result.scalar_one()
         liked = True
         
     await db.commit()
-    return {"liked": liked, "likes_count": reel.likes_count}
+    return {"liked": liked, "likes_count": new_count}
 
 
 async def _reel_to_dict(db: AsyncSession, reel: Reel, viewer_id: Optional[int] = None) -> dict:
