@@ -78,3 +78,12 @@ async def checkin(db: AsyncSession, user_id: int) -> dict:
         "xp_awarded": xp_amount,
         "leveled_up": xp_res["leveled_up"]
     }
+
+async def get_streak_status(db: AsyncSession, user_id: int) -> dict:
+    """Get current streak status for the user."""
+    streak = await get_or_create_streak(db, user_id)
+    return {
+        "current_streak": streak.current_streak,
+        "longest_streak": streak.longest_streak,
+        "last_active_date": streak.last_active_date
+    }

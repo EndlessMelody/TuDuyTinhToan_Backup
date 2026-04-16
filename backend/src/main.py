@@ -6,20 +6,91 @@ from src.core.config import settings
 from src.api.router import api_router
 from src.db.redis import init_redis
 
+class MockRedisPipeline:
+    """Giả lập pipeline cho Redis — ghi lại các lệnh và thực thi tuần tự."""
+    def __init__(self, redis_instance):
+        self.redis = redis_instance
+        self.commands = []
+
+    def zincrby(self, name, amount, value):
+        self.commands.append(("zincrby", (name, amount, value)))
+        return self
+
+    def zadd(self, name, mapping):
+        self.commands.append(("zadd", (name, mapping)))
+        return self
+
+    async def execute(self):
+        results = []
+        for cmd, args in self.commands:
+            method = getattr(self.redis, cmd)
+            res = await method(*args)
+            results.append(res)
+        return results
+
 class InMemoryRedis:
-    """Fallback khi Redis chưa bật — giả lập get/set bằng dict trong RAM."""
+    """Fallback khi Redis chưa bật — giả lập get/set và Sorted Sets (ZSET) bằng dict."""
     def __init__(self):
         self._store = {}
+        self._zsets = {}
+
     async def get(self, key):
         return self._store.get(key)
+
     async def set(self, key, value):
         self._store[key] = value
+
     async def scan(self, cursor=0, match="*", count=100):
         import fnmatch
         keys = [k for k in self._store.keys() if fnmatch.fnmatch(k, match)]
         return 0, keys
+
+    async def zincrby(self, name: str, amount: float, value: str) -> float:
+        if name not in self._zsets:
+            self._zsets[name] = {}
+        curr_score = self._zsets[name].get(str(value), 0.0)
+        new_score = float(curr_score) + float(amount)
+        self._zsets[name][str(value)] = new_score
+        return new_score
+
+    async def zadd(self, name: str, mapping: dict):
+        if name not in self._zsets:
+            self._zsets[name] = {}
+        for val, score in mapping.items():
+            self._zsets[name][str(val)] = float(score)
+
+    async def zscore(self, name: str, value: str) -> float:
+        return self._zsets.get(name, {}).get(str(value))
+
+    async def zrevrange(self, name: str, start: int, end: int, withscores: bool = False):
+        zset = self._zsets.get(name, {})
+        # Sắp xếp theo score giảm dần, sau đó theo value tăng dần để ổn định
+        sorted_items = sorted(zset.items(), key=lambda x: (-x[1], x[0]))
+        
+        # Redis slicing: [start, end] inclusive. Nếu end = -1 thì lấy đến hết.
+        if end == -1:
+            sliced = sorted_items[start:]
+        else:
+            sliced = sorted_items[start:end + 1]
+        
+        if withscores:
+            return sliced
+        return [item[0] for item in sliced]
+
+    async def zrevrank(self, name: str, value: str):
+        zset = self._zsets.get(name, {})
+        sorted_items = sorted(zset.items(), key=lambda x: (-x[1], x[0]))
+        for i, (val, _) in enumerate(sorted_items):
+            if val == str(value):
+                return i
+        return None
+
+    def pipeline(self):
+        return MockRedisPipeline(self)
+
     async def close(self):
         pass
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

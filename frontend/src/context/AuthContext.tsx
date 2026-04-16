@@ -23,6 +23,7 @@ export interface UserData {
   role: string;
   xp: number;
   level: number;
+  next_level_xp: number;
 }
 
 interface AuthContextValue {
@@ -34,6 +35,7 @@ interface AuthContextValue {
     password: string;
   }) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
   error: string | null;
   clearError: () => void;
 }
@@ -44,6 +46,7 @@ const AuthContext = createContext<AuthContextValue>({
   user: null,
   login: async () => {},
   logout: async () => {},
+  refreshUser: async () => {},
   error: null,
   clearError: () => {},
 });
@@ -171,6 +174,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     document.cookie = "user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
   };
 
+  const refreshUser = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/auth/sync`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        });
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            setUser(result.data);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to refresh user:", err);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -179,6 +205,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         login,
         logout,
+        refreshUser,
         error,
         clearError,
       }}
