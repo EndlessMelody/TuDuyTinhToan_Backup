@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React from "react";
 import { motion } from "framer-motion";
@@ -23,6 +23,7 @@ import {
   PanelLeftOpen,
   BadgeCheck,
   BookOpen,
+  Shield,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -448,6 +449,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => router.push("/group-rooms")}
         />
       </Column>
+
+      {/* ─── Admin Section ─── */}
+      {user?.role === "admin" && (
+        <Column style={{ gap: "2px", width: "100%", flexShrink: 0 }}>
+          {isOpen && <SectionLabel label="Admin" />}
+          <SidebarItem
+            icon={<Shield size={17} />}
+            label="Dashboard"
+            active={currentPath.startsWith("/admin")}
+            collapsed={!isOpen}
+            badge="Admin"
+            onClick={() => router.push("/admin")}
+          />
+        </Column>
+      )}
 
       {/* ─── Spacer ─── */}
       <div style={{ flex: 1 }} />
