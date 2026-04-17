@@ -25,9 +25,17 @@ async def get_user_xp_info(db: AsyncSession, user_id: int) -> dict:
             "next_level_xp": 100,
             "total_xp_earned": 0,
             "progress_percentage": 0,
+            "rank": None,
         }
 
     progress = await xp_service.compute_level_progress(db, user)
+    
+    # Get all-time rank from Redis
+    from src.db.redis import RedisClient
+    redis = RedisClient.get_client()
+    key = "leaderboard:alltime"
+    v_rank = await redis.zrevrank(key, str(user_id))
+    rank = (v_rank + 1) if v_rank is not None else None
 
     return {
         "current_xp": progress["xp_in_level"],
@@ -36,6 +44,7 @@ async def get_user_xp_info(db: AsyncSession, user_id: int) -> dict:
         "next_level_xp": progress["xp_for_level"],
         "total_xp_earned": user.total_xp_earned or 0,
         "progress_percentage": progress["progress_pct"],
+        "rank": rank,
     }
 
 async def join_challenge(db: AsyncSession, user_id: int, challenge_id: int) -> dict:

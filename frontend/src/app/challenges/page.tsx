@@ -531,6 +531,7 @@ export default function ChallengesPage() {
     >
       {/* ── HERO HEADER ── */}
       <div
+        className="w-full shrink-0"
         style={{
           background: "linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%)",
           padding: "48px 48px 40px",
@@ -563,8 +564,8 @@ export default function ChallengesPage() {
           }}
         />
 
-        <div className="relative max-w-[1400px] mx-auto">
-          <div className="flex items-start justify-between mb-8">
+        <div className="relative max-w-[1400px] mx-auto w-full flex flex-col">
+          <div className="flex items-start justify-between mb-8 w-full">
             <div>
               <div className="flex items-center gap-4 mb-3">
                 <div
