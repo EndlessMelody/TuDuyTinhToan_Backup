@@ -699,8 +699,9 @@ export default function ChallengesPage() {
                         boxShadow: "0 8px 16px rgba(0,0,0,0.15)",
                       }
                       : {
-                        backgroundColor: "transparent",
+                        backgroundColor: "#fcfcfeff",
                         color: "#8E8E93",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
                       }
                   }
                 >

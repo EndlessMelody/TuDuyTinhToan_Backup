@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.challenges.models import Challenge, UserChallenge
 from src.users.models import User
 from src.challenges.tracker import ChallengeTracker
-from src.challenges import xp_service
+from src.challenges import xp_service, schemas
 
 async def get_user_xp_info(db: AsyncSession, user_id: int) -> dict:
     """Get current user's XP, level and progress towards next level.
@@ -168,12 +168,21 @@ async def claim_challenge_reward(
         description=f"Completed challenge: {challenge.title}"
     )
     
+    # Award Badge if applicable
+    badge_awarded = None
+    if challenge.badge_id:
+        from src.gamification.service import award_badge
+        res_badge = await award_badge(db, user_id, challenge.badge_id)
+        if res_badge.get("status") == "awarded":
+            badge_awarded = challenge.badge_id
+            
     return {
         "success": True,
         "challenge_title": challenge.title,
         "xp_awarded": challenge.xp_reward,
         "new_level": xp_res["new_level"],
-        "leveled_up": xp_res["leveled_up"]
+        "leveled_up": xp_res["leveled_up"],
+        "badge_awarded": badge_awarded
     }
 
 async def get_user_challenges(
@@ -230,3 +239,122 @@ async def get_user_challenges(
         })
     
     return output
+
+    return output
+
+
+async def get_all_challenges_admin(db: AsyncSession) -> List[dict]:
+    """Get all challenges with aggregated stats for admin dashboard."""
+    from sqlalchemy import func
+    
+    # 1. Fetch all challenges
+    query = select(Challenge).order_by(Challenge.created_at.desc())
+    res = await db.execute(query)
+    challenges = res.scalars().all()
+    
+    # 2. Get participant counts per challenge
+    participant_query = (
+        select(UserChallenge.challenge_id, func.count(UserChallenge.id).label("count"))
+        .group_by(UserChallenge.challenge_id)
+    )
+    p_res = await db.execute(participant_query)
+    participant_map = {row.challenge_id: row.count for row in p_res.fetchall()}
+    
+    # 3. Get completion counts per challenge (status='claimed' or 'completed')
+    completion_query = (
+        select(UserChallenge.challenge_id, func.count(UserChallenge.id).label("count"))
+        .where(UserChallenge.status.in_(["completed", "claimed"]))
+        .group_by(UserChallenge.challenge_id)
+    )
+    c_res = await db.execute(completion_query)
+    completion_map = {row.challenge_id: row.count for row in c_res.fetchall()}
+    
+    output = []
+    for c in challenges:
+        p_count = participant_map.get(c.id, 0)
+        c_count = completion_map.get(c.id, 0)
+        c_rate = int((c_count / p_count * 100)) if p_count > 0 else 0
+        
+        output.append({
+            "id": c.id,
+            "title": c.title,
+            "category": c.category,
+            "difficulty": c.difficulty,
+            "xp_reward": c.xp_reward,
+            "is_active": c.is_active,
+            "start_date": c.start_date.isoformat() if c.start_date else None,
+            "end_date": c.end_date.isoformat() if c.end_date else None,
+            "participants_count": p_count,
+            "completion_rate": c_rate
+        })
+    
+    return output
+
+
+async def create_challenge(db: AsyncSession, schema: schemas.ChallengeCreate) -> Challenge:
+    """Create a new challenge template."""
+    challenge = Challenge(**schema.model_dump())
+    db.add(challenge)
+    await db.commit()
+    await db.refresh(challenge)
+    return challenge
+
+
+async def get_challenge_by_id_admin(db: AsyncSession, challenge_id: int) -> Optional[dict]:
+    """Get a single challenge with detailed stats for admin."""
+    from sqlalchemy import func
+    
+    # Fetch challenge
+    challenge = await db.get(Challenge, challenge_id)
+    if not challenge:
+        return None
+        
+    # Stats
+    participant_query = (
+        select(func.count(UserChallenge.id))
+        .where(UserChallenge.challenge_id == challenge_id)
+    )
+    p_res = await db.execute(participant_query)
+    p_count = p_res.scalar() or 0
+    
+    completion_query = (
+        select(func.count(UserChallenge.id))
+        .where(UserChallenge.challenge_id == challenge_id)
+        .where(UserChallenge.status.in_(["completed", "claimed"]))
+    )
+    c_res = await db.execute(completion_query)
+    c_count = c_res.scalar() or 0
+    
+    c_rate = int((c_count / p_count * 100)) if p_count > 0 else 0
+    
+    return {
+        **schemas.ChallengeResponse.model_validate(challenge).model_dump(),
+        "participants_count": p_count,
+        "completion_rate": c_rate
+    }
+
+
+async def update_challenge(db: AsyncSession, challenge_id: int, schema: schemas.ChallengeUpdate) -> Optional[Challenge]:
+    """Partially update a challenge."""
+    challenge = await db.get(Challenge, challenge_id)
+    if not challenge:
+        return None
+        
+    update_data = schema.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(challenge, key, value)
+        
+    await db.commit()
+    await db.refresh(challenge)
+    return challenge
+
+
+async def delete_challenge(db: AsyncSession, challenge_id: int) -> bool:
+    """Delete a challenge and all its associations."""
+    challenge = await db.get(Challenge, challenge_id)
+    if not challenge:
+        return False
+        
+    await db.delete(challenge)
+    await db.commit()
+    return True
