@@ -152,10 +152,9 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
 
   const isPublicPage = pathname === "/" || pathname === "/login";
   const isPromoPage = isPublicPage;
+  const isExplorePage = pathname.startsWith("/explore");
   const isFullScreenPage =
-    pathname.startsWith("/profile") ||
-    pathname.startsWith("/tour-builder") ||
-    pathname.startsWith("/explore");
+    pathname.startsWith("/profile") || pathname.startsWith("/tour-builder");
 
   // ─── Route guard ─────────────────────────────────────────────────────────────
   React.useEffect(() => {
@@ -205,30 +204,59 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const isAIPlanner = pathname.startsWith("/ai-planner");
 
   const rightExpandedWidth = isFoodies ? "100%" : "320px";
-  const rightSidebarWidth = isFullScreenPage || isAIPlanner
-    ? "0px"
-    : isFoodies
-      ? isChatOpen
-        ? "flex-fill"
-        : "0px"
-      : isRightExpanded
-        ? "320px"
-        : "80px";
+  const rightSidebarWidth =
+    isFullScreenPage || isAIPlanner || isExplorePage
+      ? "0px"
+      : isFoodies
+        ? isChatOpen
+          ? "flex-fill"
+          : "0px"
+        : isRightExpanded
+          ? "320px"
+          : "80px";
 
   return (
     <Row
       fillWidth
       background={isFullScreenPage ? "surface" : "page"}
       overflow="hidden"
-      style={{ height: "100vh", color: "var(--foreground)" }}
+      style={{
+        height: "100vh",
+        color: "var(--foreground)",
+        position: "relative",
+        ["--explore-left-sidebar-width" as string]: isExplorePage
+          ? isSidebarOpen
+            ? "240px"
+            : "72px"
+          : "0px",
+      }}
     >
       {/* ═══════════ 1. LEFT SIDEBAR ═══════════ */}
-      <Sidebar
-        isOpen={isSidebarOpen}
-        onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-        isFullScreen={isFullScreenPage}
-        currentPath={pathname}
-      />
+      {isExplorePage ? (
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            bottom: 0,
+            zIndex: 30,
+          }}
+        >
+          <Sidebar
+            isOpen={isSidebarOpen}
+            onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+            isFullScreen={false}
+            currentPath={pathname}
+          />
+        </div>
+      ) : (
+        <Sidebar
+          isOpen={isSidebarOpen}
+          onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+          isFullScreen={isFullScreenPage}
+          currentPath={pathname}
+        />
+      )}
 
       {/* 2. CENTER PANEL (CHATS LIST) */}
       <Column
@@ -255,11 +283,12 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
           flexShrink={1}
           flexBasis="0%"
           style={{
-            maxWidth: isFullScreenPage
-              ? "100%"
-              : isFoodies && isChatOpen
-                ? "none"
-                : "1440px",
+            maxWidth:
+              isFullScreenPage || isExplorePage
+                ? "100%"
+                : isFoodies && isChatOpen
+                  ? "none"
+                  : "1440px",
             marginLeft: isFoodies && isChatOpen ? "0" : "auto",
             marginRight: isFoodies && isChatOpen ? "0" : "auto",
             paddingBottom: "0",
@@ -272,7 +301,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
         >
           {children}
         </Column>
-        {!isFoodies && <AppStatusBar />}
+        {!isFoodies && !isExplorePage && <AppStatusBar />}
       </Column>
 
       {/* 3. RIGHT SIDEBAR */}
@@ -293,13 +322,17 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
           paddingRight: "0",
           transition: "all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)",
           overflow: "hidden",
-          paddingTop: isFullScreenPage || isFoodies ? "0" : "24px",
-          paddingBottom: isFullScreenPage || isFoodies ? "0" : "24px",
+          paddingTop:
+            isFullScreenPage || isFoodies || isExplorePage ? "0" : "24px",
+          paddingBottom:
+            isFullScreenPage || isFoodies || isExplorePage ? "0" : "24px",
           borderLeftWidth:
-            isFullScreenPage || (isFoodies && !isChatOpen) ? "0" : "1px",
+            isFullScreenPage || isExplorePage || (isFoodies && !isChatOpen)
+              ? "0"
+              : "1px",
           borderLeftStyle: "solid",
           borderLeftColor:
-            isFullScreenPage || (isFoodies && !isChatOpen)
+            isFullScreenPage || isExplorePage || (isFoodies && !isChatOpen)
               ? "transparent"
               : "rgba(0,0,0,0.06)",
         }}

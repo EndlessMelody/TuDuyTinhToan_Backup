@@ -1,5 +1,5 @@
 """
-Culture Service — Culinary Culture Guide powered by Groq LLM.
+Culture Service — Culinary Culture Guide powered by an OpenAI-compatible LLM API.
 
 Identifies food by name or image, then generates a rich cultural story
 personalized to the user's taste profile.
@@ -7,8 +7,8 @@ personalized to the user's taste profile.
 
 import json
 import logging
-import os
-import base64
+import re
+import unicodedata
 import urllib.parse
 from typing import Optional
 
@@ -18,9 +18,49 @@ from src.core.config import settings
 log = logging.getLogger(__name__)
 
 GROQ_API_KEY: str = settings.GROQ_API_KEY
-GROQ_MODEL: str = settings.GROQ_MODEL
+CULTURE_TEXT_MODEL: str = settings.CULTURE_TEXT_MODEL
 GROQ_VISION_MODEL: str = settings.GROQ_VISION_MODEL
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+BANNED_QUERY_TERMS = {
+    "weed",
+    "marijuana",
+    "cannabis",
+    "ganja",
+    "pot",
+    "hash",
+    "hashish",
+    "joint",
+    "blunt",
+    "cigarette",
+    "cigarettes",
+    "cirgarette",
+    "tobacco",
+    "nicotine",
+    "vape",
+    "vaping",
+    "smoking",
+    "thuoc la",
+    "thuocla",
+    "can sa",
+    "cansa",
+}
+
+if settings.CULTURE_BANNED_TERMS_EXTRA:
+    for raw_term in settings.CULTURE_BANNED_TERMS_EXTRA.split(","):
+        term = raw_term.strip().lower()
+        if term:
+            BANNED_QUERY_TERMS.add(term)
+
+VISION_IDENTIFY_INSTRUCTION = (
+    "Identify the main food dish in this image. "
+    "If the image shows tobacco, cigarette, vape, cannabis/weed, or non-food items, "
+    "set is_banned=true for tobacco/cigarette/vape/cannabis/weed, otherwise false. "
+    "If item is banned or non-food, return food_name=Unknown with confidence=0.0. "
+    "Return strict JSON only: "
+    '{"food_name": "English name", "food_name_local": "Vietnamese name or null", '
+    '"confidence": 0.0-1.0, "is_banned": false}'
+)
 
 
 def _groq_headers() -> dict:
@@ -28,6 +68,33 @@ def _groq_headers() -> dict:
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json",
     }
+
+
+def _normalize_policy_text(text: str) -> str:
+    normalized = unicodedata.normalize("NFKD", text.lower())
+    no_diacritics = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    cleaned = re.sub(r"[^a-z0-9\s]", " ", no_diacritics)
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def contains_banned_content(*texts: Optional[str]) -> tuple[bool, Optional[str]]:
+    """
+    Check whether any provided text contains blocked topics (weed/cigarette/tobacco).
+    Returns (is_blocked, matched_term).
+    """
+    for raw_text in texts:
+        if not raw_text:
+            continue
+
+        normalized = _normalize_policy_text(raw_text)
+        if not normalized:
+            continue
+
+        for term in BANNED_QUERY_TERMS:
+            if re.search(rf"\\b{re.escape(term)}\\b", normalized):
+                return True, term
+
+    return False, None
 
 
 async def _fetch_wikipedia_context(food_name: str, language: str = "vi") -> str:
@@ -64,17 +131,22 @@ async def identify_food_from_image(
     language: str = "vi",
 ) -> dict:
     """
-    Use Groq vision model to identify a dish from an image.
-    Returns {"food_name": str, "confidence": float, "food_name_local": str}
+    Use the configured vision model to identify a dish from an image.
+    Returns {
+        "food_name": str,
+        "confidence": float,
+        "food_name_local": str,
+        "is_banned": bool,
+    }
     """
     if not GROQ_API_KEY:
-        return {"food_name": "Unknown", "confidence": 0.0}
+        return {"food_name": "Unknown", "confidence": 0.0, "is_banned": False}
 
     # Build image content for vision model
     image_content = []
     if image_url:
         image_content = [
-            {"type": "text", "text": "Identify the Vietnamese/Asian dish in this image. Return JSON: {\"food_name\": \"English name\", \"food_name_local\": \"Vietnamese name\", \"confidence\": 0.0-1.0}"},
+            {"type": "text", "text": VISION_IDENTIFY_INSTRUCTION},
             {"type": "image_url", "image_url": {"url": image_url}},
         ]
     elif image_base64:
@@ -91,7 +163,7 @@ async def identify_food_from_image(
             image_base64_clean = image_base64
 
         image_content = [
-            {"type": "text", "text": "Identify the Vietnamese/Asian dish in this image. Return JSON: {\"food_name\": \"English name\", \"food_name_local\": \"Vietnamese name\", \"confidence\": 0.0-1.0}"},
+            {"type": "text", "text": VISION_IDENTIFY_INSTRUCTION},
             {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{image_base64_clean}"}},
         ]
 
@@ -110,14 +182,21 @@ async def identify_food_from_image(
             result = resp.json()
             raw = result["choices"][0]["message"]["content"].strip()
             parsed = json.loads(raw)
+            is_banned_raw = parsed.get("is_banned", False)
+            is_banned = (
+                is_banned_raw.strip().lower() in {"1", "true", "yes"}
+                if isinstance(is_banned_raw, str)
+                else bool(is_banned_raw)
+            )
             return {
                 "food_name": parsed.get("food_name", "Unknown"),
                 "food_name_local": parsed.get("food_name_local"),
                 "confidence": float(parsed.get("confidence", 0.5)),
+                "is_banned": is_banned,
             }
     except Exception as exc:
         log.warning(f"[Culture] Vision identification failed: {exc}")
-        return {"food_name": "Unknown", "confidence": 0.0}
+        return {"food_name": "Unknown", "confidence": 0.0, "is_banned": False}
 
 
 def parse_food_vector(vector: list | None) -> dict:
@@ -165,7 +244,7 @@ async def generate_culture_story(
     user_taste_profile: Optional[dict] = None,
 ) -> dict:
     """
-    Generate a rich cultural story about a dish using Groq LLM.
+    Generate a rich cultural story about a dish using the configured text model.
     Personalized based on the user's taste profile if available.
     """
 
@@ -236,7 +315,7 @@ Return a JSON object with this exact structure:
 }}"""
 
     body = {
-        "model": GROQ_MODEL,
+        "model": CULTURE_TEXT_MODEL,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.5,
         "max_tokens": 3000,

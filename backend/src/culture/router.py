@@ -11,9 +11,27 @@ from src.db.database import get_db
 from src.core.dependencies import get_current_user_id
 from src.users.models import User
 from src.culture.schemas import CultureQuery, CultureStoryResponse, CultureStorySection
-from src.culture.service import identify_food_from_image, generate_culture_story, parse_food_vector
+from src.culture.service import (
+    identify_food_from_image,
+    generate_culture_story,
+    parse_food_vector,
+    contains_banned_content,
+)
 
 router = APIRouter()
+
+
+def _reject_banned_food_query(*texts: str | None) -> None:
+    blocked, term = contains_banned_content(*texts)
+    if blocked:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "This query is not allowed in Culture Guide. "
+                "Requests related to weed/cigarette/tobacco/vape are blocked. "
+                f"(matched term: {term})"
+            ),
+        )
 
 
 @router.post("/story", response_model=CultureStoryResponse)
@@ -23,6 +41,8 @@ async def get_culture_story_by_name(
     user_id: int = Depends(get_current_user_id),
 ):
     """Generate a cultural story for a food item by name."""
+    _reject_banned_food_query(query.food_name)
+
     user = await db.get(User, user_id)
     taste_profile = parse_food_vector(user.food_vector) if user else None
 
@@ -55,12 +75,23 @@ async def identify_and_story(
         language=language,
     )
 
+    if identification.get("is_banned"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "The uploaded image appears to contain a banned item "
+                "(weed/cigarette/tobacco/vape), so it cannot be processed."
+            ),
+        )
+
     food_name = identification.get("food_name", "Unknown")
     if food_name == "Unknown":
         raise HTTPException(
             status_code=422,
             detail="Could not identify the dish from the image. Try a clearer photo or use text search.",
         )
+
+    _reject_banned_food_query(food_name, identification.get("food_name_local"))
 
     # Step 2: Generate the story
     result = await generate_culture_story(
@@ -96,12 +127,23 @@ async def identify_from_upload(
         language=language,
     )
 
+    if identification.get("is_banned"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "The uploaded image appears to contain a banned item "
+                "(weed/cigarette/tobacco/vape), so it cannot be processed."
+            ),
+        )
+
     food_name = identification.get("food_name", "Unknown")
     if food_name == "Unknown":
         raise HTTPException(
             status_code=422,
             detail="Could not identify the dish from the image. Try a clearer photo or use text search.",
         )
+
+    _reject_banned_food_query(food_name, identification.get("food_name_local"))
 
     # Step 2: Story
     result = await generate_culture_story(

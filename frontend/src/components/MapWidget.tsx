@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useEffect, useId, useMemo, useSyncExternalStore } from "react";
+import React, {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 import {
   MapContainer,
   TileLayer,
@@ -57,35 +63,47 @@ function ChangeView({
   zoom: number;
 }) {
   const map = useMap();
+  const previousCenterRef = useRef<[number, number]>(center);
+  const previousZoomRef = useRef<number>(zoom);
+
   useEffect(() => {
     if (!map) return;
 
-    // Safety check: wait for the next frame to ensure the DOM is stable
-    const timer = setTimeout(() => {
+    const isSameCenter =
+      Math.abs(previousCenterRef.current[0] - center[0]) < 1e-7 &&
+      Math.abs(previousCenterRef.current[1] - center[1]) < 1e-7;
+    const isSameZoom = Math.abs(previousZoomRef.current - zoom) < 1e-7;
+
+    if (isSameCenter && isSameZoom) {
+      return;
+    }
+
+    const raf = window.requestAnimationFrame(() => {
       try {
-        const container = map.getContainer();
-        if (
-          !container ||
-          !(
-            "_leaflet_pos" in
-            (container as HTMLElement & Record<string, unknown>)
-          )
-        ) {
-          // If the container is not fully initialized, skip this frame
-          return;
+        map.getContainer();
+
+        map.stop();
+
+        if (isSameCenter && !isSameZoom) {
+          map.setZoom(zoom, { animate: true });
+        } else if (!isSameCenter) {
+          map.flyTo(center, zoom, {
+            animate: true,
+            duration: 0.55,
+            easeLinearity: 0.2,
+          });
         }
 
-        map.flyTo(center, zoom, {
-          animate: true,
-          duration: 0.8,
-        });
+        previousCenterRef.current = center;
+        previousZoomRef.current = zoom;
       } catch (e) {
         console.warn("Leaflet transition safely skipped:", e);
       }
-    }, 50);
+    });
 
-    return () => clearTimeout(timer);
+    return () => window.cancelAnimationFrame(raf);
   }, [center, zoom, map]);
+
   return null;
 }
 
@@ -94,6 +112,9 @@ interface MapWidgetProps {
   points?: [number, number][];
   center?: [number, number];
   zoom?: number;
+  minZoom?: number;
+  maxZoom?: number;
+  userLocation?: [number, number] | null;
   showBanner?: boolean;
 }
 
@@ -102,6 +123,9 @@ export default function MapWidget({
   points = [],
   center = [10.897, 106.772],
   zoom = 14,
+  minZoom = 3,
+  maxZoom = 19,
+  userLocation = null,
   showBanner = true,
 }: MapWidgetProps) {
   // ─── CRITICAL STABILITY LAYER ───
@@ -118,6 +142,7 @@ export default function MapWidget({
 
   const pulseIcon = useMemo(() => createPulseIcon("#ff6b35"), []);
   const activePulseIcon = useMemo(() => createPulseIcon("#FF2D55"), []);
+  const userPulseIcon = useMemo(() => createPulseIcon("#0A84FF"), []);
 
   // Return a stable placeholder if not mounted or in a transition state
   if (!isMounted) {
@@ -148,6 +173,10 @@ export default function MapWidget({
         key={instanceKey} // FORCE A FRESH DOM ATOM TO PREVENT REUSE ERRORS
         center={center}
         zoom={zoom}
+        minZoom={minZoom}
+        maxZoom={maxZoom}
+        zoomSnap={0.25}
+        zoomDelta={0.25}
         scrollWheelZoom={false}
         style={{ height: "100%", width: "100%", backgroundColor: "#F8FAFF" }}
         zoomControl={false}
@@ -159,7 +188,7 @@ export default function MapWidget({
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          maxZoom={19}
+          maxZoom={maxZoom}
         />
 
         {/* Existing Route Connections - Safely mapped with static key */}
@@ -185,6 +214,15 @@ export default function MapWidget({
             icon={idx === points.length - 1 ? activePulseIcon : pulseIcon}
           />
         ))}
+
+        {/* User marker */}
+        {userLocation && (
+          <Marker
+            key={`${instanceKey}-user-${userLocation[0]}-${userLocation[1]}`}
+            position={userLocation}
+            icon={userPulseIcon}
+          />
+        )}
 
         {/* Base center marker if no points */}
         {points.length === 0 && (
