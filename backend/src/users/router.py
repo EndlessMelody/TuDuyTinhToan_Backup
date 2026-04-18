@@ -54,7 +54,7 @@ async def upload_image_to_supabase(file: UploadFile, folder: str, user_id: int) 
     "/me",
     response_model=UserMe,
     summary="Cập nhật profile",
-    description="Chỉ gửi fields cần thay đổi."
+    description="Chỉ gửi fields cần thay đổi. Ảnh upload qua /api/v1/media/upload rồi truyền URL vào đây."
 )
 async def update_me(
     display_name: str | None = Form(None),
@@ -62,8 +62,12 @@ async def update_me(
     bio: str | None = Form(None),
     location: str | None = Form(None),
     phone: str | None = Form(None),
+    # Legacy: nhận file trực tiếp (Supabase Storage)
     avatar_file: UploadFile | None = File(None),
     cover_file: UploadFile | None = File(None),
+    # New: nhận URL sau khi đã upload qua /api/v1/media/upload
+    avatar_url: str | None = Form(None),
+    cover_url: str | None = Form(None),
     user_id: int = Depends(get_current_user_id),
     service: UserService = Depends(get_user_service)
 ):
@@ -73,14 +77,19 @@ async def update_me(
     if bio is not None: update_data["bio"] = bio
     if location is not None: update_data["location"] = location
     if phone is not None: update_data["phone"] = phone
-    
-    if avatar_file is not None:
-        avatar_url = await upload_image_to_supabase(avatar_file, "avatars", user_id)
+
+    # Priority: URL string > file upload
+    if avatar_url is not None:
         update_data["avatar_url"] = avatar_url
-        
-    if cover_file is not None:
-        cover_url = await upload_image_to_supabase(cover_file, "covers", user_id)
+    elif avatar_file is not None:
+        _avatar_url = await upload_image_to_supabase(avatar_file, "avatars", user_id)
+        update_data["avatar_url"] = _avatar_url
+
+    if cover_url is not None:
         update_data["cover_url"] = cover_url
+    elif cover_file is not None:
+        _cover_url = await upload_image_to_supabase(cover_file, "covers", user_id)
+        update_data["cover_url"] = _cover_url
 
     body = UserUpdate(**update_data)
     return await service.update_me(user_id, body)

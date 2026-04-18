@@ -61,7 +61,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { useUserVector } from "@/context/UserVectorContext";
 import { CreatePostModal } from "@/components/modals/CreatePostModal";
-import { apiGet } from "@/lib/api";
+import { apiGet, apiUploadMedia, ApiError } from "@/lib/api";
 
 // ═══════════ PROFILE PAGE ═══════════ //
 
@@ -107,6 +107,34 @@ const StatItem = ({
   </motion.div>
 );
 
+// ─── Friend item from /api/v1/friends/foodies ───
+interface FriendItem {
+  id: number;
+  username: string;
+  display_name?: string | null;
+  avatar_url?: string | null;
+  bio?: string | null;
+  location?: string | null;
+  title?: string | null;
+  match_score: number;
+  friendship_id?: number | null;
+}
+
+// ─── Type for a single post/review item ───
+interface PostItem {
+  id: number;
+  user?: { id: number; display_name?: string; avatar_url?: string };
+  location?: { id: number; name: string };
+  review: string;
+  rating?: number | null;
+  image_url?: string | null;
+  tags?: string[] | null;
+  likes_count: number;
+  comments_count: number;
+  is_liked: boolean;
+  created_at?: string;
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -119,7 +147,11 @@ export default function ProfilePage() {
   const { user, loading, refetch } = useAuth();
   const { radarData } = useUserVector();
   const [totalBadges, setTotalBadges] = useState<number>(0);
-  const [friendsList, setFriendsList] = useState<any[]>([]);
+  const [friendsList, setFriendsList] = useState<FriendItem[]>([]);
+  const [friendsLoading, setFriendsLoading] = useState(false);
+  const [userPosts, setUserPosts] = useState<PostItem[]>([]);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [postsTotal, setPostsTotal] = useState(0);
 
   React.useEffect(() => {
     const fetchTotalBadges = async () => {
@@ -135,15 +167,39 @@ export default function ProfilePage() {
 
   React.useEffect(() => {
     const fetchFriends = async () => {
+      setFriendsLoading(true);
       try {
-        const data = await apiGet<{ items: any[] }>("/api/v1/social/foodies");
+        // /api/v1/friends/foodies — bạn bè accepted + taste match score
+        const data = await apiGet<{ items: FriendItem[] }>("/api/v1/friends/foodies");
         setFriendsList(data?.items || []);
       } catch (err) {
         console.error("Failed to fetch friends", err);
+      } finally {
+        setFriendsLoading(false);
       }
     };
     fetchFriends();
   }, []);
+
+  // Fetch user's posts/reviews from backend
+  React.useEffect(() => {
+    if (!user?.id) return;
+    const fetchUserPosts = async () => {
+      setPostsLoading(true);
+      try {
+        const data = await apiGet<{ items: PostItem[]; total: number }>(
+          `/api/v1/posts/?user_id=${user.id}&limit=50&offset=0`
+        );
+        setUserPosts(data?.items || []);
+        setPostsTotal(data?.total || 0);
+      } catch (err) {
+        console.error("Failed to fetch user posts", err);
+      } finally {
+        setPostsLoading(false);
+      }
+    };
+    fetchUserPosts();
+  }, [user?.id]);
 
   // Form state
   const [formName, setFormName] = useState("");
@@ -207,9 +263,9 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const validTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    const validTypes = ["image/jpeg", "image/png", "image/webp"];
     if (!validTypes.includes(file.type)) {
-      toast.error("Cover must be JPEG, PNG, WEBP, or GIF.");
+      toast.error("Cover must be JPEG, PNG, or WEBP.");
       if (coverInputRef.current) coverInputRef.current.value = "";
       return;
     }
@@ -233,16 +289,46 @@ export default function ProfilePage() {
       } = await supabase.auth.getSession();
       if (!session) throw new Error("No session found");
 
+      // ── Step 1: Upload media files via /api/v1/media/upload ──
+      let uploadedAvatarUrl: string | undefined;
+      let uploadedCoverUrl: string | undefined;
+
+      if (avatarFile) {
+        try {
+          const result = await apiUploadMedia(avatarFile, "avatar");
+          uploadedAvatarUrl = result.url;
+        } catch (uploadErr) {
+          const msg = uploadErr instanceof ApiError
+            ? `Avatar upload failed: ${uploadErr.message}`
+            : "Avatar upload failed";
+          toast.error(msg);
+          // Don't abort — still patch text fields
+        }
+      }
+
+      if (coverFile) {
+        try {
+          const result = await apiUploadMedia(coverFile, "cover");
+          uploadedCoverUrl = result.url;
+        } catch (uploadErr) {
+          const msg = uploadErr instanceof ApiError
+            ? `Cover upload failed: ${uploadErr.message}`
+            : "Cover upload failed";
+          toast.error(msg);
+        }
+      }
+
+      // ── Step 2: PATCH profile with text fields + resolved URLs ──
       const formData = new FormData();
       formData.append("display_name", formName);
       formData.append("username", formUsername);
       formData.append("bio", formBio);
       formData.append("phone", formPhone);
       if (formLocation) formData.append("location", formLocation);
-      // NOTE: emails aren't naturally edited in simple patches unless your backend explicitly supports it
 
-      if (avatarFile) formData.append("avatar_file", avatarFile);
-      if (coverFile) formData.append("cover_file", coverFile);
+      // Pass URLs (not raw files) to backend
+      if (uploadedAvatarUrl) formData.append("avatar_url", uploadedAvatarUrl);
+      if (uploadedCoverUrl) formData.append("cover_url", uploadedCoverUrl);
 
       const API_URL =
         process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ??
@@ -1204,7 +1290,30 @@ export default function ProfilePage() {
                 </motion.button>
               </Row>
 
-              {friendsList.length === 0 ? (
+              {friendsLoading ? (
+                // ── Skeleton loading ──
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", flex: 1 }}>
+                  {[1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        padding: "10px 12px",
+                        borderRadius: "14px",
+                      }}
+                    >
+                      <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: "linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite", flexShrink: 0 }} />
+                      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <div style={{ height: "13px", borderRadius: "6px", background: "linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite", width: "55%" }} />
+                        <div style={{ height: "11px", borderRadius: "5px", background: "linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite", width: "75%" }} />
+                      </div>
+                    </div>
+                  ))}
+                  <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
+                </div>
+              ) : friendsList.length === 0 ? (
                 <div
                   style={{
                     flex: 1,
@@ -1232,7 +1341,7 @@ export default function ProfilePage() {
                       textAlign: "center",
                     }}
                   >
-                    No friends yet. Start exploring!
+                    Chưa có bạn bè. Bắt đầu khám phá!
                   </Text>
                   <motion.button
                     whileHover={{ scale: 1.03 }}
@@ -1257,7 +1366,7 @@ export default function ProfilePage() {
                   style={{
                     display: "flex",
                     flexDirection: "column",
-                    gap: "8px",
+                    gap: "6px",
                     flex: 1,
                   }}
                 >
@@ -1266,7 +1375,7 @@ export default function ProfilePage() {
                       key={friend.id}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.3, delay: 0.1 * i }}
+                      transition={{ duration: 0.3, delay: 0.08 * i }}
                       whileHover={{ backgroundColor: "#F9F9FB" }}
                       style={{
                         display: "flex",
@@ -1275,45 +1384,46 @@ export default function ProfilePage() {
                         padding: "10px 12px",
                         borderRadius: "14px",
                         cursor: "pointer",
-                        transition: "all 0.2s",
+                        transition: "background-color 0.2s",
                       }}
                       onClick={handleComingSoon}
                     >
-                      <img
-                        src={
-                          friend.avatar_url ||
-                          `https://i.pravatar.cc/150?u=${friend.id}`
-                        }
-                        alt={friend.display_name || friend.username}
-                        style={{
-                          width: "40px",
-                          height: "40px",
-                          borderRadius: "50%",
-                          objectFit: "cover",
-                          border: "2px solid #F2F2F7",
-                        }}
-                      />
-                      <Column style={{ flex: 1, gap: "2px" }}>
-                        <Text
+                      {/* Avatar with match-score ring */}
+                      <div style={{ position: "relative", flexShrink: 0 }}>
+                        <img
+                          src={
+                            friend.avatar_url ||
+                            `https://i.pravatar.cc/150?u=${friend.id}`
+                          }
+                          alt={friend.display_name || friend.username}
                           style={{
-                            color: "#1C1C1E",
-                            fontWeight: 600,
-                            fontSize: "0.88rem",
+                            width: "40px",
+                            height: "40px",
+                            borderRadius: "50%",
+                            objectFit: "cover",
+                            border: friend.match_score >= 80
+                              ? "2px solid #ff6b35"
+                              : "2px solid #F2F2F7",
+                            display: "block",
                           }}
-                        >
+                        />
+                      </div>
+
+                      {/* Name + subtitle */}
+                      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
+                        <span style={{ color: "#1C1C1E", fontWeight: 600, fontSize: "0.88rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           {friend.display_name || friend.username}
-                        </Text>
-                        <Text
-                          style={{
-                            color: "#8E8E93",
-                            fontSize: "0.75rem",
-                          }}
-                        >
-                          @{friend.username}
-                          {friend.match_score != null &&
-                            ` · ${friend.match_score}% match`}
-                        </Text>
-                      </Column>
+                        </span>
+                        <span style={{ color: "#8E8E93", fontSize: "0.72rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {friend.title
+                            ? `${friend.title}`
+                            : friend.location
+                            ? `📍 ${friend.location}`
+                            : `@${friend.username}`}
+                        </span>
+                      </div>
+
+                      {/* Match score badge */}
                       <div
                         style={{
                           padding: "4px 10px",
@@ -1322,23 +1432,22 @@ export default function ProfilePage() {
                             friend.match_score >= 80
                               ? "linear-gradient(135deg, #FFF0E6, #FFE8D6)"
                               : "#F2F2F7",
+                          flexShrink: 0,
                         }}
                       >
-                        <Text
+                        <span
                           style={{
-                            color:
-                              friend.match_score >= 80
-                                ? "#ff6b35"
-                                : "#8E8E93",
+                            color: friend.match_score >= 80 ? "#ff6b35" : "#8E8E93",
                             fontWeight: 700,
                             fontSize: "0.75rem",
                           }}
                         >
-                          {friend.match_score ?? 0}%
-                        </Text>
+                          {friend.match_score}%
+                        </span>
                       </div>
                     </motion.div>
                   ))}
+
                   {friendsList.length > 5 && (
                     <motion.button
                       whileHover={{ scale: 1.02 }}
@@ -1347,16 +1456,17 @@ export default function ProfilePage() {
                       style={{
                         marginTop: "4px",
                         background: "#F9F9FB",
-                        border: "none",
+                        border: "1px solid #F2F2F7",
                         padding: "10px",
                         borderRadius: "12px",
                         color: "#ff6b35",
                         fontWeight: 600,
-                        fontSize: "0.85rem",
+                        fontSize: "0.82rem",
                         cursor: "pointer",
+                        width: "100%",
                       }}
                     >
-                      View all {friendsList.length} friends
+                      Xem tất cả {friendsList.length} bạn bè
                     </motion.button>
                   )}
                 </div>
@@ -2027,14 +2137,221 @@ export default function ProfilePage() {
               transition={{ duration: 0.2 }}
             >
               {activeTab === "Posts" && (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "center",
-                    padding: "40px",
-                  }}
-                >
-                  <Text style={{ color: "#8E8E93" }}>No posts yet.</Text>
+                <div>
+                  {postsLoading ? (
+                    // ── Skeleton grid ──
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                        gap: "20px",
+                      }}
+                    >
+                      {[1, 2, 3, 4].map((i) => (
+                        <div
+                          key={i}
+                          style={{
+                            borderRadius: "20px",
+                            overflow: "hidden",
+                            border: "1px solid #F2F2F7",
+                            background: "#FAFAFA",
+                          }}
+                        >
+                          <div
+                            style={{
+                              height: "160px",
+                              background: "linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)",
+                              backgroundSize: "200% 100%",
+                              animation: "shimmer 1.5s infinite",
+                            }}
+                          />
+                          <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                            <div style={{ height: "14px", borderRadius: "7px", background: "linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite", width: "60%" }} />
+                            <div style={{ height: "12px", borderRadius: "6px", background: "linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite", width: "90%" }} />
+                            <div style={{ height: "12px", borderRadius: "6px", background: "linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite", width: "75%" }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : userPosts.length === 0 ? (
+                    // ── Empty state ──
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "64px 40px",
+                        gap: "16px",
+                        background: "#FAFAFA",
+                        borderRadius: "24px",
+                        border: "2px dashed #FFE8D6",
+                      }}
+                    >
+                      <div style={{ opacity: 0.25 }}>
+                        <ImageIcon size={48} color="#ff6b35" />
+                      </div>
+                      <Text style={{ color: "#8E8E93", fontWeight: 600, fontSize: "0.95rem" }}>
+                        Chưa có bài đăng nào
+                      </Text>
+                      <Text style={{ color: "#C7C7CC", fontSize: "0.8rem", textAlign: "center" }}>
+                        Chia sẻ trải nghiệm ẩm thực đầu tiên của bạn!
+                      </Text>
+                    </div>
+                  ) : (
+                    // ── Posts grid ──
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                        gap: "20px",
+                      }}
+                    >
+                      {userPosts.map((post, idx) => (
+                        <motion.div
+                          key={post.id}
+                          initial={{ opacity: 0, y: 16 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3, delay: idx * 0.05 }}
+                          style={{
+                            borderRadius: "20px",
+                            overflow: "hidden",
+                            border: "1px solid #F2F2F7",
+                            background: "#FFFFFF",
+                            boxShadow: "0 4px 16px rgba(0,0,0,0.04)",
+                            cursor: "pointer",
+                            transition: "box-shadow 0.2s, transform 0.2s",
+                          }}
+                          whileHover={{ y: -4, boxShadow: "0 12px 32px rgba(255,107,53,0.12)" }}
+                        >
+                          {/* Post image */}
+                          {post.image_url ? (
+                            <div style={{ position: "relative", height: "180px", overflow: "hidden" }}>
+                              <img
+                                src={post.image_url}
+                                alt="post"
+                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                              />
+                              {post.rating != null && (
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    top: "10px",
+                                    right: "10px",
+                                    background: "rgba(255,107,53,0.9)",
+                                    backdropFilter: "blur(8px)",
+                                    borderRadius: "10px",
+                                    padding: "4px 10px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                  }}
+                                >
+                                  <Star size={12} color="white" fill="white" />
+                                  <span style={{ color: "white", fontSize: "0.8rem", fontWeight: 700 }}>
+                                    {post.rating.toFixed(1)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div
+                              style={{
+                                height: "120px",
+                                background: "linear-gradient(135deg, #FFF5F0, #FFE8D6)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                            >
+                              <Utensils size={32} color="#FFB399" />
+                            </div>
+                          )}
+
+                          {/* Post body */}
+                          <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                            {/* Location */}
+                            {post.location && (
+                              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                <MapPin size={12} color="#ff6b35" />
+                                <span style={{ color: "#ff6b35", fontSize: "0.75rem", fontWeight: 600 }}>
+                                  {post.location.name}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Review text */}
+                            <p
+                              style={{
+                                color: "#1C1C1E",
+                                fontSize: "0.875rem",
+                                lineHeight: 1.5,
+                                margin: 0,
+                                display: "-webkit-box",
+                                WebkitLineClamp: 3,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                              }}
+                            >
+                              {post.review}
+                            </p>
+
+                            {/* Tags */}
+                            {post.tags && post.tags.length > 0 && (
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                                {post.tags.slice(0, 3).map((tag) => (
+                                  <span
+                                    key={tag}
+                                    style={{
+                                      backgroundColor: "#FFF5F0",
+                                      color: "#ff6b35",
+                                      fontSize: "0.7rem",
+                                      fontWeight: 600,
+                                      padding: "3px 8px",
+                                      borderRadius: "6px",
+                                      border: "1px solid #FFE8D6",
+                                    }}
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Footer: likes, comments, date */}
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                borderTop: "1px solid #F2F2F7",
+                                paddingTop: "10px",
+                                marginTop: "4px",
+                              }}
+                            >
+                              <div style={{ display: "flex", gap: "12px" }}>
+                                <span style={{ display: "flex", alignItems: "center", gap: "4px", color: "#8E8E93", fontSize: "0.75rem" }}>
+                                  <Heart size={13} color={post.is_liked ? "#ff6b35" : "#C7C7CC"} fill={post.is_liked ? "#ff6b35" : "none"} />
+                                  {post.likes_count}
+                                </span>
+                                <span style={{ display: "flex", alignItems: "center", gap: "4px", color: "#8E8E93", fontSize: "0.75rem" }}>
+                                  <MessageCircle size={13} color="#C7C7CC" />
+                                  {post.comments_count}
+                                </span>
+                              </div>
+                              {post.created_at && (
+                                <span style={{ color: "#C7C7CC", fontSize: "0.7rem" }}>
+                                  {new Date(post.created_at).toLocaleDateString("vi-VN", { day: "numeric", month: "short" })}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                  {/* Shimmer keyframe */}
+                  <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
                 </div>
               )}
 
@@ -2077,17 +2394,227 @@ export default function ProfilePage() {
                 </Column>
               )}
 
-              {activeTab === "Reviews" && (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "center",
-                    padding: "40px",
-                  }}
-                >
-                  <Text style={{ color: "#8E8E93" }}>No reviews yet.</Text>
-                </div>
-              )}
+              {activeTab === "Reviews" && (() => {
+                const reviews = userPosts.filter((p) => p.rating != null);
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    {/* Header summary */}
+                    {reviews.length > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "12px",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            background: "linear-gradient(135deg, #ff6b35, #ff8c5a)",
+                            padding: "8px 16px",
+                            borderRadius: "12px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                          }}
+                        >
+                          <Star size={14} color="white" fill="white" />
+                          <span style={{ color: "white", fontWeight: 700, fontSize: "0.85rem" }}>
+                            {reviews.length} đánh giá
+                          </span>
+                        </div>
+                        <span style={{ color: "#8E8E93", fontSize: "0.8rem" }}>
+                          Điểm trung bình:{" "}
+                          <strong style={{ color: "#ff6b35" }}>
+                            {(reviews.reduce((s, r) => s + (r.rating ?? 0), 0) / reviews.length).toFixed(1)}
+                          </strong>
+                          {" "}/ 5
+                        </span>
+                      </div>
+                    )}
+
+                    {postsLoading ? (
+                      // ── Skeleton list ──
+                      [1, 2, 3].map((i) => (
+                        <div
+                          key={i}
+                          style={{
+                            borderRadius: "18px",
+                            border: "1px solid #F2F2F7",
+                            padding: "20px",
+                            background: "#FAFAFA",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "10px",
+                          }}
+                        >
+                          <div style={{ height: "16px", borderRadius: "8px", background: "linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite", width: "40%" }} />
+                          <div style={{ height: "13px", borderRadius: "6px", background: "linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite", width: "85%" }} />
+                          <div style={{ height: "13px", borderRadius: "6px", background: "linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite", width: "70%" }} />
+                        </div>
+                      ))
+                    ) : reviews.length === 0 ? (
+                      // ── Empty state ──
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          padding: "64px 40px",
+                          gap: "16px",
+                          background: "#FAFAFA",
+                          borderRadius: "24px",
+                          border: "2px dashed #FFE8D6",
+                        }}
+                      >
+                        <div style={{ opacity: 0.25 }}>
+                          <Star size={48} color="#ff6b35" />
+                        </div>
+                        <Text style={{ color: "#8E8E93", fontWeight: 600, fontSize: "0.95rem" }}>
+                          Chưa có đánh giá nào
+                        </Text>
+                        <Text style={{ color: "#C7C7CC", fontSize: "0.8rem", textAlign: "center" }}>
+                          Đăng bài với rating để thấy reviews tại đây!
+                        </Text>
+                      </div>
+                    ) : (
+                      // ── Review rows ──
+                      reviews.map((review, idx) => (
+                        <motion.div
+                          key={review.id}
+                          initial={{ opacity: 0, x: -12 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.25, delay: idx * 0.05 }}
+                          style={{
+                            borderRadius: "18px",
+                            border: "1px solid #F2F2F7",
+                            padding: "20px 24px",
+                            background: "#FFFFFF",
+                            boxShadow: "0 2px 12px rgba(0,0,0,0.03)",
+                            display: "flex",
+                            gap: "16px",
+                            alignItems: "flex-start",
+                            cursor: "pointer",
+                            transition: "box-shadow 0.2s",
+                          }}
+                        >
+                          {/* Image thumbnail */}
+                          {review.image_url ? (
+                            <img
+                              src={review.image_url}
+                              alt="review"
+                              style={{
+                                width: "72px",
+                                height: "72px",
+                                borderRadius: "12px",
+                                objectFit: "cover",
+                                flexShrink: 0,
+                                border: "1px solid #F2F2F7",
+                              }}
+                            />
+                          ) : (
+                            <div
+                              style={{
+                                width: "72px",
+                                height: "72px",
+                                borderRadius: "12px",
+                                background: "linear-gradient(135deg, #FFF5F0, #FFE8D6)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <Utensils size={24} color="#FFB399" />
+                            </div>
+                          )}
+
+                          {/* Review content */}
+                          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "6px" }}>
+                            {/* Top row: location + rating + date */}
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                {review.location && (
+                                  <span style={{ display: "flex", alignItems: "center", gap: "3px", color: "#1C1C1E", fontWeight: 700, fontSize: "0.9rem" }}>
+                                    <MapPin size={13} color="#ff6b35" />
+                                    {review.location.name}
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                {/* Star rating */}
+                                <div style={{ display: "flex", gap: "2px" }}>
+                                  {[1, 2, 3, 4, 5].map((s) => (
+                                    <Star
+                                      key={s}
+                                      size={14}
+                                      color="#ff6b35"
+                                      fill={s <= Math.round(review.rating ?? 0) ? "#ff6b35" : "none"}
+                                    />
+                                  ))}
+                                </div>
+                                <span style={{ color: "#ff6b35", fontWeight: 700, fontSize: "0.85rem" }}>
+                                  {(review.rating ?? 0).toFixed(1)}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Review text */}
+                            <p
+                              style={{
+                                color: "#636366",
+                                fontSize: "0.875rem",
+                                lineHeight: 1.55,
+                                margin: 0,
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                              }}
+                            >
+                              {review.review}
+                            </p>
+
+                            {/* Tags + footer */}
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "4px" }}>
+                              <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
+                                {(review.tags ?? []).slice(0, 2).map((tag) => (
+                                  <span
+                                    key={tag}
+                                    style={{
+                                      backgroundColor: "#FFF5F0",
+                                      color: "#ff6b35",
+                                      fontSize: "0.68rem",
+                                      fontWeight: 600,
+                                      padding: "2px 8px",
+                                      borderRadius: "6px",
+                                      border: "1px solid #FFE8D6",
+                                    }}
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                <span style={{ display: "flex", alignItems: "center", gap: "3px", color: "#C7C7CC", fontSize: "0.72rem" }}>
+                                  <Heart size={12} color={review.is_liked ? "#ff6b35" : "#C7C7CC"} fill={review.is_liked ? "#ff6b35" : "none"} />
+                                  {review.likes_count}
+                                </span>
+                                {review.created_at && (
+                                  <span style={{ color: "#C7C7CC", fontSize: "0.72rem" }}>
+                                    {new Date(review.created_at).toLocaleDateString("vi-VN", { day: "numeric", month: "short", year: "numeric" })}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))
+                    )}
+                  </div>
+                );
+              })()}
 
               {activeTab === "Visited" && (
                 <Column
