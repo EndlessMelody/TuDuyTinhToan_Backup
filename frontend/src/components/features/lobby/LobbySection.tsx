@@ -26,13 +26,7 @@ export default function LobbySection({ lobbies }: LobbySectionProps) {
 
   const handleLobbyClick = (lobby: LobbyData) => {
     const isJoined = Boolean(
-      user &&
-      lobby.members.some(
-        (m) =>
-          m.user_id === user.id ||
-          m.name === user.username ||
-          m.name === user.display_name,
-      ),
+      user && lobby.members.some((m) => m.user_id === user.id)
     );
     if (isJoined && lobby.id) {
       router.push(`/group-rooms/${lobby.id}`);

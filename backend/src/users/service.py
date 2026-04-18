@@ -15,6 +15,7 @@ from src.posts.models import Post
 from src.bookmarks.models import Bookmark
 from src.social.models import Friendship
 from src.gamification.models import UserBadge, Badge
+from src.challenges.xp_service import compute_level_progress
 
 
 class UserService:
@@ -57,12 +58,23 @@ class UserService:
 
     async def _get_badges(self, user_id: int) -> List[BadgeSummary]:
         result = await self.db.execute(
-            select(Badge)
+            select(Badge, UserBadge.earned_at)
             .join(UserBadge, UserBadge.badge_id == Badge.id)
             .where(UserBadge.user_id == user_id)
         )
-        badges = result.scalars().all()
-        return [BadgeSummary(icon=b.icon, label=b.label, color=b.color) for b in badges]
+        rows = result.all()
+        return [
+            BadgeSummary(
+                id=b.id,
+                name=b.name,
+                description=b.description,
+                icon_name=b.icon_name,
+                rarity=b.rarity,
+                accent_color=b.accent_color,
+                is_hidden=b.is_hidden,
+                earned_at=earned_at
+            ) for b, earned_at in rows
+        ]
 
     # ─── Public API ───────────────────────────────────────────────────────
 
@@ -73,6 +85,7 @@ class UserService:
         user = await self._get_user_or_404(user_id)
         stats = await self._compute_stats(user_id)
         badges = await self._get_badges(user_id)
+        progress = await compute_level_progress(self.db, user)
         return UserProfile(
             id=user.id,
             username=user.username,
@@ -82,8 +95,10 @@ class UserService:
             cover_url=user.cover_url,
             location=user.location,
             title=user.title,
-            xp=user.xp,
-            level=user.level,
+            xp=progress["xp_in_level"],
+            level=user.level or 1,
+            next_level_xp=progress["xp_for_level"],
+            total_xp_earned=user.total_xp_earned or 0,
             created_at=user.created_at,
             stats=stats,
             badges=badges,
@@ -93,6 +108,7 @@ class UserService:
         user = await self._get_user_or_404(user_id)
         stats = await self._compute_stats(user_id)
         badges = await self._get_badges(user_id)
+        progress = await compute_level_progress(self.db, user)
         return UserMe(
             id=user.id,
             username=user.username,
@@ -104,8 +120,10 @@ class UserService:
             location=user.location,
             title=user.title,
             phone=user.phone,
-            xp=user.xp,
-            level=user.level,
+            xp=progress["xp_in_level"],
+            level=user.level or 1,
+            next_level_xp=progress["xp_for_level"],
+            total_xp_earned=user.total_xp_earned or 0,
             food_vector=list(user.food_vector) if user.food_vector is not None else None,
             place_vector=list(user.place_vector) if user.place_vector is not None else None,
             settings=user.settings or {},
@@ -292,7 +310,6 @@ class UserService:
             avatar_url=avatar_url,
             food_vector=[0.5] * 15,
             place_vector=[0.5] * 15,
-            xp=0,
             level=1
         )
         self.db.add(new_user)

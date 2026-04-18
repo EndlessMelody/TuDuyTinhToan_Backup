@@ -11,6 +11,7 @@ import {
   IconButton,
   Input,
   Avatar,
+  Grid,
 } from "@/components/OnceUI";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -42,6 +43,9 @@ import {
   Link2,
   QrCode,
   Settings,
+  Shield,
+  Medal,
+  Trophy,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -57,6 +61,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { useUserVector } from "@/context/UserVectorContext";
 import { CreatePostModal } from "@/components/modals/CreatePostModal";
+import { apiGet } from "@/lib/api";
 
 // ═══════════ PROFILE PAGE ═══════════ //
 
@@ -113,6 +118,19 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState("Posts");
   const { user, loading, refetch } = useAuth();
   const { radarData } = useUserVector();
+  const [totalBadges, setTotalBadges] = useState<number>(0);
+
+  React.useEffect(() => {
+    const fetchTotalBadges = async () => {
+      try {
+        const badgesData = await apiGet<any[]>("/api/v1/badges/");
+        setTotalBadges(badgesData.length);
+      } catch (err) {
+        console.error("Failed to fetch total badges", err);
+      }
+    };
+    fetchTotalBadges();
+  }, []);
 
   // Form state
   const [formName, setFormName] = useState("");
@@ -230,7 +248,7 @@ export default function ProfilePage() {
         try {
           const errJson = await res.json();
           errMessage = errJson.detail || errMessage;
-        } catch {}
+        } catch { }
         throw new Error(errMessage);
       }
 
@@ -669,7 +687,100 @@ export default function ProfilePage() {
           </div>
         </Row>
 
-        {/* ═══ BENTO GRID LAYOUT ═══ */}
+        {/* Name + Info */}
+        <Column style={{ gap: "10px", marginBottom: "32px" }}>
+          <Heading
+            variant="display-strong-s"
+            style={{ color: "#1C1C1E", fontSize: "2.5rem" }}
+          >
+            {user?.display_name || user?.username || "Guest"}
+          </Heading>
+
+          <Row style={{ gap: "12px", alignItems: "center" }}>
+            <Text
+              style={{ color: "#007AFF", fontWeight: 600, fontSize: "1rem" }}
+            >
+              @{user?.username || "guest"} • {user?.title || "Taste Explorer"}
+            </Text>
+          </Row>
+
+          <Text
+            style={{
+              color: "#636366",
+              fontSize: "1rem",
+              lineHeight: 1.6,
+              maxWidth: "720px",
+            }}
+          >
+            {user?.bio || "Enjoying the food exploration journey!"}
+          </Text>
+
+          {/* Level Progress Bar */}
+          <Column style={{ gap: "8px", maxWidth: "320px", marginTop: "8px" }}>
+            <Row style={{ justifyContent: "space-between" }}>
+              <Text
+                style={{
+                  color: "#8E8E93",
+                  fontSize: "0.75rem",
+                  fontWeight: 600,
+                }}
+              >
+                Level {user?.level || 1} Progress
+              </Text>
+              <Text
+                style={{
+                  color: "#1C1C1E",
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                }}
+              >
+                {user?.xp ?? 0} / {user?.next_level_xp ?? 100} XP
+              </Text>
+            </Row>
+            <div
+              style={{
+                width: "100%",
+                height: "6px",
+                backgroundColor: "#EAF2FF",
+                borderRadius: "3px",
+                overflow: "hidden",
+              }}
+            >
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{
+                  width: `${Math.min(((user?.xp ?? 0) / (user?.next_level_xp || 1)) * 100, 100)}%`,
+                }}
+                transition={{ duration: 1, delay: 0.5 }}
+                style={{
+                  height: "100%",
+                  backgroundColor: "#007AFF",
+                  borderRadius: "3px",
+                }}
+              />
+            </div>
+          </Column>
+
+          <Row style={{ gap: "24px", marginTop: "16px" }}>
+            <Row style={{ gap: "8px", alignItems: "center" }}>
+              <MapPin size={16} color="#8E8E93" />
+              <Text style={{ color: "#8E8E93", fontSize: "0.9rem" }}>
+                {user?.location || "Khám phá"}
+              </Text>
+            </Row>
+            <Row style={{ gap: "8px", alignItems: "center" }}>
+              <Calendar size={16} color="#8E8E93" />
+              <Text style={{ color: "#8E8E93", fontSize: "0.9rem" }}>
+                Joined{" "}
+                {user?.created_at
+                  ? new Date(user.created_at).toLocaleDateString()
+                  : "March 2025"}
+              </Text>
+            </Row>
+          </Row>
+        </Column>
+
+        {/* ── STATS ROW ── */}
         <div
           style={{
             display: "grid",
@@ -1794,63 +1905,41 @@ export default function ProfilePage() {
               )}
 
               {activeTab === "Achievements" && (
-                <Column style={{ gap: "32px" }}>
-                  <Row style={{ gap: "16px", flexWrap: "wrap" }}>
-                    {(user?.badges || []).map((badge: any) => (
-                      <Row
-                        key={badge.label}
-                        style={{
-                          gap: "16px",
-                          alignItems: "center",
-                          paddingTop: "18px",
-                          paddingBottom: "18px",
-                          paddingLeft: "32px",
-                          paddingRight: "32px",
-                          backgroundColor: "#FFF5F0",
-                          borderTopWidth: "1px",
-                          borderBottomWidth: "1px",
-                          borderLeftWidth: "1px",
-                          borderRightWidth: "1px",
-                          borderStyle: "solid",
-                          borderColor: "rgba(255,107,53,0.08)",
-                          borderRadius: "24px",
-                        }}
-                      >
-                        <span style={{ fontSize: "1.5rem" }}>{badge.icon}</span>
-                        <Column>
-                          <Text
-                            style={{
-                              color: "#ff6b35",
-                              fontWeight: 700,
-                              fontSize: "0.95rem",
-                            }}
-                          >
-                            {badge.label}
-                          </Text>
-                          <Text
-                            style={{
-                              color: "rgba(255,107,53,0.6)",
-                              fontSize: "0.75rem",
-                              fontWeight: 600,
-                            }}
-                          >
-                            Unlocked recently
-                          </Text>
-                        </Column>
-                      </Row>
-                    ))}
-                    {!user?.badges?.length && (
-                      <Text
-                        style={{
-                          color: "#8E8E93",
-                          paddingTop: "16px",
-                          paddingBottom: "16px",
-                        }}
-                      >
-                        No achievements unlocked yet.
+                <Column fillWidth gap="24">
+                  <Row fillWidth horizontal="between" vertical="center" paddingX="8">
+                    <Column gap="4">
+                      <Heading variant="display-strong-s">Badge Vault</Heading>
+                      <Text variant="body-default-xs" onBackground="neutral-weak">
+                        Collect and show off your culinary journey
                       </Text>
-                    )}
+                    </Column>
+                    <div style={{ padding: '8px 16px', borderRadius: '12px', background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.05)' }}>
+                      <Text variant="body-strong-xs">{(user?.badges || []).length} / {totalBadges}</Text>
+                    </div>
                   </Row>
+
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', /* Phép thuật tự động co giãn */
+                      gap: '20px',
+                      width: '100%'
+                    }}
+                  >
+                    {(user?.badges || []).map((badge: any, index: number) => (
+                      <BadgeCard key={badge.id || index} badge={badge} delay={index * 0.05} />
+                    ))}
+
+                    {(!user?.badges || user.badges.length === 0) && (
+                      <Column fillWidth horizontal="center" vertical="center" padding="64" gap="16" background="neutral-alpha-weak" radius="xl" style={{ border: '2px dashed rgba(0,0,0,0.05)', gridColumn: '1 / -1' }}>
+                        <div style={{ opacity: 0.2 }}>
+                          <Award size={48} />
+                        </div>
+                        <Text variant="body-default-s" onBackground="neutral-weak">No badges yet. Join a challenge to earn your first one!</Text>
+                        <Button variant="secondary" size="s">Explore Challenges</Button>
+                      </Column>
+                    )}
+                  </div>
                 </Column>
               )}
 
@@ -2596,3 +2685,155 @@ export default function ProfilePage() {
     </div>
   );
 }
+// ═══════════════════════════════════════════════════════════════════════
+//  BADGE CARD COMPONENT
+// ═══════════════════════════════════════════════════════════════════════
+const BadgeCard = ({ badge, delay }: { badge: any; delay: number }) => {
+  const IconMap: any = {
+    Star, Utensils, Award, Heart, TrendingUp, Flame, Cake, Gem, Feather, PartyPopper, Users, Handshake, Shield, Medal, Trophy
+  };
+
+  const IconComponent = IconMap[badge.icon_name] || Award;
+
+  const rarityStyles: any = {
+    Common: { border: 'rgba(0,0,0,0.05)', glow: 'transparent', text: 'neutral-strong', bg: 'rgba(0,0,0,0.02)' },
+    Rare: { border: 'rgba(0,122,255,0.2)', glow: 'rgba(0,122,255,0.1)', text: 'info-strong', bg: 'rgba(0,122,255,0.03)' },
+    Epic: { border: 'rgba(175,82,222,0.3)', glow: 'rgba(175,82,222,0.15)', text: 'brand-strong', bg: 'rgba(175,82,222,0.05)' },
+    Legendary: { border: 'rgba(251,191,36,0.5)', glow: 'rgba(251,191,36,0.25)', text: 'warning-strong', bg: 'rgba(251,191,36,0.08)', animate: true }
+  };
+
+  const style = rarityStyles[badge.rarity] || rarityStyles.Common;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9, y: 10 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.4, delay }}
+      whileHover={{ y: -5, scale: 1.02 }}
+      style={{
+        position: 'relative',
+        width: '100%', // Khóa cứng width 100% của ô Grid
+        height: '100%',
+        display: 'block', // Ép motion.div hiển thị dạng khối
+        zIndex: 1
+      }}
+    >
+      {/* Hào quang (Glow Aura) */}
+      {(badge.rarity === 'Epic' || badge.rarity === 'Legendary') && (
+        <div
+          style={{
+            position: 'absolute',
+            top: -4, left: -4, right: -4, bottom: -4, // Xài top/left thay vì inset cho chắc cú
+            background: style.glow,
+            filter: 'blur(20px)',
+            borderRadius: '24px',
+            zIndex: -1,
+          }}
+        />
+      )}
+
+      {/* RỘNG 100%, KHÔNG XÀI <Column> NỮA ĐỂ CHỐNG BÓP MÉO */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'flex-start', // Đẩy nội dung lên trên
+          width: '100%',
+          height: '100%',
+          minWidth: 0, // Hack CSS Flexbox chống tràn
+          padding: '20px',
+          gap: '12px',
+          borderRadius: '24px', // Tương đương radius="xl"
+          background: style.bg,
+          border: `1px solid ${style.border}`,
+          backdropFilter: 'blur(10px)',
+          textAlign: 'center',
+          boxShadow: badge.rarity === 'Legendary' ? '0 10px 30px rgba(251,191,36,0.15)' : 'none',
+          boxSizing: 'border-box'
+        }}
+      >
+        {/* KHUNG CHỨA ICON */}
+        <div
+          style={{
+            width: '60px',
+            height: '60px',
+            minWidth: '60px', // Đóng đinh chiều rộng
+            minHeight: '60px', // Đóng đinh chiều cao
+            flexShrink: 0, // Cấm tuyệt đối việc thu nhỏ
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '50%',
+            background: '#fff',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+            color: badge.accent_color || '#007AFF',
+            position: 'relative'
+          }}
+        >
+          {badge.rarity === 'Legendary' && (
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+              style={{
+                position: 'absolute',
+                top: -4, left: -4, right: -4, bottom: -4, // Không xài inset nữa
+                borderRadius: '50%', // Ép cứng hình tròn
+                border: '2px dashed #FBBF24',
+                opacity: 0.8,
+                boxSizing: 'border-box'
+              }}
+            />
+          )}
+          <IconComponent size={28} />
+        </div>
+
+        {/* KHUNG CHỮ */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '4px',
+          width: '100%'
+        }}>
+          <Text variant="body-strong-s">{badge.name}</Text>
+
+          <div style={{
+            padding: '2px 8px',
+            borderRadius: '100px',
+            background: style.border,
+            marginBottom: '4px'
+          }}>
+            <Text variant="body-default-xs" style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>
+              {badge.rarity}
+            </Text>
+          </div>
+
+          {badge.description && (
+            <div style={{ width: '100%' }}>
+              <Text
+                variant="body-default-xs"
+                onBackground="neutral-weak"
+                style={{
+                  fontSize: '11px',
+                  lineHeight: '1.4',
+                  wordWrap: 'break-word', // Chuẩn trị liệu ép chữ
+                  whiteSpace: 'normal',
+                  display: 'block'
+                }}
+              >
+                {badge.description}
+              </Text>
+            </div>
+          )}
+        </div>
+
+        {badge.earned_at && (
+          <Text variant="body-default-xs" style={{ color: 'rgba(0,0,0,0.3)', marginTop: 'auto' }}>
+            {new Date(badge.earned_at).toLocaleDateString('vi-VN')}
+          </Text>
+        )}
+      </div>
+    </motion.div>
+  );
+};

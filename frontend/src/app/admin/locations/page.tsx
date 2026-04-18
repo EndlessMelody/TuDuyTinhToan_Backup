@@ -1292,96 +1292,104 @@ export default function AdminLocationsPage() {
   //  STYLES
   // ═══════════════════════════════════════════════════════════════
   const cardStyle: React.CSSProperties = {
-    background: "var(--surface-base)",
-    borderRadius: 20,
-    border: "1px solid var(--border-weak)",
-    boxShadow: "var(--shadow-card)",
+    background: "#ffffff",
+    borderRadius: 32,
+    border: "1px solid rgba(0,0,0,0.05)",
+    boxShadow: "0 20px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01)",
+    padding: "32px",
   };
 
   const inputStyle: React.CSSProperties = {
     width: "100%",
-    padding: "12px 16px",
+    padding: "16px 20px",
     fontSize: "0.875rem",
-    borderRadius: 14,
-    border: "1px solid var(--border-medium)",
+    borderRadius: 16,
+    border: "1px solid rgba(0,0,0,0.1)",
     background: "#F9F9FB",
     outline: "none",
     fontFamily: "inherit",
-    color: "var(--text-primary)",
+    color: "#1C1C1E",
+    fontWeight: 500,
     transition: "border-color 0.15s, box-shadow 0.15s",
   };
 
   const labelStyle: React.CSSProperties = {
-    fontSize: "0.8rem",
-    fontWeight: 600,
-    color: "var(--text-secondary)",
-    marginBottom: 4,
+    fontSize: "0.85rem",
+    fontWeight: 700,
+    color: "#8E8E93",
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: "0.5px"
   };
 
   // ═══════════════════════════════════════════════════════════════
   //  RENDER
   // ═══════════════════════════════════════════════════════════════
   return (
-    <Column
-      fillWidth
+    <div
+      className="no-scrollbar"
       style={{
+        display: "flex",
+        flexDirection: "column",
+        width: "100%",
         minHeight: "100vh",
-        background: "var(--surface-page)",
+        backgroundColor: "#F2F2F7",
         overflowY: "auto",
+        overflowX: "hidden",
       }}
     >
-      {/* ─── Header ────────────────────────────────────── */}
-      <Row
-        fillWidth
-        horizontal="between"
-        vertical="center"
-        style={{
-          padding: "16px 24px",
-          background: "var(--surface-base)",
-          borderBottom: "1px solid var(--border-weak)",
-          position: "sticky",
-          top: 0,
-          zIndex: 50,
-        }}
+      {/* ── HERO HEADER (Giao diện Chỉ huy) ── */}
+      <div
+          className="w-full shrink-0"
+          style={{
+              background: "linear-gradient(135deg, #1C1C1E 0%, #000000 100%)",
+              padding: "48px 48px 40px",
+              position: "relative",
+              overflow: "hidden",
+          }}
       >
-        <Row gap={12} vertical="center">
-          <Row
-            align="center"
-            justify="center"
+        {/* Đèn báo động cam cho ngầu */}
+        <div
             style={{
-              width: 36,
-              height: 36,
-              borderRadius: 10,
-              background: "linear-gradient(135deg, #ff6b35, #ff8c5f)",
+                position: "absolute",
+                top: -60,
+                right: -60,
+                width: 300,
+                height: 300,
+                borderRadius: "50%",
+                background: "rgba(255,149,0,0.15)",
+                filter: "blur(80px)",
             }}
-          >
-            <MapPin size={18} color="#fff" />
-          </Row>
-          <Column gap={2}>
-            <Heading variant="heading-strong-s">Quản lý Địa điểm</Heading>
-            <Text
-              variant="body-default-xs"
-              style={{ color: "var(--text-tertiary)" }}
-            >
-              Thêm location mới vào Database
-            </Text>
-          </Column>
-        </Row>
-
-        <IconButton
-          icon={<LogOut size={18} />}
-          variant="tertiary"
-          size="m"
-          tooltip="Đăng xuất Admin"
-          onClick={handleLogout}
         />
-      </Row>
+
+        <div className="relative max-w-[960px] mx-auto w-full flex flex-col">
+            <div className="flex items-start justify-between mb-8 w-full">
+                <div>
+                    <div className="flex items-center gap-4 mb-3">
+                        <div
+                            className="w-12 h-12 rounded-[18px] flex items-center justify-center shadow-xl cursor-pointer hover:opacity-90 transition-opacity"
+                            style={{ background: "linear-gradient(135deg, #FF9500, #FFCC00)" }}
+                            onClick={() => router.push("/admin")}
+                        >
+                            <MapPin size={24} className="text-white" />
+                        </div>
+                        <h1 className="text-[32px] font-black text-white tracking-tight">
+                            Location Manager
+                        </h1>
+                    </div>
+                    <p className="text-[15px] text-[rgba(255,255,255,0.6)] font-medium max-w-md">
+                        Review, manage, search, and update places of interest globally.
+                    </p>
+                </div>
+            </div>
+        </div>
+      </div>
 
       {/* ─── Content ───────────────────────────────────── */}
       <Column
         fillWidth
         align="center"
-        style={{ padding: "0 16px 20px", maxWidth: 960, margin: "0 auto" }}
+        style={{ padding: "40px 16px 20px", maxWidth: 960, margin: "0 auto", gap: "24px" }}
       >
         {/* Bulk Import Card */}
         <Column fillWidth gap={16} style={{ ...cardStyle, padding: 24 }}>
@@ -2041,7 +2049,7 @@ export default function AdminLocationsPage() {
           </Column>
         )}
       </Column>
-    </Column>
+    </div>
   );
 }
 

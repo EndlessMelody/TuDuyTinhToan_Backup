@@ -59,13 +59,26 @@ export interface LeaderboardEntry {
   is_current_user: boolean;
 }
 
+export interface BadgeSummary {
+  id: number;
+  name: string;
+  description?: string;
+  icon_name: string;
+  rarity: "Common" | "Rare" | "Epic" | "Legendary";
+  accent_color: string;
+  is_hidden: boolean;
+  earned_at?: string;
+}
+
 export interface UserGamificationInfo {
-  xp: number;
+  current_xp: number;
+  xp: number; // For backward compatibility
   level: number;
   next_level_xp: number;
   xp_to_next_level: number;
   title: string;
   total_xp_earned: number;
+  progress_percentage: number;
   rank?: number;
 }
 

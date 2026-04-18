@@ -33,7 +33,14 @@ async def seed_levels():
             (60, "Texture Architect"),
             (70, "Taste Legend"),
             (85, "Cuisine Oracle"),
-            (100, "God of Taste")
+            (100, "God of Taste"),
+            (200, "Flavor Dimension Walker"),
+            (300, "Mythical Chef"),
+            (400, "Taste Sovereign"),
+            (500, "Grandmaster of Gastronomy"),
+            (700, "Eater of Worlds"),
+            (900, "Culinary Ascendant"),
+            (1000, "The Absolute Palate")
         ]
         
         def get_title(lvl):
@@ -45,7 +52,7 @@ async def seed_levels():
                     break
             return current_title
 
-        for lvl in range(1, 101):
+        for lvl in range(1, 1001):
             # Target ~15,000 XP at Level 70
             # Formula: 100 + (level-1) * 215
             xp_req = 100 + (lvl - 1) * 215

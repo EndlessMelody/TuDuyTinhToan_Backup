@@ -22,9 +22,45 @@ class ChallengeResponse(ChallengeBase):
     duration_days: Optional[int] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
+    is_active: bool
     is_recurring: bool
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ChallengeCreate(ChallengeBase):
+    action_type: str
+    action_filter: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    badge_id: Optional[int] = None
+    duration_days: Optional[int] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    is_active: bool = True
+    is_recurring: bool = False
+
+
+class ChallengeUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    difficulty: Optional[str] = None
+    xp_reward: Optional[int] = None
+    target_count: Optional[int] = None
+    icon: Optional[str] = None
+    accent_color: Optional[str] = None
+    action_type: Optional[str] = None
+    action_filter: Optional[Dict[str, Any]] = None
+    badge_id: Optional[int] = None
+    duration_days: Optional[int] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    is_active: Optional[bool] = None
+    is_recurring: Optional[bool] = None
+
+
+class ChallengeAdminDetail(ChallengeResponse):
+    participants_count: int = 0
+    completion_rate: int = 0
 
 
 class UserChallengeProgress(BaseModel):

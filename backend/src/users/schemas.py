@@ -11,9 +11,14 @@ class UserStats(BaseModel):
 
 
 class BadgeSummary(BaseModel):
-    icon: str
-    label: str
-    color: str
+    id: int
+    name: str
+    description: Optional[str] = None
+    icon_name: str
+    rarity: str
+    accent_color: str
+    is_hidden: bool
+    earned_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -87,10 +92,10 @@ class UserProfile(BaseModel):
     cover_url: Optional[str] = None
     location: Optional[str] = None
     title: Optional[str] = None
-    xp: int = 0
+    xp: int = 0               # XP trong level hiện tại (relative)
     level: int = 1
-    next_level_xp: int = 100
-    total_xp_earned: int = 0
+    next_level_xp: int = 100  # XP cần để hoàn thành level này (relative)
+    total_xp_earned: int = 0   # Tổng XP tích lũy (absolute)
     created_at: Optional[datetime] = None
     stats: UserStats = UserStats()
     badges: List[BadgeSummary] = []
@@ -111,10 +116,10 @@ class UserMe(BaseModel):
     location: Optional[str] = None
     title: Optional[str] = None
     phone: Optional[str] = None
-    xp: int = 0
+    xp: int = 0               # XP trong level hiện tại (relative)
     level: int = 1
-    next_level_xp: int = 100
-    total_xp_earned: int = 0
+    next_level_xp: int = 100  # XP cần để hoàn thành level này (relative)
+    total_xp_earned: int = 0   # Tổng XP tích lũy (absolute)
     food_vector: Optional[List[float]] = None
     place_vector: Optional[List[float]] = None
     role: str = "user"
@@ -227,10 +232,11 @@ class ProfileResponse(BaseModel):
     phone: Optional[str] = None
     joined: str  # formatted like "March 2025"
     
-    # Gamification
+    # Gamification — all relative values, computed server-side
     level: int
-    xp: int
-    nextLevelXp: int  # calculated: level * 100
+    xp: int           # XP trong level hiện tại (relative)
+    nextLevelXp: int  # XP cần để hoàn thành level này (relative, từ LevelConfig)
+    total_xp_earned: int = 0  # Tổng XP tích lũy (absolute)
     
     # Stats
     stats: UserStats

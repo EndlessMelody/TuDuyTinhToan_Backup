@@ -15,13 +15,7 @@ export default function LobbyCard({ lobby, onClick }: LobbyCardProps) {
   const { user } = useAuth();
   const spotsLeft = lobby.spots - lobby.members.length;
   const isJoined = Boolean(
-    user &&
-    lobby.members.some(
-      (m) =>
-        m.user_id === user.id ||
-        m.name === user.username ||
-        m.name === user.display_name,
-    ),
+    user && lobby.members.some((m) => m.user_id === user.id)
   );
 
   return (
@@ -62,8 +56,7 @@ export default function LobbyCard({ lobby, onClick }: LobbyCardProps) {
       <div className="mt-5 flex justify-between items-end">
         <AvatarStack members={lobby.members} spotsLeft={spotsLeft} />
         <button
-          className={`${
-            isJoined
+          className={`${isJoined
               ? "bg-[#34C759] hover:bg-[#28A745] text-white"
               : "bg-[#FFF0E6] hover:bg-[#FFE0CC] text-[#ff6b35]"
           } text-[14px] font-semibold py-2 px-4 rounded-full transition-colors`}

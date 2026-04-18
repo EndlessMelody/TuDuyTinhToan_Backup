@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import { supabase } from "@/lib/supabase";
 import { apiPost } from "@/lib/api";
+import { BadgeSummary } from "@/types/gamification";
 
 export interface UserData {
   id: number;
@@ -20,10 +21,20 @@ export interface UserData {
   bio?: string;
   location?: string;
   title?: string;
+  phone?: string;
   role: string;
-  xp: number;
+  xp: number;           // XP earned WITHIN the current level (relative)
   level: number;
-  next_level_xp: number;
+  next_level_xp: number; // XP needed to complete the current level (relative)
+  total_xp_earned: number; // Absolute total XP ever earned
+  created_at?: string;
+  stats?: {
+    reviews: number;
+    visited: number;
+    followers: number;
+    following: number;
+  };
+  badges?: BadgeSummary[];
 }
 
 interface AuthContextValue {
@@ -104,6 +115,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   role: "user",
                   xp: 0,
                   level: 1,
+                  next_level_xp: 100,
+                  total_xp_earned: 0,
                 });
                 document.cookie = `user_role=user; path=/; max-age=86400`;
               }

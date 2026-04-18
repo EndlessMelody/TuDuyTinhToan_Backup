@@ -429,14 +429,8 @@ function BadgeCard() {
   );
 }
 
-function CompactLevelCard({
-  user,
-  stats,
-}: {
-  user: any;
-  stats: UserGamificationInfo | null;
-}) {
-  const pct = stats ? (stats.xp / stats.next_level_xp) * 100 : 0;
+function CompactLevelCard({ user, stats }: { user: any; stats: UserGamificationInfo | null }) {
+  const pct = stats?.progress_percentage || 0;
   return (
     <div
       className="bg-white rounded-[32px] p-6 shadow-xl shadow-black/5 flex flex-col gap-4"
@@ -450,7 +444,7 @@ function CompactLevelCard({
           </h3>
         </div>
         <span className="text-[13px] font-bold text-[#8E8E93] tabular-nums">
-          {stats?.xp || 0} / {stats?.next_level_xp || 1000} XP
+          {stats?.current_xp ?? 0} / {stats?.next_level_xp ?? 100} XP
         </span>
       </div>
       <div className="h-3 bg-[#F2F2F7] rounded-full overflow-hidden">
@@ -462,8 +456,7 @@ function CompactLevelCard({
         />
       </div>
       <p className="text-[12px] text-[#8E8E93] font-medium">
-        {stats ? stats.next_level_xp - stats.xp : 1000} XP to Level{" "}
-        {(user?.level || 1) + 1} ·{" "}
+        {stats ? Math.max(0, stats.next_level_xp - stats.current_xp) : 100} XP to Level {(user?.level || 1) + 1} ·{" "}
         <span className="font-extrabold text-[#1C1C1E]">Teenage Syndrome</span>
       </p>
     </div>
@@ -600,6 +593,7 @@ export default function ChallengesPage() {
     >
       {/* ── HERO HEADER ── */}
       <div
+        className="w-full shrink-0"
         style={{
           background: "linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%)",
           padding: "48px 48px 40px",
@@ -632,8 +626,8 @@ export default function ChallengesPage() {
           }}
         />
 
-        <div className="relative max-w-[1400px] mx-auto">
-          <div className="flex items-start justify-between mb-8">
+        <div className="relative max-w-[1400px] mx-auto w-full flex flex-col">
+          <div className="flex items-start justify-between mb-8 w-full">
             <div>
               <div className="flex items-center gap-4 mb-3">
                 <div
@@ -699,12 +693,7 @@ export default function ChallengesPage() {
                     LEVEL
                   </p>
                   <div className="mt-1.5 w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-[#ff6b35] rounded-full"
-                      style={{
-                        width: `${((userStats?.xp || 0) / (userStats?.next_level_xp || 1000)) * 100}%`,
-                      }}
-                    />
+                    <div className="h-full bg-[#007AFF] rounded-full" style={{ width: `${userStats?.progress_percentage || 0}%` }} />
                   </div>
                 </div>
               </div>
@@ -785,9 +774,10 @@ export default function ChallengesPage() {
                           boxShadow: "0 8px 16px rgba(0,0,0,0.15)",
                         }
                       : {
-                          backgroundColor: "transparent",
-                          color: "#8E8E93",
-                        }
+                        backgroundColor: "#fcfcfeff",
+                        color: "#8E8E93",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                      }
                   }
                 >
                   {tab}
@@ -932,13 +922,25 @@ export default function ChallengesPage() {
             </p>
             <button
               onClick={async () => {
-                const res = await apiPost<{ success: boolean; data: any }>(
-                  "/api/v1/challenges/streaks/checkin",
-                  {},
-                );
-                if (res.success) {
+                try {
+                  await apiPost("/api/v1/challenges/streaks/checkin", {});
+
                   toast.success("Checked in for today!");
-                  fetchData();
+                  setStreakInfo((prev) => prev ? {
+                    ...prev,
+                    is_active_today: true,
+                    current_streak: prev.current_streak + 1
+                  } : null);
+
+                  // 3. Chỉ gọi API lấy lại điểm XP (nếu check-in có thưởng điểm) 
+                  // Tuyệt đối KHÔNG gọi lại fetchData() ở đây để tránh đè data cũ
+                  const statsRes = await apiGet<{ success: boolean; data: UserGamificationInfo }>("/api/v1/challenges/xp/me");
+                  if (statsRes.success) {
+                    setUserStats(statsRes.data);
+                  }
+
+                } catch (err: any) {
+                  toast.error(err.message || "Check-in thất bại!");
                 }
               }}
               disabled={streakInfo?.is_active_today}
