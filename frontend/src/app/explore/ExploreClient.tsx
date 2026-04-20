@@ -4,19 +4,27 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  ChevronLeft,
+  ChevronRight,
   Clock,
+  Filter,
   LocateFixed,
-  MapPin,
   Minus,
-  Navigation,
   Plus,
   Search,
   SearchX,
   SlidersHorizontal,
+  Star,
   X,
+  Layers,
+  Map as MapIcon,
+  Maximize,
+  Minimize,
+  Building2,
 } from "lucide-react";
 
-import { CATEGORIES, PRICE_ICONS, SPOTS } from "./data";
+import { useFeedCards, FeedCard } from "@/hooks/useFeedCards";
+import { CATEGORIES, PRICE_ICONS } from "./data";
 import type { Spot } from "./types";
 import { CATEGORY_ICONS } from "./ui-constants";
 import SpotCard from "./components/SpotCard";
@@ -34,6 +42,10 @@ const MapWidget = dynamic(() => import("@/components/MapWidget"), {
 const FALLBACK_CENTER: [number, number] = [10.899, 106.774];
 const MIN_MAP_ZOOM = 3;
 const MAX_MAP_ZOOM = 19;
+const RIGHT_PANEL_WIDTH = 360;
+const RIGHT_PANEL_COLLAPSED_WIDTH = 48;
+const RIGHT_PANEL_OPEN_SHADOW = "-12px 0 28px rgba(15,23,42,0.14)";
+const RIGHT_PANEL_COLLAPSED_SHADOW = "-8px 0 18px rgba(15,23,42,0.1)";
 
 function toLocationErrorMessage(error: GeolocationPositionError): string {
   switch (error.code) {
@@ -48,12 +60,55 @@ function toLocationErrorMessage(error: GeolocationPositionError): string {
   }
 }
 
+// Helper to transform FeedCard to Spot format
+function feedCardToSpot(card: FeedCard): Spot {
+  return {
+    id: card.id,
+    name: card.name,
+    category: card.category === "food" ? "Vietnamese" : "Place", // Simplified mapping
+    emoji: card.category === "food" ? "🍜" : "📍",
+    accent: "#ff6b35",
+    lat: card.lat ?? 10.897,
+    lon: card.lng ?? 106.772,
+    rating: card.rating ?? 0,
+    reviewCount: 0, // Not available from feed API
+    priceLevel: card.price_range?.includes("$") ? 2 : 1,
+    isOpen: true, // Not available from feed API
+    closesAt: card.open_hours || "Unknown",
+    distance: card.distance_km ? `${card.distance_km.toFixed(1)} km` : "Nearby",
+    img: card.image_url || "",
+    description:
+      card.reviews_preview?.[0] || card.address || "Explore this location",
+    tags: card.tags || [card.category || "spot"],
+  };
+}
+
 export default function ExploreClient() {
+  // Use real locations from API
+  const {
+    cards: feedCards,
+    loading: cardsLoading,
+    error: cardsError,
+  } = useFeedCards({
+    type: "food",
+    limit: 50,
+  });
+
+  // Transform to Spot format
+  const spots = useMemo(() => feedCards.map(feedCardToSpot), [feedCards]);
+
+  // Extract all unique tags from real data
+  const ALL_TAGS = useMemo(
+    () => Array.from(new Set(spots.flatMap((s: Spot) => s.tags))).sort(),
+    [spots],
+  );
+
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [openOnly, setOpenOnly] = useState(false);
   const [priceMax, setPriceMax] = useState<1 | 2 | 3>(3);
   const [selected, setSelected] = useState<Spot | null>(null);
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(
     null,
   );
@@ -62,6 +117,49 @@ export default function ExploreClient() {
     null,
   );
   const [manualZoom, setManualZoom] = useState<number | null>(null);
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
+  const [minRating, setMinRating] = useState<number>(0);
+  const [sortBy, setSortBy] = useState<"recommended" | "rating" | "reviews">(
+    "recommended",
+  );
+  const [hoveredSpotId, setHoveredSpotId] = useState<number | null>(null);
+
+  // Map Settings State
+  const [mapStyleType, setMapStyleType] = useState<
+    "dark" | "satellite" | "light" | "streets"
+  >("dark");
+  const [show3D, setShow3D] = useState(false);
+  const [isMapSettingsOpen, setIsMapSettingsOpen] = useState(false);
+
+  const toggleTag = useCallback((tag: string) => {
+    setSelectedTags((prev) => {
+      const next = new Set(prev);
+      if (next.has(tag)) next.delete(tag);
+      else next.add(tag);
+      return next;
+    });
+  }, []);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (category !== "All") count++;
+    if (openOnly) count++;
+    if (priceMax !== 3) count++;
+    if (selectedTags.size > 0) count++;
+    if (minRating > 0) count++;
+    if (sortBy !== "recommended") count++;
+    return count;
+  }, [category, openOnly, priceMax, selectedTags, minRating, sortBy]);
+
+  const clearAllFilters = useCallback(() => {
+    setCategory("All");
+    setOpenOnly(false);
+    setPriceMax(3);
+    setSelectedTags(new Set());
+    setMinRating(0);
+    setSortBy("recommended");
+  }, []);
 
   const getCurrentPosition = useCallback(
     (options: PositionOptions) =>
@@ -139,6 +237,12 @@ export default function ExploreClient() {
     }
   }, [getCurrentPosition]);
 
+  const handleLocateUser = useCallback(() => {
+    setSelected(null);
+    setManualZoom(MAX_MAP_ZOOM);
+    void detectUserLocation();
+  }, [detectUserLocation]);
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void detectUserLocation();
@@ -147,22 +251,58 @@ export default function ExploreClient() {
     return () => window.clearTimeout(timer);
   }, [detectUserLocation]);
 
-  const filtered = useMemo(
-    () =>
-      SPOTS.filter((spot) => {
-        const matchCat = category === "All" || spot.category === category;
-        const matchOpen = !openOnly || spot.isOpen;
-        const matchPrice = spot.priceLevel <= priceMax;
-        const query = search.trim().toLowerCase();
-        const matchQuery =
-          !query ||
-          spot.name.toLowerCase().includes(query) ||
-          spot.category.toLowerCase().includes(query);
+  useEffect(() => {
+    if (selected) {
+      const el = document.getElementById(`spot-card-${selected.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }, [selected]);
 
-        return matchCat && matchOpen && matchPrice && matchQuery;
-      }),
-    [category, openOnly, priceMax, search],
-  );
+  const filtered = useMemo(() => {
+    let result = spots.filter((spot: Spot) => {
+      const matchCat = category === "All" || spot.category === category;
+      const matchOpen = !openOnly || spot.isOpen;
+      const matchPrice = spot.priceLevel <= priceMax;
+      const matchRating = spot.rating >= minRating;
+      const matchTags =
+        selectedTags.size === 0 ||
+        spot.tags.some((t: string) => selectedTags.has(t));
+      const query = search.trim().toLowerCase();
+      const matchQuery =
+        !query ||
+        spot.name.toLowerCase().includes(query) ||
+        spot.category.toLowerCase().includes(query) ||
+        spot.tags.some((t: string) => t.toLowerCase().includes(query));
+
+      return (
+        matchCat &&
+        matchOpen &&
+        matchPrice &&
+        matchRating &&
+        matchTags &&
+        matchQuery
+      );
+    });
+
+    if (sortBy === "rating") {
+      result.sort((a: Spot, b: Spot) => b.rating - a.rating);
+    } else if (sortBy === "reviews") {
+      result.sort((a: Spot, b: Spot) => b.reviewCount - a.reviewCount);
+    }
+
+    return result;
+  }, [
+    category,
+    openOnly,
+    priceMax,
+    minRating,
+    selectedTags,
+    search,
+    sortBy,
+    spots,
+  ]);
 
   const mapCenter: [number, number] = selected
     ? [selected.lat, selected.lon]
@@ -171,9 +311,6 @@ export default function ExploreClient() {
   const mapZoom = Math.max(
     MIN_MAP_ZOOM,
     Math.min(MAX_MAP_ZOOM, manualZoom ?? mapZoomFromContext),
-  );
-  const mapPoints = filtered.map(
-    (spot) => [spot.lat, spot.lon] as [number, number],
   );
 
   const setZoomLevel = useCallback((value: number) => {
@@ -206,13 +343,20 @@ export default function ExploreClient() {
       <div style={{ position: "absolute", inset: 0 }}>
         <MapWidget
           mapId="explore-main"
-          points={mapPoints}
+          spots={filtered}
           center={mapCenter}
           zoom={mapZoom}
           minZoom={MIN_MAP_ZOOM}
           maxZoom={MAX_MAP_ZOOM}
           userLocation={userLocation}
           showBanner={false}
+          enableClustering
+          mapStyleType={mapStyleType}
+          show3D={show3D}
+          selectedSpotId={selected?.id ?? null}
+          hoveredSpotId={hoveredSpotId}
+          onMarkerClick={(spot) => setSelected(spot)}
+          onMarkerHover={(spot) => setHoveredSpotId(spot ? spot.id : null)}
         />
 
         <AnimatePresence>
@@ -221,30 +365,12 @@ export default function ExploreClient() {
           )}
         </AnimatePresence>
 
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="absolute top-4 right-4 z-10 flex items-center gap-2 px-3.5 py-2 rounded-full"
-          style={{
-            backgroundColor: "rgba(255,255,255,0.9)",
-            backdropFilter: "blur(16px)",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
-            border: "1px solid rgba(0,0,0,0.06)",
-            right: "376px",
-          }}
-        >
-          <MapPin size={14} className="text-[#ff6b35]" />
-          <span className="text-[13px] font-bold text-[#1C1C1E]">
-            {filtered.length} spots
-          </span>
-        </motion.div>
-
         <motion.button
           type="button"
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.08 }}
-          onClick={detectUserLocation}
+          onClick={handleLocateUser}
           className="absolute top-4 z-40 flex items-center gap-2 px-3.5 py-2 rounded-full"
           style={{
             left: "calc(var(--explore-left-sidebar-width, 0px) + 16px)",
@@ -282,137 +408,564 @@ export default function ExploreClient() {
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.12 }}
-          className="absolute z-40"
+          className="absolute z-40 flex flex-col gap-2"
           style={{
             left: "calc(var(--explore-left-sidebar-width, 0px) + 16px)",
             top: "66px",
           }}
         >
-          <div className="flex flex-col items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setZoomLevel(MAX_MAP_ZOOM)}
-              className="w-8 h-5 rounded-full text-[8px] font-extrabold text-white"
-              title="Set maximum zoom"
-              style={{
-                backgroundColor: "rgba(17,24,39,0.78)",
-                border: "1px solid rgba(255,255,255,0.22)",
-              }}
-            >
-              MAX
-            </button>
+          {/* Map Layer Settings Button */}
+          <button
+            type="button"
+            onClick={() => setIsMapSettingsOpen((prev) => !prev)}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-white relative transition-all"
+            title="Map Settings"
+            style={{
+              backgroundColor: isMapSettingsOpen
+                ? "rgba(17,24,39,0.95)"
+                : "rgba(17,24,39,0.78)",
+              border: "1px solid rgba(255,255,255,0.22)",
+              boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
+            }}
+          >
+            {isMapSettingsOpen ? <X size={18} /> : <Layers size={18} />}
+          </button>
 
-            <button
-              type="button"
-              onClick={() => stepZoom(1)}
-              className="w-6 h-6 rounded-full flex items-center justify-center text-white"
-              title="Zoom in"
-              style={{
-                backgroundColor: "rgba(17,24,39,0.78)",
-                border: "1px solid rgba(255,255,255,0.22)",
-              }}
-            >
-              <Plus size={12} />
-            </button>
-
-            <div
-              style={{
-                height: "96px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <input
-                type="range"
-                min={MIN_MAP_ZOOM}
-                max={MAX_MAP_ZOOM}
-                step={0.25}
-                value={mapZoom}
-                onChange={(event) =>
-                  setZoomLevel(Number(event.currentTarget.value))
-                }
-                className="zoom-stick-input w-20"
+          <AnimatePresence>
+            {isMapSettingsOpen && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, x: -10 }}
+                animate={{ opacity: 1, scale: 1, x: 0 }}
+                exit={{ opacity: 0, scale: 0.9, x: -10 }}
+                className="absolute left-12 top-0 bg-white rounded-2xl p-4 shadow-2xl border border-gray-100 flex flex-row gap-6"
                 style={{
-                  transform: "rotate(-90deg) scale(0.88)",
-                  transformOrigin: "center",
-                  accentColor: "#111827",
-                  cursor: "pointer",
+                  width: "340px",
+                  backdropFilter: "blur(20px)",
+                  backgroundColor: "rgba(255,255,255,0.95)",
                 }}
-                title="Zoom stick"
-              />
-            </div>
+              >
+                {/* Visual Settings Column */}
+                <div className="flex-1 flex flex-col gap-4">
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-gray-500 mb-2 tracking-widest">
+                      Map Style
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(["dark", "light", "streets", "satellite"] as const).map(
+                        (style) => (
+                          <button
+                            key={style}
+                            onClick={() => setMapStyleType(style)}
+                            className="px-2 py-1.5 rounded-lg text-xs font-semibold border flex items-center gap-1.5 capitalize transition-all"
+                            style={
+                              mapStyleType === style
+                                ? {
+                                    backgroundColor: "#111827",
+                                    color: "white",
+                                    borderColor: "#111827",
+                                  }
+                                : {
+                                    backgroundColor: "transparent",
+                                    color: "#4B5563",
+                                    borderColor: "#E5E7EB",
+                                  }
+                            }
+                          >
+                            <MapIcon size={12} /> {style}
+                          </button>
+                        ),
+                      )}
+                    </div>
+                  </div>
 
-            <button
-              type="button"
-              onClick={() => stepZoom(-1)}
-              className="w-6 h-6 rounded-full flex items-center justify-center text-white"
-              title="Zoom out"
-              style={{
-                backgroundColor: "rgba(17,24,39,0.78)",
-                border: "1px solid rgba(255,255,255,0.22)",
-              }}
-            >
-              <Minus size={12} />
-            </button>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-gray-500 mb-2 tracking-widest">
+                      Layers
+                    </p>
+                    <button
+                      onClick={() => setShow3D((v) => !v)}
+                      className="w-full px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between border transition-all"
+                      style={
+                        show3D
+                          ? {
+                              backgroundColor: "#ff6b35",
+                              color: "white",
+                              borderColor: "#ff6b35",
+                              boxShadow: "0 4px 10px rgba(255,107,53,0.3)",
+                            }
+                          : {
+                              backgroundColor: "#F9FAFB",
+                              color: "#4B5563",
+                              borderColor: "#E5E7EB",
+                            }
+                      }
+                    >
+                      <span className="flex items-center gap-2">
+                        <Building2 size={14} /> 3D Buildings
+                      </span>
+                      <span className="text-[10px] uppercase">
+                        {show3D ? "ON" : "OFF"}
+                      </span>
+                    </button>
+                  </div>
+                </div>
 
-            <button
-              type="button"
-              onClick={() => setZoomLevel(MIN_MAP_ZOOM)}
-              className="w-8 h-5 rounded-full text-[8px] font-extrabold text-white"
-              title="Set minimum zoom"
-              style={{
-                backgroundColor: "rgba(17,24,39,0.78)",
-                border: "1px solid rgba(255,255,255,0.22)",
-              }}
-            >
-              MIN
-            </button>
+                {/* Vertical Divider */}
+                <div className="w-[1px] bg-gray-200" />
 
-            <span className="text-[8px] font-bold text-[#1F2937]">z{zoomLabel}</span>
-          </div>
+                {/* Zoom Controls Column */}
+                <div className="flex flex-col items-center justify-between py-1">
+                  <button
+                    onClick={() => setZoomLevel(MAX_MAP_ZOOM)}
+                    className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-700 transition"
+                    title="Max Zoom"
+                  >
+                    <Maximize size={12} />
+                  </button>
+                  <button
+                    onClick={() => stepZoom(1)}
+                    className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-800 text-white hover:bg-gray-700 transition"
+                  >
+                    <Plus size={14} />
+                  </button>
+
+                  <div className="flex-1 flex items-center justify-center relative my-2 min-h-[60px]">
+                    <div className="absolute font-bold text-[10px] text-gray-400 -left-6">
+                      z{zoomLabel}
+                    </div>
+                    <input
+                      type="range"
+                      min={MIN_MAP_ZOOM}
+                      max={MAX_MAP_ZOOM}
+                      step={0.25}
+                      value={mapZoom}
+                      onChange={(e) => setZoomLevel(Number(e.target.value))}
+                      className="zoom-slider"
+                      style={{
+                        transform: "rotate(-90deg)",
+                        width: "80px",
+                        accentColor: "#111827",
+                        cursor: "pointer",
+                      }}
+                    />
+                  </div>
+
+                  <button
+                    onClick={() => stepZoom(-1)}
+                    className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-800 text-white hover:bg-gray-700 transition"
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <button
+                    onClick={() => setZoomLevel(MIN_MAP_ZOOM)}
+                    className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-700 transition"
+                    title="Min Zoom"
+                  >
+                    <Minimize size={12} />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
 
         <style jsx>{`
-          .zoom-stick-input {
+          .zoom-slider {
             -webkit-appearance: none;
-            appearance: none;
             background: transparent;
           }
-
-          .zoom-stick-input::-webkit-slider-runnable-track {
-            height: 3px;
+          .zoom-slider::-webkit-slider-runnable-track {
+            height: 4px;
             border-radius: 999px;
-            background: rgba(17, 24, 39, 0.68);
+            background: #e5e7eb;
           }
-
-          .zoom-stick-input::-webkit-slider-thumb {
+          .zoom-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
-            appearance: none;
-            width: 10px;
-            height: 10px;
+            width: 14px;
+            height: 14px;
             border-radius: 50%;
-            background: #ffffff;
-            border: 2px solid rgba(17, 24, 39, 0.95);
-            margin-top: -3.5px;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
-          }
-
-          .zoom-stick-input::-moz-range-track {
-            height: 3px;
-            border-radius: 999px;
-            background: rgba(17, 24, 39, 0.68);
-          }
-
-          .zoom-stick-input::-moz-range-thumb {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #ffffff;
-            border: 2px solid rgba(17, 24, 39, 0.95);
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+            background: #fff;
+            border: 3px solid #111827;
+            margin-top: -5px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
           }
         `}</style>
+
+        {/* ── Floating Filter Panel ── */}
+        <AnimatePresence>
+          {isFilterPanelOpen && (
+            <>
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                onClick={() => setIsFilterPanelOpen(false)}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  backgroundColor: "rgba(0,0,0,0.18)",
+                  zIndex: 30,
+                }}
+              />
+
+              {/* Filter Panel (Positioned next to right bar) */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: "-47%", x: 20 }}
+                animate={{ opacity: 1, scale: 1, y: "-50%", x: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: "-47%", x: 20 }}
+                transition={{ type: "spring", damping: 28, stiffness: 340 }}
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  right: `${(isRightPanelOpen ? RIGHT_PANEL_WIDTH : RIGHT_PANEL_COLLAPSED_WIDTH) + 20}px`,
+                  width: "min(480px, 90%)",
+                  maxHeight: "85vh",
+                  overflowY: "auto",
+                  zIndex: 35,
+                  borderRadius: 20,
+                  backgroundColor: "rgba(255,255,255,0.92)",
+                  backdropFilter: "blur(24px)",
+                  border: "1px solid rgba(15,23,42,0.08)",
+                  boxShadow:
+                    "0 20px 60px rgba(15,23,42,0.18), 0 4px 16px rgba(15,23,42,0.08)",
+                  padding: "20px",
+                }}
+                className="no-scrollbar"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between mb-5">
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className="flex items-center justify-center"
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 10,
+                        background:
+                          "linear-gradient(135deg, #ff6b35 0%, #ff8f5e 100%)",
+                        boxShadow: "0 4px 12px rgba(255,107,53,0.3)",
+                      }}
+                    >
+                      <SlidersHorizontal size={15} color="#fff" />
+                    </div>
+                    <div>
+                      <p className="text-[15px] font-bold text-[#111827]">
+                        Filters
+                      </p>
+                      <p className="text-[11px] text-[#94A3B8] font-medium">
+                        {filtered.length} spots match
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {activeFilterCount > 0 && (
+                      <button
+                        onClick={clearAllFilters}
+                        className="text-[11px] font-semibold text-[#ff6b35] hover:text-[#e55a28] transition-colors px-2 py-1"
+                      >
+                        Reset
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setIsFilterPanelOpen(false)}
+                      className="flex items-center justify-center"
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 8,
+                        background: "rgba(15,23,42,0.06)",
+                        color: "#64748B",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Categories Grid */}
+                <div className="mb-5">
+                  <p className="text-[10px] uppercase tracking-[0.16em] font-semibold text-[#94A3B8] mb-2.5 px-0.5">
+                    Category
+                  </p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {CATEGORIES.map((cat) => (
+                      <motion.button
+                        key={cat}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setCategory(cat)}
+                        className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl text-[11px] font-semibold border transition-all"
+                        style={
+                          category === cat
+                            ? {
+                                background:
+                                  "linear-gradient(180deg, #111827 0%, #1F2937 100%)",
+                                borderColor: "rgba(255,255,255,0.2)",
+                                color: "#fff",
+                                boxShadow: "0 6px 16px rgba(17,24,39,0.2)",
+                              }
+                            : {
+                                backgroundColor: "rgba(255,255,255,0.8)",
+                                borderColor: "rgba(15,23,42,0.08)",
+                                color: "#334155",
+                                boxShadow: "0 2px 6px rgba(15,23,42,0.04)",
+                              }
+                        }
+                      >
+                        <span style={{ fontSize: 18 }}>
+                          {CATEGORY_ICONS[cat]}
+                        </span>
+                        {cat}
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div
+                  style={{
+                    height: 1,
+                    background: "rgba(15,23,42,0.06)",
+                    margin: "0 -4px 16px",
+                  }}
+                />
+
+                {/* Availability & Price Row */}
+                <div className="flex items-start gap-3 mb-4">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.16em] font-semibold text-[#94A3B8] mb-2 px-0.5">
+                      Hours
+                    </p>
+                    <button
+                      onClick={() => setOpenOnly((v) => !v)}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[12px] font-semibold border transition-all"
+                      style={
+                        openOnly
+                          ? {
+                              background:
+                                "linear-gradient(180deg, #16A34A 0%, #15803D 100%)",
+                              borderColor: "rgba(255,255,255,0.22)",
+                              color: "#fff",
+                              boxShadow: "0 6px 14px rgba(21,128,61,0.2)",
+                            }
+                          : {
+                              backgroundColor: "rgba(255,255,255,0.8)",
+                              borderColor: "rgba(15,23,42,0.08)",
+                              color: "#334155",
+                              boxShadow: "0 2px 6px rgba(15,23,42,0.04)",
+                            }
+                      }
+                    >
+                      <Clock size={13} /> Open Now
+                    </button>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.16em] font-semibold text-[#94A3B8] mb-2 px-0.5">
+                      Budget
+                    </p>
+                    <div
+                      className="flex gap-1 p-1 rounded-xl"
+                      style={{
+                        backgroundColor: "rgba(255,255,255,0.8)",
+                        border: "1px solid rgba(15,23,42,0.08)",
+                        boxShadow: "0 2px 6px rgba(15,23,42,0.04)",
+                      }}
+                    >
+                      {([1, 2, 3] as const).map((price) => (
+                        <button
+                          key={price}
+                          onClick={() => setPriceMax(price)}
+                          className="px-3.5 py-2 rounded-lg text-[12px] font-bold border transition-all"
+                          style={
+                            priceMax === price
+                              ? {
+                                  background:
+                                    "linear-gradient(180deg, #111827 0%, #1F2937 100%)",
+                                  borderColor: "rgba(255,255,255,0.18)",
+                                  color: "#fff",
+                                }
+                              : {
+                                  backgroundColor: "transparent",
+                                  borderColor: "transparent",
+                                  color: "#64748B",
+                                }
+                          }
+                        >
+                          {PRICE_ICONS[price]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div
+                  style={{
+                    height: 1,
+                    background: "rgba(15,23,42,0.06)",
+                    margin: "0 -4px 16px",
+                  }}
+                />
+
+                {/* Rating Filter */}
+                <div className="mb-4">
+                  <p className="text-[10px] uppercase tracking-[0.16em] font-semibold text-[#94A3B8] mb-2 px-0.5">
+                    Minimum Rating
+                  </p>
+                  <div className="flex gap-1.5">
+                    {[0, 3.5, 4.0, 4.5].map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => setMinRating(r)}
+                        className="flex items-center gap-1 px-3 py-2 rounded-xl text-[12px] font-semibold border transition-all"
+                        style={
+                          minRating === r
+                            ? {
+                                background:
+                                  "linear-gradient(180deg, #111827 0%, #1F2937 100%)",
+                                borderColor: "rgba(255,255,255,0.18)",
+                                color: "#fff",
+                                boxShadow: "0 4px 12px rgba(17,24,39,0.18)",
+                              }
+                            : {
+                                backgroundColor: "rgba(255,255,255,0.8)",
+                                borderColor: "rgba(15,23,42,0.08)",
+                                color: "#334155",
+                                boxShadow: "0 2px 6px rgba(15,23,42,0.04)",
+                              }
+                        }
+                      >
+                        <Star
+                          size={11}
+                          fill={minRating === r && r > 0 ? "#FBBF24" : "none"}
+                          color={minRating === r ? "#FBBF24" : "#94A3B8"}
+                        />
+                        {r === 0 ? "Any" : `${r}+`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div
+                  style={{
+                    height: 1,
+                    background: "rgba(15,23,42,0.06)",
+                    margin: "0 -4px 16px",
+                  }}
+                />
+
+                {/* Tag Filtering */}
+                <div className="mb-5">
+                  <p className="text-[10px] uppercase tracking-[0.16em] font-semibold text-[#94A3B8] mb-2.5 px-0.5">
+                    Tags{" "}
+                    {selectedTags.size > 0 && (
+                      <span className="text-[#ff6b35] normal-case">
+                        ({selectedTags.size})
+                      </span>
+                    )}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {ALL_TAGS.map((tag) => (
+                      <motion.button
+                        key={tag}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => toggleTag(tag)}
+                        className="px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-all"
+                        style={
+                          selectedTags.has(tag)
+                            ? {
+                                background:
+                                  "linear-gradient(180deg, #111827 0%, #1F2937 100%)",
+                                borderColor: "rgba(255,255,255,0.18)",
+                                color: "#fff",
+                                boxShadow: "0 3px 10px rgba(17,24,39,0.16)",
+                              }
+                            : {
+                                backgroundColor: "rgba(255,255,255,0.8)",
+                                borderColor: "rgba(15,23,42,0.08)",
+                                color: "#64748B",
+                              }
+                        }
+                      >
+                        {tag}
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div
+                  style={{
+                    height: 1,
+                    background: "rgba(15,23,42,0.06)",
+                    margin: "0 -4px 16px",
+                  }}
+                />
+
+                {/* Sort By section */}
+                <div className="mb-5">
+                  <p className="text-[10px] uppercase tracking-[0.16em] font-semibold text-[#94A3B8] mb-2.5 px-0.5">
+                    Sort By
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: "recommended", label: "Recommended" },
+                      { id: "rating", label: "Highest Rated" },
+                      { id: "reviews", label: "Most Reviews" },
+                    ].map((opt) => {
+                      const isActive = sortBy === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          onClick={() => setSortBy(opt.id as any)}
+                          className="px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-all"
+                          style={
+                            isActive
+                              ? {
+                                  background:
+                                    "linear-gradient(180deg, #111827 0%, #1F2937 100%)",
+                                  borderColor: "rgba(255,255,255,0.18)",
+                                  color: "#fff",
+                                  boxShadow: "0 3px 10px rgba(17,24,39,0.16)",
+                                }
+                              : {
+                                  backgroundColor: "rgba(255,255,255,0.8)",
+                                  borderColor: "rgba(15,23,42,0.08)",
+                                  color: "#64748B",
+                                }
+                          }
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Apply Button */}
+                <motion.button
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setIsFilterPanelOpen(false)}
+                  className="w-full py-3 rounded-xl text-[13px] font-bold transition-all"
+                  style={{
+                    background:
+                      "linear-gradient(180deg, #111827 0%, #1F2937 100%)",
+                    color: "#fff",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    boxShadow: "0 8px 20px rgba(17,24,39,0.22)",
+                  }}
+                >
+                  Show {filtered.length} spots
+                </motion.button>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
       </div>
 
       <div
@@ -422,178 +975,332 @@ export default function ExploreClient() {
           right: 0,
           top: 0,
           bottom: 0,
-          width: "360px",
-          backgroundColor: "rgba(255,255,255,0.93)",
+          width: isRightPanelOpen
+            ? `${RIGHT_PANEL_WIDTH}px`
+            : `${RIGHT_PANEL_COLLAPSED_WIDTH}px`,
+          background:
+            "linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,250,252,0.95) 100%)",
           backdropFilter: "blur(14px)",
-          borderLeft: "1px solid rgba(0,0,0,0.06)",
+          borderLeft: "1px solid rgba(15,23,42,0.08)",
           display: "flex",
           flexDirection: "column",
-          overflowY: "auto",
+          overflow: "hidden",
           zIndex: 20,
+          pointerEvents: "auto",
+          boxShadow: isRightPanelOpen
+            ? RIGHT_PANEL_OPEN_SHADOW
+            : RIGHT_PANEL_COLLAPSED_SHADOW,
+          transition: "width 0.28s cubic-bezier(0.22, 1, 0.36, 1)",
         }}
       >
-        <div
-          style={{
-            padding: "24px 20px 16px",
-            borderBottom: "1px solid rgba(0,0,0,0.05)",
-          }}
-        >
-          <div className="flex items-center gap-2 mb-1">
-            <Navigation size={20} className="text-[#ff6b35]" />
-            <h1 className="text-[22px] font-extrabold text-[#1C1C1E] tracking-tight">
-              Explore
-            </h1>
-          </div>
-          <p className="text-[13px] text-[#8E8E93]">
-            {filtered.length} spots · Ho Chi Minh City
-          </p>
-
-          <div className="relative mt-3">
-            <Search
-              size={15}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93]"
-            />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search spots, cuisines..."
-              className="w-full pl-9 pr-9 py-2.5 rounded-m text-[14px] outline-none transition-all"
+        {isRightPanelOpen ? (
+          <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto" }}>
+            <div
               style={{
-                backgroundColor: "#F2F2F7",
-                border: "1.5px solid transparent",
-                color: "#1C1C1E",
+                padding: "16px 18px 14px",
+                borderBottom: "1px solid rgba(15,23,42,0.06)",
+                background: "rgba(255,255,255,0.92)",
               }}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#ff6b35")}
-              onBlur={(e) =>
-                (e.currentTarget.style.borderColor = "transparent")
-              }
-            />
-            {search && (
-              <button
-                onClick={() => setSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8E8E93]"
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div
-          className="flex gap-2 overflow-x-auto no-scrollbar px-4 py-3"
-          style={{ borderBottom: "1px solid rgba(0,0,0,0.05)" }}
-        >
-          {CATEGORIES.map((cat) => (
-            <motion.button
-              key={cat}
-              whileTap={{ scale: 0.93 }}
-              onClick={() => setCategory(cat)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold whitespace-nowrap border transition-all"
-              style={
-                category === cat
-                  ? {
-                      backgroundColor: "#1C1C1E",
-                      borderColor: "#1C1C1E",
-                      color: "#fff",
-                    }
-                  : {
-                      backgroundColor: "#F2F2F7",
-                      borderColor: "transparent",
-                      color: "#3C3C43",
-                    }
-              }
             >
-              {CATEGORY_ICONS[cat]} {cat}
-            </motion.button>
-          ))}
-        </div>
+              <div className="flex items-center justify-between mb-2">
+                <button
+                  type="button"
+                  onClick={() => setIsRightPanelOpen(false)}
+                  className="flex items-center justify-center"
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 9,
+                    background: "rgba(15,23,42,0.05)",
+                    border: "1px solid rgba(15,23,42,0.06)",
+                    color: "#94A3B8",
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(15,23,42,0.1)";
+                    e.currentTarget.style.color = "#334155";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "rgba(15,23,42,0.05)";
+                    e.currentTarget.style.color = "#94A3B8";
+                  }}
+                  aria-label="Collapse right panel"
+                  title="Hide panel"
+                >
+                  <ChevronRight size={14} />
+                </button>
 
-        <div
-          className="flex items-center gap-3 px-4 py-3"
-          style={{ borderBottom: "1px solid rgba(0,0,0,0.05)" }}
-        >
-          <SlidersHorizontal size={14} className="text-[#8E8E93]" />
+                <div className="flex items-center gap-2.5 flex-row-reverse text-right">
+                  <div
+                    className="flex items-center justify-center"
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 10,
+                      background:
+                        "linear-gradient(135deg, #ff6b35 0%, #ff8f5e 100%)",
+                      boxShadow: "0 3px 10px rgba(255,107,53,0.25)",
+                    }}
+                  >
+                    <Search size={14} color="#fff" />
+                  </div>
+                  <div className="leading-tight">
+                    <h1 className="text-[17px] font-extrabold text-[#111827] tracking-tight">
+                      Explore
+                    </h1>
+                    <p className="text-[10px] font-semibold tracking-[0.14em] text-[#94A3B8] uppercase">
+                      City Discovery
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-          <button
-            onClick={() => setOpenOnly((value) => !value)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-all"
-            style={
-              openOnly
-                ? {
-                    backgroundColor: "#34C759",
-                    borderColor: "#34C759",
-                    color: "#fff",
-                  }
-                : {
-                    backgroundColor: "#F2F2F7",
-                    borderColor: "transparent",
-                    color: "#3C3C43",
-                  }
-            }
-          >
-            <Clock size={12} /> Open Now
-          </button>
-
-          <div className="flex gap-1">
-            {([1, 2, 3] as const).map((price) => (
-              <button
-                key={price}
-                onClick={() => setPriceMax(price)}
-                className="px-2.5 py-1.5 rounded-full text-[11px] font-bold border transition-all"
-                style={
-                  priceMax === price
-                    ? {
-                        backgroundColor: "#1C1C1E",
-                        borderColor: "#1C1C1E",
-                        color: "#fff",
-                      }
-                    : {
-                        backgroundColor: "#F2F2F7",
-                        borderColor: "transparent",
-                        color: "#8E8E93",
-                      }
-                }
-              >
-                {PRICE_ICONS[price]}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex flex-col px-3 py-2 gap-1">
-          <AnimatePresence>
-            {filtered.map((spot) => (
-              <SpotCard
-                key={spot.id}
-                spot={spot}
-                selected={selected?.id === spot.id}
-                onClick={() =>
-                  setSelected((prev) => (prev?.id === spot.id ? null : spot))
-                }
-              />
-            ))}
-          </AnimatePresence>
-
-          {filtered.length === 0 && (
-            <div className="flex flex-col items-center py-16 text-center gap-2">
               <div
-                className="w-14 h-14 rounded-full flex items-center justify-center"
+                className="relative mt-3"
+                style={{ position: "relative", zIndex: 1 }}
+              >
+                <Search
+                  size={15}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93]"
+                />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search spots, cuisines..."
+                  className="w-full pl-9 pr-9 py-2.5 text-[14px] outline-none transition-all"
+                  style={{
+                    backgroundColor: "rgba(255,255,255,0.92)",
+                    border: "1.5px solid rgba(15,23,42,0.08)",
+                    borderRadius: "14px",
+                    color: "#1C1C1E",
+                    boxShadow: "0 6px 14px rgba(15,23,42,0.06)",
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = "#ff6b35";
+                    e.currentTarget.style.boxShadow =
+                      "0 0 0 4px rgba(255,107,53,0.12)";
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = "rgba(15,23,42,0.08)";
+                    e.currentTarget.style.boxShadow =
+                      "0 6px 14px rgba(15,23,42,0.06)";
+                  }}
+                />
+                {search && (
+                  <button
+                    onClick={() => setSearch("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8E8E93]"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Filter Trigger Bar */}
+            <div
+              className="px-3 py-2.5"
+              style={{
+                borderBottom: "1px solid rgba(15,23,42,0.06)",
+                background: "rgba(255,255,255,0.62)",
+              }}
+            >
+              <button
+                onClick={() => setIsFilterPanelOpen(true)}
+                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-[13px] font-semibold transition-all"
                 style={{
-                  backgroundColor: "rgba(142,142,147,0.1)",
-                  color: "#8E8E93",
+                  backgroundColor: isFilterPanelOpen
+                    ? "rgba(255,107,53,0.08)"
+                    : "rgba(255,255,255,0.9)",
+                  border: isFilterPanelOpen
+                    ? "1.5px solid rgba(255,107,53,0.25)"
+                    : "1.5px solid rgba(15,23,42,0.08)",
+                  color: "#334155",
+                  boxShadow: "0 2px 8px rgba(15,23,42,0.06)",
                 }}
               >
-                <SearchX size={28} />
-              </div>
-              <p className="text-[15px] font-bold text-[#1C1C1E]">
-                No spots match
-              </p>
-              <p className="text-[13px] text-[#8E8E93]">
-                Try clearing some filters
-              </p>
+                <div className="flex items-center gap-2">
+                  <Filter size={14} className="text-[#94A3B8]" />
+                  <span className="truncate">
+                    {activeFilterCount > 0 ? (
+                      <>
+                        {category !== "All" && (
+                          <span className="text-[#111827]">{category}</span>
+                        )}
+                        {openOnly && (
+                          <span className="text-[#16A34A]"> · Open</span>
+                        )}
+                        {priceMax !== 3 && (
+                          <span className="text-[#64748B]">
+                            {" "}
+                            · {PRICE_ICONS[priceMax]}
+                          </span>
+                        )}
+                        {minRating > 0 && (
+                          <span className="text-[#FBBF24]">
+                            {" "}
+                            · ★{minRating}+
+                          </span>
+                        )}
+                        {selectedTags.size > 0 && (
+                          <span className="text-[#8B5CF6]">
+                            {" "}
+                            · {selectedTags.size} tags
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      "All categories"
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {activeFilterCount > 0 && (
+                    <span
+                      className="flex items-center justify-center text-[10px] font-bold text-white"
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: 6,
+                        background: "linear-gradient(135deg, #ff6b35, #ff8f5e)",
+                      }}
+                    >
+                      {activeFilterCount}
+                    </span>
+                  )}
+                  <SlidersHorizontal size={13} className="text-[#94A3B8]" />
+                </div>
+              </button>
             </div>
-          )}
-        </div>
+
+            <div
+              className="flex flex-col px-3 py-3 gap-2"
+              style={{
+                background:
+                  "linear-gradient(180deg, rgba(250,252,255,0.76) 0%, rgba(248,250,252,0.88) 100%)",
+              }}
+            >
+              <div className="flex items-center justify-between px-1">
+                <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-[#64748B]">
+                  Top picks
+                </p>
+                <span
+                  className="text-[11px] font-semibold px-2 py-1 rounded-full"
+                  style={{
+                    color: "#334155",
+                    backgroundColor: "rgba(255,255,255,0.86)",
+                    border: "1px solid rgba(15,23,42,0.08)",
+                  }}
+                >
+                  {filtered.length}
+                </span>
+              </div>
+
+              <AnimatePresence mode="popLayout">
+                {filtered.map((spot, index) => (
+                  <motion.div
+                    key={spot.id}
+                    initial={{ opacity: 0, y: 12, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -8 }}
+                    transition={{
+                      type: "spring",
+                      damping: 25,
+                      stiffness: 300,
+                      delay: index * 0.04,
+                    }}
+                    layout
+                  >
+                    <SpotCard
+                      spot={spot}
+                      selected={selected?.id === spot.id}
+                      onClick={() =>
+                        setSelected((prev) =>
+                          prev?.id === spot.id ? null : spot,
+                        )
+                      }
+                      onMouseEnter={() => setHoveredSpotId(spot.id)}
+                      onMouseLeave={() => setHoveredSpotId(null)}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+
+              {filtered.length === 0 && (
+                <div className="flex flex-col items-center py-16 text-center gap-2">
+                  <div
+                    className="w-14 h-14 rounded-full flex items-center justify-center"
+                    style={{
+                      backgroundColor: "rgba(142,142,147,0.1)",
+                      color: "#8E8E93",
+                    }}
+                  >
+                    <SearchX size={28} />
+                  </div>
+                  <p className="text-[15px] font-bold text-[#1C1C1E]">
+                    No spots match
+                  </p>
+                  <p className="text-[13px] text-[#8E8E93]">
+                    Try clearing some filters
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "flex-start",
+              paddingTop: "18px",
+            }}
+          >
+            <div className="flex flex-col items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsRightPanelOpen(true)}
+                className="flex items-center justify-center"
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "12px",
+                  background: "rgba(15,23,42,0.06)",
+                  border: "1px solid rgba(15,23,42,0.08)",
+                  color: "#64748B",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(15,23,42,0.1)";
+                  e.currentTarget.style.color = "#334155";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(15,23,42,0.06)";
+                  e.currentTarget.style.color = "#64748B";
+                }}
+                aria-label="Expand right panel"
+                title="Show panel"
+              >
+                <ChevronLeft size={16} />
+              </button>
+
+              <div
+                style={{
+                  writingMode: "vertical-rl",
+                  transform: "rotate(180deg)",
+                  letterSpacing: "0.22em",
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  color: "#94A3B8",
+                  userSelect: "none",
+                }}
+              >
+                EXPLORE
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

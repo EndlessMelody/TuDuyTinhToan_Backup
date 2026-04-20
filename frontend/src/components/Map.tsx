@@ -16,6 +16,6 @@ const MapWidget = dynamic(
   }
 );
 
-export default function Map() {
-  return <MapWidget />;
+export default function Map(props: any) {
+  return <MapWidget {...props} />;
 }

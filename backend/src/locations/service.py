@@ -111,3 +111,56 @@ async def create_location(db: AsyncSession, data: LocationCreate) -> Location:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
     return loc
+
+
+async def find_locations_by_food_name(
+    db: AsyncSession,
+    food_name: str,
+    limit: int = 10,
+) -> LocationListResponse:
+    """
+    Find locations that likely serve the searched food.
+    Uses smart matching: name contains food_name OR category is 'food' with name similarity.
+    """
+    from sqlalchemy import or_, func
+    
+    # Normalize search term
+    search_term = food_name.lower().strip()
+    
+    # Build query with flexible matching
+    query = select(Location).where(
+        or_(
+            # Direct name match (e.g., "Phở" matches "Phở Thìn")
+            func.lower(Location.name).contains(search_term),
+            # Food category locations that might serve this
+            Location.category == "food",
+        )
+    )
+    
+    # Prefer food category, then by rating
+    query = query.order_by(
+        func.case((Location.category == "food", 1), else_=0).desc(),
+        Location.rating.desc().nullslast(),
+        Location.base_score.desc().nullslast(),
+    )
+    
+    query = query.limit(limit)
+    result = await db.execute(query)
+    locations = result.scalars().all()
+    
+    # If no direct matches, fallback to any food locations
+    if not locations:
+        fallback_query = select(Location).where(
+            Location.category == "food"
+        ).order_by(
+            Location.rating.desc().nullslast(),
+        ).limit(limit)
+        fallback_result = await db.execute(fallback_query)
+        locations = fallback_result.scalars().all()
+    
+    return LocationListResponse(
+        items=[LocationResponse.model_validate(loc) for loc in locations],
+        total=len(locations),
+        limit=limit,
+        offset=0,
+    )

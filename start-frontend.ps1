@@ -1,8 +1,7 @@
 # Start the TasteMap Next.js frontend
 # Runs on http://localhost:3000
 
-$projectRoot = Split-Path -Parent $PSScriptRoot
-$frontendPath = Join-Path $projectRoot "frontend"
+$frontendPath = "C:\Users\phanp\Code\TasteMap\frontend"
 
 Write-Host "Starting TasteMap Frontend (Next.js)..." -ForegroundColor Cyan
 Write-Host "Location: $frontendPath" -ForegroundColor Gray

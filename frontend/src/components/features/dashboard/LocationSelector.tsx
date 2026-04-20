@@ -54,12 +54,16 @@ type DrillLevel = "province" | "district" | "ward";
 
 /* ── Component ── */
 
+import { useAuth } from "@/context/AuthContext";
+
 export const LocationSelector: React.FC<LocationSelectorProps> = ({
   value,
   onChange,
 }) => {
+  const { isLoggedIn } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"gps" | "manual">("manual");
+  const [hasAutoDetected, setHasAutoDetected] = useState(false);
 
   // 3-level drill-down state
   const [drillLevel, setDrillLevel] = useState<DrillLevel>("province");
@@ -75,6 +79,52 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { status, error, detect, reset } = useLocation();
   const isDetecting = status === "acquiring" || status === "geocoding";
+  // ── Handlers ──
+
+  const handleGPSDetect = useCallback(async () => {
+    setActiveTab("gps");
+    const result = await detect();
+    if (!result?.coordinate) return;
+
+    try {
+      const { lat, lon } = result.coordinate;
+      console.log("[GPS] Raw coordinates:", lat, lon);
+
+      // Coordinate matching for Province + District + Ward
+      const resolved = await resolveLocationByCoordinates(lat, lon);
+
+      console.log("[GPS] Resolved:", {
+        province: resolved.province.name,
+        district: resolved.district.name,
+        ward: resolved.ward.name,
+        wardCentroid: [resolved.ward.latitude, resolved.ward.longitude],
+      });
+
+      // Update drill-down state
+      setSelectedProvince(resolved.province);
+      const dists = await fetchDistricts(resolved.province.code);
+      setDistricts(dists);
+      setSelectedDistrict(resolved.district);
+      const wrds = await fetchWards(resolved.district.code);
+      setWards(wrds);
+      setDrillLevel("ward");
+
+      onChange(
+        formatLocationString(
+          `${resolved.ward.name}, ${resolved.district.name}, ${resolved.province.name}`,
+        ),
+      );
+      setIsOpen(false);
+    } catch (err) {
+      console.error("GPS coordinate resolution failed", err);
+      if (result.address?.formatted) {
+        onChange(formatLocationString(result.address.formatted));
+        setIsOpen(false);
+      }
+    }
+  }, [detect, onChange]);
+
+  // ── Effects ──
 
   // ── Close on outside click ──
   useEffect(() => {
@@ -93,6 +143,14 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
       setTimeout(() => searchInputRef.current?.focus(), 120);
     }
   }, [isOpen, activeTab, drillLevel]);
+
+  // ── Auto-detect on Login ──
+  useEffect(() => {
+    if (isLoggedIn && !value && !hasAutoDetected && status === "idle") {
+      setHasAutoDetected(true);
+      handleGPSDetect();
+    }
+  }, [isLoggedIn, value, hasAutoDetected, handleGPSDetect, status]);
 
   // ── Load provinces on first open ──
   useEffect(() => {
@@ -176,48 +234,6 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
     }
   }, [drillLevel]);
 
-  const handleGPSDetect = useCallback(async () => {
-    setActiveTab("gps");
-    const result = await detect();
-    if (!result?.coordinate) return;
-
-    try {
-      const { lat, lon } = result.coordinate;
-      console.log("[GPS] Raw coordinates:", lat, lon);
-
-      // Coordinate matching for Province + District + Ward
-      const resolved = await resolveLocationByCoordinates(lat, lon);
-
-      console.log("[GPS] Resolved:", {
-        province: resolved.province.name,
-        district: resolved.district.name,
-        ward: resolved.ward.name,
-        wardCentroid: [resolved.ward.latitude, resolved.ward.longitude],
-      });
-
-      // Update drill-down state
-      setSelectedProvince(resolved.province);
-      const dists = await fetchDistricts(resolved.province.code);
-      setDistricts(dists);
-      setSelectedDistrict(resolved.district);
-      const wrds = await fetchWards(resolved.district.code);
-      setWards(wrds);
-      setDrillLevel("ward");
-
-      onChange(
-        formatLocationString(
-          `${resolved.ward.name}, ${resolved.district.name}, ${resolved.province.name}`,
-        ),
-      );
-      setIsOpen(false);
-    } catch (err) {
-      console.error("GPS coordinate resolution failed", err);
-      if (result.address?.formatted) {
-        onChange(formatLocationString(result.address.formatted));
-        setIsOpen(false);
-      }
-    }
-  }, [detect, onChange]);
 
   const handleClear = useCallback(() => {
     onChange("");
@@ -247,11 +263,13 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
   }, [drillLevel]);
 
   const displayLabel = useMemo(() => {
-    if (!value) return "Discover";
+    if (isDetecting) return "Locating...";
+    if (status === "error") return "Set Location";
+    if (!value) return "Near You";
     const parts = value.split(",").map((s) => s.trim());
     // Display the most specific level available (Level 3 / Ward is parts[0])
     return parts[0];
-  }, [value]);
+  }, [value, isDetecting, status]);
 
   return (
     <div ref={panelRef} style={{ position: "relative" }}>
@@ -261,46 +279,75 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 8,
-          backgroundColor: isOpen ? "#fff3ed" : "#F2F2F7",
-          padding: "8px 18px",
+          gap: 10,
+          backgroundColor: isOpen ? "#fff3ed" : "rgba(242, 242, 247, 0.6)",
+          backdropFilter: "blur(8px)",
+          padding: "10px 20px",
           borderRadius: 999,
-          border: `1px solid ${isOpen ? "#ff6b35" : "#E5E5EA"}`,
+          border: "1px solid",
+          borderColor: isOpen ? "#ff6b35" : (value ? "#ffcdb8" : "#E5E5EA"),
           cursor: "pointer",
-          transition: "all 0.2s",
+          transition: "all 0.25s cubic-bezier(0.22, 1, 0.36, 1)",
           whiteSpace: "nowrap",
           maxWidth: 300,
+          boxShadow: isOpen 
+            ? "0 4px 12px rgba(255,107,53,0.15)" 
+            : (value ? "0 2px 8px rgba(255,107,53,0.05)" : "none"),
+        }}
+        onMouseEnter={(e) => {
+          if (!isOpen) {
+            e.currentTarget.style.borderColor = "#ffcdb8";
+            e.currentTarget.style.backgroundColor = "rgba(255, 243, 237, 0.8)";
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isOpen) {
+            e.currentTarget.style.borderColor = value ? "#ffcdb8" : "#E5E5EA";
+            e.currentTarget.style.backgroundColor = "rgba(242, 242, 247, 0.6)";
+          }
         }}
       >
-        <Compass size={15} color={value ? "#ff6b35" : "#ED1B24"} />
+        <Compass 
+          size={16} 
+          color={isOpen || value ? "#ff6b35" : "#AEAEB2"} 
+          style={{ transition: "color 0.2s" }}
+        />
         <Text
           style={{
-            color: "#1C1C1E",
-            fontWeight: 600,
-            fontSize: "0.82rem",
+            color: (isOpen || value) ? "#1C1C1E" : "#8E8E93",
+            fontWeight: (isOpen || value) ? 700 : 600,
+            fontSize: "0.85rem",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
             maxWidth: 220,
+            transition: "all 0.2s",
           }}
         >
           {displayLabel}
         </Text>
         {value ? (
-          <span
+          <motion.span
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
             onClick={(e) => { e.stopPropagation(); handleClear(); }}
             style={{
               display: "flex", alignItems: "center", justifyContent: "center",
-              width: 16, height: 16, borderRadius: "50%",
-              backgroundColor: "#E5E5EA", cursor: "pointer", flexShrink: 0,
+              width: 18, height: 18, borderRadius: "50%",
+              backgroundColor: "#ff6b35", cursor: "pointer", flexShrink: 0,
+              boxShadow: "0 2px 4px rgba(255,107,53,0.2)",
             }}
           >
-            <X size={10} color="#8E8E93" />
-          </span>
+            <X size={10} color="white" />
+          </motion.span>
         ) : (
           <ChevronDown
             size={14} color="#C7C7CC"
-            style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}
+            style={{ 
+              transform: isOpen ? "rotate(180deg)" : "none", 
+              transition: "transform 0.25s ease-out",
+              marginLeft: -2
+            }}
           />
         )}
       </button>

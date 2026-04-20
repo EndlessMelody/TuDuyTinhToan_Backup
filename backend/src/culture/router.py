@@ -160,20 +160,38 @@ async def identify_from_upload(
 
 def _to_response(result: dict, identified_from_image: bool = False) -> CultureStoryResponse:
     """Convert raw Groq result dict to CultureStoryResponse."""
+    # Handle both old "sections" format and new "insights" format
     sections = []
-    for s in result.get("sections", []):
-        sections.append(CultureStorySection(
-            title=s.get("title", ""),
-            content=s.get("content", ""),
-            icon=s.get("icon"),
-        ))
+
+    # Try new "insights" format first (nội_dung -> content)
+    insights = result.get("insights", [])
+    if insights:
+        for idx, s in enumerate(insights):
+            # Map nội_dung to content for the response
+            content = s.get("nội_dung") or s.get("content", "")
+            sections.append(CultureStorySection(
+                title=s.get("title", ""),
+                content=content,
+                icon=s.get("icon"),
+            ))
+    else:
+        # Fallback to old "sections" format
+        for s in result.get("sections", []):
+            sections.append(CultureStorySection(
+                title=s.get("title", ""),
+                content=s.get("content", ""),
+                icon=s.get("icon"),
+            ))
+
+    # Handle both "tags" (new) and "taste_tags" (old) format
+    taste_tags = result.get("tags") or result.get("taste_tags", [])
 
     return CultureStoryResponse(
         food_name=result.get("food_name", ""),
         food_name_local=result.get("food_name_local"),
         identified_from_image=identified_from_image,
         sections=sections,
-        taste_tags=result.get("taste_tags", []),
+        taste_tags=taste_tags,
         pairing_suggestions=result.get("pairing_suggestions", []),
         when_to_eat=result.get("when_to_eat"),
         fun_fact=result.get("fun_fact"),

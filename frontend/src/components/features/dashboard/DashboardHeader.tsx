@@ -15,7 +15,7 @@ import {
   Input,
   Avatar,
 } from "@/components/OnceUI";
-import { Bell, MessageSquare } from "lucide-react";
+import { Bell, MessageSquare, Search } from "lucide-react";
 import { ProfileMenuItem } from "@/components/common/ProfileMenuItem";
 import { LogOut, User, Settings, Info } from "lucide-react";
 import { toast } from "sonner";
@@ -165,35 +165,45 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         />
 
         {/* Search */}
-        <motion.div style={{ width: searchWidth, position: "relative" }}>
-          <Input
+        <motion.div style={{ width: searchWidth, position: "relative", zIndex: 2 }}>
+          <Search
+            size={16}
+            color={isSearchFocused ? "#ff6b35" : "#AEAEB2"}
+            style={{
+              position: "absolute",
+              left: "18px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              zIndex: 1,
+              pointerEvents: "none",
+              transition: "color 0.2s ease-out",
+            }}
+          />
+          <input
             placeholder="Search locations, tours, foodies..."
             onFocus={() => setIsSearchFocused(true)}
             onBlur={() => setIsSearchFocused(false)}
             style={{
               borderRadius: "999px",
-              paddingTop: "10px",
-              paddingBottom: "10px",
-              paddingLeft: "20px",
-              paddingRight: "20px",
+              paddingTop: "12px",
+              paddingBottom: "12px",
+              paddingLeft: "44px",
+              paddingRight: "60px",
               width: "100%",
+              outline: "none",
+              backgroundColor: isSearchFocused ? "#ffffff" : "rgba(242, 242, 247, 0.5)",
               borderTopWidth: isSearchFocused ? "1.5px" : "1px",
               borderBottomWidth: isSearchFocused ? "1.5px" : "1px",
               borderLeftWidth: isSearchFocused ? "1.5px" : "1px",
               borderRightWidth: isSearchFocused ? "1.5px" : "1px",
-              borderTopStyle: "solid",
-              borderBottomStyle: "solid",
-              borderLeftStyle: "solid",
-              borderRightStyle: "solid",
-              borderTopColor: isSearchFocused ? "#ff6b35" : "#E5E5EA",
-              borderBottomColor: isSearchFocused ? "#ff6b35" : "#E5E5EA",
-              borderLeftColor: isSearchFocused ? "#ff6b35" : "#E5E5EA",
-              borderRightColor: isSearchFocused ? "#ff6b35" : "#E5E5EA",
-              transitionProperty: "all",
-              transitionDuration: "0.2s",
+              borderStyle: "solid",
+              borderColor: isSearchFocused ? "#ff6b35" : "#E5E5EA",
+              transition: "all 0.25s cubic-bezier(0.22, 1, 0.36, 1)",
               boxShadow: isSearchFocused
-                ? "0 0 0 4px rgba(255, 107, 53, 0.1)"
+                ? "0 8px 32px rgba(255, 107, 53, 0.12), 0 0 0 4px rgba(255, 107, 53, 0.05)"
                 : "none",
+              fontSize: "0.9rem",
+              color: "#1C1C1E",
             }}
           />
           <Row
@@ -209,28 +219,20 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           >
             <span
               style={{
-                paddingTop: "2px",
-                paddingBottom: "2px",
-                paddingLeft: "6px",
-                paddingRight: "6px",
-                backgroundColor: "#F2F2F7",
-                borderTopWidth: "1px",
-                borderBottomWidth: "1px",
-                borderLeftWidth: "1px",
-                borderRightWidth: "1px",
-                borderTopStyle: "solid",
-                borderBottomStyle: "solid",
-                borderLeftStyle: "solid",
-                borderRightStyle: "solid",
-                borderTopColor: "#E5E5EA",
-                borderBottomColor: "#E5E5EA",
-                borderLeftColor: "#E5E5EA",
-                borderRightColor: "#E5E5EA",
-                borderRadius: "4px",
-                fontSize: "0.6rem",
+                paddingTop: "3px",
+                paddingBottom: "3px",
+                paddingLeft: "8px",
+                paddingRight: "8px",
+                backgroundColor: isSearchFocused ? "#fff0e5" : "#FFFFFF",
+                border: "1px solid",
+                borderColor: isSearchFocused ? "#ffcda8" : "#E5E5EA",
+                borderRadius: "6px",
+                fontSize: "0.65rem",
                 fontWeight: 700,
-                color: "#AEAEB2",
+                color: isSearchFocused ? "#ff6b35" : "#AEAEB2",
                 lineHeight: 1.2,
+                boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
+                transition: "all 0.25s",
               }}
             >
               Ctrl + K

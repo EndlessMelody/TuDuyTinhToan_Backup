@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Row, Heading, Text, Input, IconButton } from "@/components/OnceUI";
 import { useAuth } from "@/context/AuthContext";
-import { apiPost } from "@/lib/api";
+import { apiPost, apiGet } from "@/lib/api";
+import { normalizeImageUrl } from "@/lib/image-utils";
+import MapWidget from "@/components/MapWidget";
 import { Fraunces, Manrope } from "next/font/google";
 import {
   Search,
@@ -20,6 +22,7 @@ import {
   ChevronRight,
   Flame,
   MapPin,
+  Tag,
 } from "lucide-react";
 
 const displayFont = Fraunces({
@@ -53,6 +56,28 @@ interface CultureStoryResponse {
   fun_fact?: string | null;
 }
 
+interface LocationItem {
+  id: number;
+  name: string;
+  lat: number;
+  lng: number;
+  address?: string | null;
+  city?: string | null;
+  category?: string | null;
+  image_url?: string | null;
+  price_range?: string | null;
+  open_hours?: string | null;
+  rating?: number | null;
+  characteristics?: Record<string, unknown> | null;
+}
+
+interface LocationListResponse {
+  items: LocationItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 // ─── Section Icon Map ─────────────────────────────────────────────────────────
 
 const SECTION_ICONS: Record<string, React.ReactNode> = {
@@ -60,6 +85,14 @@ const SECTION_ICONS: Record<string, React.ReactNode> = {
   "Cultural Significance": <BookOpen size={18} />,
   "How Locals Eat It": <Sparkles size={18} />,
   "The Science of Flavor": <Lightbulb size={18} />,
+  Origin: <Globe size={18} />,
+  History: <BookOpen size={18} />,
+  Flavor: <Sparkles size={18} />,
+  Taste: <Sparkles size={18} />,
+  Preparation: <Lightbulb size={18} />,
+  Cooking: <Flame size={18} />,
+  Seasonal: <Clock size={18} />,
+  "Best Places": <MapPin size={18} />,
 };
 
 // ─── Suggested Dishes ─────────────────────────────────────────────────────────
@@ -115,32 +148,35 @@ const SUGGESTED_DISHES = [
   },
 ];
 
-const normalizeImageUrl = (url?: string | null): string | null => {
-  if (!url) return null;
-
-  const trimmed = url.trim();
-  if (!trimmed) return null;
-
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (trimmed.startsWith("//")) return `https:${trimmed}`;
-
-  const baseUrl =
-    process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
-    "http://127.0.0.1:8000";
-
-  return `${baseUrl}/${trimmed.replace(/^\/+/, "")}`;
-};
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CulturePage() {
   useAuth(); // ensures auth context is loaded
   const [searchQuery, setSearchQuery] = useState("");
   const [story, setStory] = useState<CultureStoryResponse | null>(null);
+  const [locations, setLocations] = useState<LocationItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Map center based on locations or default to Vietnam center
+  const mapCenter: [number, number] = useMemo(() => {
+    if (locations.length > 0) {
+      // Calculate centroid of all locations
+      const avgLat =
+        locations.reduce((sum, loc) => sum + loc.lat, 0) / locations.length;
+      const avgLng =
+        locations.reduce((sum, loc) => sum + loc.lng, 0) / locations.length;
+      return [avgLat, avgLng];
+    }
+    return [10.897, 106.772]; // Default: Vung Tau area
+  }, [locations]);
+
+  // Map points from locations
+  const mapPoints: [number, number][] = useMemo(() => {
+    return locations.map((loc) => [loc.lat, loc.lng]);
+  }, [locations]);
 
   const handleSearch = async (foodName?: string) => {
     const query = foodName || searchQuery.trim();
@@ -149,17 +185,23 @@ export default function CulturePage() {
     setLoading(true);
     setError(null);
     setStory(null);
+    setLocations([]);
     setActiveSection(0);
 
     try {
-      const result = await apiPost<CultureStoryResponse>(
-        "/api/v1/culture/story",
-        {
+      // Fetch culture story and locations in parallel
+      const [storyResult, locationsResult] = await Promise.all([
+        apiPost<CultureStoryResponse>("/api/v1/culture/story", {
           food_name: query,
           language: "vi",
-        },
-      );
-      setStory(result);
+        }),
+        apiGet<LocationListResponse>(
+          `/api/v1/locations/by-food/${encodeURIComponent(query)}?limit=12`,
+        ),
+      ]);
+
+      setStory(storyResult);
+      setLocations(locationsResult.items || []);
     } catch (e: unknown) {
       setError(
         e instanceof Error
@@ -929,20 +971,49 @@ export default function CulturePage() {
                     />
                   </div>
                 )}
+              </div>
 
-                {story.taste_tags.length > 0 && (
+              {/* Tags & Insight Count */}
+              {story.taste_tags.length > 0 && (
+                <div
+                  className="culture-story-card"
+                  style={{
+                    borderRadius: 16,
+                    padding: "16px",
+                    border: "1px solid rgba(255,167,103,0.35)",
+                    background:
+                      "linear-gradient(150deg, rgba(255,250,245,0.95), rgba(255,238,220,0.92))",
+                  }}
+                >
+                  <Row
+                    style={{ alignItems: "center", gap: 8, marginBottom: 10 }}
+                  >
+                    <Tag size={16} color="#d6622a" />
+                    <Text
+                      style={{
+                        fontSize: "0.74rem",
+                        fontWeight: 800,
+                        color: "#c9551f",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.07em",
+                      }}
+                    >
+                      {story.sections.length} Insights
+                    </Text>
+                  </Row>
                   <Row style={{ flexWrap: "wrap", gap: 6 }}>
                     {story.taste_tags.map((tag) => (
                       <span
                         key={tag}
                         style={{
-                          padding: "5px 10px",
+                          padding: "6px 12px",
                           borderRadius: 999,
-                          backgroundColor: "rgba(255,124,68,0.1)",
-                          border: "1px solid rgba(214,105,48,0.2)",
-                          fontSize: "0.72rem",
+                          background:
+                            "linear-gradient(135deg, rgba(255,167,103,0.15), rgba(255,138,90,0.1))",
+                          border: "1px solid rgba(214,105,48,0.25)",
+                          fontSize: "0.75rem",
                           fontWeight: 700,
-                          color: "#b44b1d",
+                          color: "#a84a1a",
                           letterSpacing: "0.01em",
                         }}
                       >
@@ -950,8 +1021,8 @@ export default function CulturePage() {
                       </span>
                     ))}
                   </Row>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* When to Eat */}
               {story.when_to_eat && (
@@ -1236,6 +1307,139 @@ export default function CulturePage() {
                   </motion.div>
                 );
               })}
+
+              {/* Map Section - Real Locations */}
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="culture-story-card"
+                style={{
+                  borderRadius: 16,
+                  padding: "16px",
+                  border: "1px solid rgba(209,145,100,0.28)",
+                  background:
+                    "linear-gradient(145deg, rgba(255,255,255,0.92), rgba(255,246,235,0.94))",
+                }}
+              >
+                <Row style={{ alignItems: "center", gap: 8, marginBottom: 10 }}>
+                  <MapPin size={16} color="#c76a2a" />
+                  <Text
+                    style={{
+                      fontSize: "0.74rem",
+                      fontWeight: 800,
+                      color: "#b85a1f",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.07em",
+                    }}
+                  >
+                    {locations.length > 0
+                      ? `${locations.length} Places to Try`
+                      : "Places to Try"}
+                  </Text>
+                </Row>
+
+                {/* Map with location points */}
+                {locations.length > 0 && (
+                  <div
+                    style={{
+                      height: 200,
+                      borderRadius: 12,
+                      overflow: "hidden",
+                      marginBottom: 12,
+                      border: "1px solid rgba(209,145,100,0.3)",
+                    }}
+                  >
+                    <MapWidget
+                      mapId="culture-map"
+                      points={mapPoints}
+                      center={mapCenter}
+                      zoom={locations.length > 1 ? 11 : 14}
+                      showBanner={false}
+                      enableClustering={locations.length > 5}
+                      mapStyleType="light"
+                    />
+                  </div>
+                )}
+
+                {/* Location Grid */}
+                {locations.length > 0 ? (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(2, 1fr)",
+                      gap: 8,
+                    }}
+                  >
+                    {locations.slice(0, 6).map((loc) => (
+                      <motion.div
+                        key={loc.id}
+                        whileHover={{ scale: 1.02 }}
+                        style={{
+                          borderRadius: 10,
+                          overflow: "hidden",
+                          background: "#fff",
+                          border: "1px solid rgba(209,145,100,0.2)",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <img
+                          src={normalizeImageUrl(loc.image_url, {
+                            id: loc.id,
+                            category: loc.category || "food",
+                          })}
+                          alt={loc.name}
+                          style={{
+                            width: "100%",
+                            height: 70,
+                            objectFit: "cover",
+                            display: "block",
+                          }}
+                        />
+                        <div style={{ padding: "8px 10px" }}>
+                          <Text
+                            style={{
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                              color: "#5a3d2b",
+                              lineHeight: 1.3,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {loc.name}
+                          </Text>
+                          {loc.city && (
+                            <Text
+                              style={{
+                                fontSize: "0.68rem",
+                                color: "#8f5a3f",
+                                marginTop: 2,
+                              }}
+                            >
+                              � {loc.city}
+                            </Text>
+                          )}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <Text
+                    style={{
+                      color: "#8f5a3f",
+                      fontSize: "0.85rem",
+                      textAlign: "center",
+                      padding: "20px 0",
+                      fontStyle: "italic",
+                    }}
+                  >
+                    No specific locations found — but this dish is available at
+                    many local spots!
+                  </Text>
+                )}
+              </motion.div>
             </div>
           </motion.div>
         )}

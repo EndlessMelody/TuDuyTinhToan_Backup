@@ -50,3 +50,18 @@ async def create_location(
     db: AsyncSession = Depends(get_db)
 ):
     return await service.create_location(db, body)
+
+
+@router.get(
+    "/by-food/{food_name}",
+    response_model=LocationListResponse,
+    summary="Tìm địa điểm theo tên món ăn",
+    description="Tìm các địa điểm có tên món ăn tương tự (hỗ trợ Culture Guide)"
+)
+async def get_locations_by_food(
+    food_name: str,
+    limit: int = Query(10, ge=1, le=50),
+    db: AsyncSession = Depends(get_db)
+):
+    """Find locations that serve the searched food item."""
+    return await service.find_locations_by_food_name(db, food_name, limit)

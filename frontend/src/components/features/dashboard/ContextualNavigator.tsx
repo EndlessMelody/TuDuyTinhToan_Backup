@@ -31,16 +31,33 @@ export const ContextualNavigator = () => {
             alignItems: "flex-end",
           }}
         >
-          <Row style={{ alignItems: "center", gap: "10px" }}>
-            {ctx.icon}
-            <Heading
-              variant="heading-strong-l"
-              weight="strong"
-              style={{ color: "#1C1C1E" }}
+          <Column style={{ gap: "4px", paddingLeft: "16px" }}>
+            <span
+              style={{
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+                color: ctx.accent,
+              }}
             >
-              {ctx.title}
-            </Heading>
-            <Row style={{ gap: "6px", marginLeft: "8px" }}>
+              Right Now
+            </span>
+            <Row style={{ alignItems: "center", gap: "10px" }}>
+              {ctx.icon}
+              <h2
+                style={{
+                  fontSize: "1.8rem",
+                  fontWeight: 800,
+                  letterSpacing: "-0.035em",
+                  color: "#1C1C1E",
+                  margin: 0,
+                  lineHeight: 1.1,
+                }}
+              >
+                {ctx.title}
+              </h2>
+              <Row style={{ gap: "6px", marginLeft: "8px" }}>
               {ctx.tags.map((tag, tagIdx) => (
                 <motion.span
                   key={tag}
@@ -81,8 +98,23 @@ export const ContextualNavigator = () => {
                   {tag}
                 </motion.span>
               ))}
+              </Row>
             </Row>
-          </Row>
+            {ctx.subtitle && (
+              <p
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 500,
+                  color: "#8E8E93",
+                  margin: 0,
+                  lineHeight: 1.4,
+                  marginTop: "2px",
+                }}
+              >
+                {ctx.subtitle}
+              </p>
+            )}
+          </Column>
           <Row
             onClick={() => { }}
             style={{

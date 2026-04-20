@@ -6,6 +6,7 @@ import { motion, useScroll } from "framer-motion";
 
 // Modular Components
 import { DashboardHeader } from "@/components/features/dashboard/DashboardHeader";
+import { ContextRibbon } from "@/components/features/dashboard/ContextRibbon";
 import { HeroSection } from "@/components/features/dashboard/HeroSection";
 import { AIPicksSection } from "@/components/features/dashboard/AIPicksSection";
 import { TrendingReels } from "@/components/features/dashboard/TrendingReels";
@@ -20,6 +21,9 @@ import PostModal from "@/components/PostModal";
 import ReelModal from "@/components/ReelModal";
 import { SettingsModal } from "@/components/modals/SettingsModal";
 import { CreateRoomModal } from "@/components/modals/CreateRoomModal";
+
+// Design tokens
+import { tokens } from "@/styles/tokens";
 
 // Types & Data
 import { ReelData, PostData } from "@/types/dashboard";
@@ -75,7 +79,7 @@ export default function DiscoverPage() {
           flex: 1,
           minWidth: 0,
           position: "relative",
-          backgroundColor: "#fff5f0",
+          backgroundColor: tokens.color.bg,
         }}
       >
         <DashboardHeader
@@ -111,41 +115,53 @@ export default function DiscoverPage() {
             <Column
               fillWidth
               style={{
-                gap: "32px",
-                paddingTop: "32px",
+                gap: "0px",
+                paddingTop: "16px",
                 paddingBottom: "12px",
                 paddingLeft: "32px",
                 paddingRight: "32px",
               }}
             >
+              {/* ── Context Ribbon ─────────────────────────────────── */}
               <motion.div variants={itemVariants}>
+                <ContextRibbon />
+              </motion.div>
+
+              {/* ── Fold 1 — YOU TODAY ─────────────────────────────── */}
+              <motion.div variants={itemVariants} style={{ marginTop: "20px" }}>
                 <HeroSection />
               </motion.div>
-              <motion.div variants={itemVariants}>
+
+              {/* ── Fold 2 — GET READY (Discovery) ─────────────────── */}
+              <motion.div variants={itemVariants} style={{ marginTop: "32px" }}>
                 <AIPicksSection isLoading={isLoading} />
               </motion.div>
-              <motion.div variants={itemVariants}>
+              <motion.div variants={itemVariants} style={{ marginTop: "32px" }}>
+                <ContextualNavigator />
+              </motion.div>
+
+              {/* ── Fold 3 — INSPIRE (Social) ──────────────────────── */}
+              <motion.div variants={itemVariants} style={{ marginTop: "32px" }}>
                 <TrendingReels
                   onReelClick={(reel) => setSelectedReel(reel)}
                   isLoading={isLoading}
                 />
               </motion.div>
-              <motion.div variants={itemVariants}>
-                <ContextualNavigator />
-              </motion.div>
-              <motion.div variants={itemVariants}>
-                <LobbySection />
-              </motion.div>
-              <motion.div variants={itemVariants}>
-                <TasteVault />
-              </motion.div>
-              <motion.div variants={itemVariants}>
+              <motion.div variants={itemVariants} style={{ marginTop: "32px" }}>
                 <FoodieFeed
                   onPostClick={(post) => setSelectedPost(post)}
                   isLoading={isLoading}
                 />
               </motion.div>
-              <motion.div variants={itemVariants}>
+
+              {/* ── Fold 4 — EXPAND ────────────────────────────────── */}
+              <motion.div variants={itemVariants} style={{ marginTop: "32px" }}>
+                <LobbySection />
+              </motion.div>
+              <motion.div variants={itemVariants} style={{ marginTop: "32px" }}>
+                <TasteVault />
+              </motion.div>
+              <motion.div variants={itemVariants} style={{ marginTop: "32px" }}>
                 <TasteMapProBanner />
               </motion.div>
             </Column>

@@ -1,8 +1,7 @@
 # Start the TasteMap FastAPI backend
 # Runs on http://127.0.0.1:8000
 
-$projectRoot = Split-Path -Parent $PSScriptRoot
-$backendPath = Join-Path $projectRoot "backend"
+$backendPath = "C:\Users\phanp\Code\TasteMap\backend"
 
 Write-Host "Starting TasteMap Backend (FastAPI)..." -ForegroundColor Cyan
 Write-Host "Location: $backendPath" -ForegroundColor Gray

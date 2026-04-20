@@ -46,19 +46,37 @@ export default function LobbySection({ lobbies }: LobbySectionProps) {
       {/* Section Container */}
       <div className="w-full flex flex-col gap-5">
         {/* Section Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-[12px] bg-[#FFF0E6] flex items-center justify-center">
-              <Users size={18} className="text-[#ff6b35]" />
-            </div>
-            <div>
-              <h2 className="text-[20px] font-bold tracking-tight text-[#1C1C1E]">
-                Live Group Lobbies
+        <div className="flex items-end justify-between pr-4 pl-4 w-full">
+          <div className="flex flex-col gap-1 flex-1 min-w-0">
+            <span
+              style={{
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+                color: "#ff6b35",
+              }}
+            >
+              Collaborate
+            </span>
+            <div className="flex items-center gap-3">
+              <Users size={18} className="text-[#ff6b35] shrink-0" />
+              <h2 
+                style={{
+                  fontSize: "1.8rem",
+                  fontWeight: 800,
+                  letterSpacing: "-0.035em",
+                  color: "#1C1C1E",
+                  margin: 0,
+                  lineHeight: 1.1,
+                }}
+              >
+                Social Tables
               </h2>
-              <p className="text-[13px] text-[#8E8E93]">
-                {data.length} active sessions near you
-              </p>
             </div>
+            <p className="text-[14px] font-medium text-[#8E8E93] m-0 leading-snug">
+              {data.length} active sessions near you
+            </p>
           </div>
           <Link
             href="/group-rooms"

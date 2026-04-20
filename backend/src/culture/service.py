@@ -283,36 +283,43 @@ The following is an authoritative encyclopedia excerpt regarding the subject:
 Use this context strictly to ensure absolute historical and culinary accuracy in your response. Do not hallucinate history.
 """
 
-    prompt = f"""You are an elite Culinary Historian and Gastronomy Expert specializing in Michelin-level dining analysis.
-Your task is to provide a highly professional, factual, and authoritative cultural and culinary analysis of the dish: **{food_name}**
+    prompt = f"""You are an elite Culinary Historian and Gastronomy Expert specializing in Vietnamese and world cuisine.
+Your task is to provide a rich, engaging cultural analysis of the dish: **{food_name}**
 {local_name_line}
-Target Output Language: English
+Target Output Language: English for field names, but content should feel warm and authentic
 
 {taste_context}
 {rag_block}
 
 CRITICAL RULES:
 - Ground all facts strictly in the [FACTUAL KNOWLEDGE BASE ENTRY] provided.
-- Maintain a highly sophisticated, academic, yet articulate tone (similar to a Michelin guide or an authoritative gastronomy review). Do NOT use conversational fluff, emojis in the text body, or colloquialisms.
-- Keep each analytical section dense with expertise, concise (3-4 sentences maximum), but highly detailed. 
-- Taste tags must be precise culinary terms (e.g., "umami-rich", "herbaceous", "astringent", "caramelized").
+- Write in a warm, storytelling tone - NOT formal or academic. Like a knowledgeable local friend sharing secrets.
+- Generate 4 to 6 insights about this food. Each insight must have a catchy title and detailed "nội dung" (content).
+- The insights can cover: origin story, cultural significance, how locals eat it, flavor science, best places to try, preparation secrets, seasonal variations, or any fascinating angle.
+- Tags should be evocative descriptors like "🌿 Fresh Herbs", "🔥 Street Food Classic", "☕ Breakfast Essential" - mix emojis with culinary terms.
 - **API OUTPUT RESTRAINT**: YOU MUST ONLY OUTPUT A RAW, VALID JSON OBJECT. DO NOT ADD ANY PREAMBLE, POSTSCRIPT, OR CONVERSATIONAL TEXT OUTSIDE THE JSON BLOCK.
 
 Return a JSON object with this exact structure:
 {{
   "food_name": "{food_name}",
   "food_name_local": "Vietnamese name here or null",
-  "sections": [
-    {{"title": "Origin Analysis", "content": "Professional analysis of its historical and geographical inception.", "icon": "🏛️"}},
-    {{"title": "Cultural Significance", "content": "The sociopolitical or cultural weight this dish carries within the region.", "icon": "🎭"}},
-    {{"title": "Gastronomic Etiquette", "content": "Authoritative etiquette, common pairings, and consumption environment.", "icon": "🥢"}},
-    {{"title": "The Science of Flavor", "content": "Advanced flavor profile breakdown using precise culinary terminology.", "icon": "🔬"}}
+  "insights": [
+    {{
+      "title": "Catchy insight title",
+      "nội_dung": "Detailed, warm content about this aspect of the dish. Write like you're telling a story to a curious friend. 2-3 sentences."
+    }},
+    {{
+      "title": "Another angle",
+      "nội_dung": "More fascinating details..."
+    }}
   ],
-  "taste_tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
-  "pairing_suggestions": ["expert pairing 1", "expert pairing 2", "expert pairing 3"],
-  "when_to_eat": "Authoritative context on seasonal or daily timing",
-  "fun_fact": "One obscure but historically verified piece of trivia"
-}}"""
+  "tags": ["🏷️ Descriptive tag 1", "🏷️ Tag 2", "🏷️ Tag 3", "🏷️ Tag 4"],
+  "pairing_suggestions": ["pairing 1", "pairing 2", "pairing 3"],
+  "when_to_eat": "When people typically enjoy this dish",
+  "fun_fact": "One surprising or little-known fact"
+}}
+
+IMPORTANT: Generate between 4 and 6 insights. Each must have both "title" and "nội_dung" fields."""
 
     body = {
         "model": CULTURE_TEXT_MODEL,
@@ -343,14 +350,13 @@ Return a JSON object with this exact structure:
         return {
             "food_name": food_name,
             "food_name_local": food_name_local,
-            "sections": [
+            "insights": [
                 {
                     "title": "Story Unavailable",
-                    "content": f"We couldn't generate the cultural story for {food_name} right now. Please try again.",
-                    "icon": "⚠️",
+                    "nội_dung": f"We couldn't generate the cultural story for {food_name} right now. Please try again.",
                 }
             ],
-            "taste_tags": [],
+            "tags": [],
             "pairing_suggestions": [],
             "when_to_eat": None,
             "fun_fact": None,

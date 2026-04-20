@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { apiGet, ApiError } from "@/lib/api";
-import { normalizeMediaUrl } from "@/lib/media";
+import { normalizeImageUrl } from "@/lib/image-utils";
 
 // ─── API Response Types ───────────────────────────────────────────────────────
 
@@ -24,6 +24,8 @@ export interface FeedCard {
   category: "food" | "place";
   photos?: string[];
   reviews_preview?: string[];
+  lat?: number;
+  lng?: number;
 }
 
 interface FeedCardsResponse {
@@ -65,7 +67,10 @@ export function useFeedCards({
     setError(null);
 
     try {
-      const params = new URLSearchParams({ type, limit: String(limit) });
+      const params = new URLSearchParams({
+        category: type,
+        limit: String(limit),
+      });
       if (lat !== undefined) params.set("lat", String(lat));
       if (lng !== undefined) params.set("lng", String(lng));
       if (userId) params.set("user_id", userId);
@@ -79,9 +84,17 @@ export function useFeedCards({
       setCards(
         (data.cards ?? []).map((card) => ({
           ...card,
-          image_url: normalizeMediaUrl(card.image_url),
+          image_url: normalizeImageUrl(card.image_url, {
+            id: card.id,
+            category: card.category,
+          }),
           photos: (card.photos ?? [])
-            .map((photo) => normalizeMediaUrl(photo))
+            .map((photo) =>
+              normalizeImageUrl(photo, {
+                id: card.id,
+                category: card.category,
+              }),
+            )
             .filter((photo): photo is string => !!photo),
         })),
       );

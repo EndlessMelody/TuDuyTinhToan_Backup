@@ -40,6 +40,7 @@ export interface AIPickData {
 
 export interface ContextOption {
   title: string;
+  subtitle?: string;
   icon: React.ReactNode;
   accent: string;
   tags: string[];

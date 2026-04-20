@@ -10,26 +10,31 @@ interface SpotCardProps {
   spot: Spot;
   selected: boolean;
   onClick: () => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }
 
-export default function SpotCard({ spot, selected, onClick }: SpotCardProps) {
+export default function SpotCard({ spot, selected, onClick, onMouseEnter, onMouseLeave }: SpotCardProps) {
   return (
     <motion.button
+      id={`spot-card-${spot.id}`}
       type="button"
       whileHover={{ y: -2 }}
       whileTap={{ scale: 0.99 }}
       onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       className="w-full text-left flex gap-3 p-2.5 rounded-[18px] cursor-pointer transition-all"
       style={{
         background: selected
-          ? `linear-gradient(145deg, ${spot.accent}20 0%, rgba(255,255,255,0.96) 100%)`
-          : "linear-gradient(145deg, rgba(255,255,255,0.96) 0%, rgba(255,246,235,0.96) 100%)",
+          ? `linear-gradient(145deg, ${spot.accent}1f 0%, rgba(255,255,255,0.98) 100%)`
+          : "linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.96) 100%)",
         border: selected
-          ? `1.5px solid ${spot.accent}5f`
-          : "1.5px solid rgba(189,127,87,0.2)",
+          ? `1.5px solid ${spot.accent}5a`
+          : "1.5px solid rgba(15,23,42,0.08)",
         boxShadow: selected
-          ? `0 14px 24px ${spot.accent}2b`
-          : "0 8px 18px rgba(139, 82, 48, 0.09)",
+          ? `0 14px 24px ${spot.accent}29`
+          : "0 8px 16px rgba(15,23,42,0.1)",
       }}
     >
       <div className="w-21 h-21 rounded-[13px] overflow-hidden shrink-0 relative">
@@ -69,7 +74,7 @@ export default function SpotCard({ spot, selected, onClick }: SpotCardProps) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <h4 className="text-[14px] font-extrabold text-[#29160d] leading-tight">
+          <h4 className="text-[14px] font-extrabold text-[#0F172A] leading-tight">
             {spot.name}
           </h4>
           <span
@@ -91,18 +96,18 @@ export default function SpotCard({ spot, selected, onClick }: SpotCardProps) {
           <span style={{ color: spot.accent }}>
             {CATEGORY_ICON[spot.category] ?? <Utensils size={12} />}
           </span>
-          <span className="text-[12px] text-[#7b5946] font-semibold">{spot.category}</span>
-          <span className="text-[#cfb9a9]">·</span>
-          <span className="text-[12px] text-[#8f6c57] font-semibold">
+          <span className="text-[12px] text-[#475569] font-semibold">{spot.category}</span>
+          <span className="text-[#cbd5e1]">·</span>
+          <span className="text-[12px] text-[#64748B] font-semibold">
             {PRICE_ICONS[spot.priceLevel]}
           </span>
         </div>
         <div className="flex items-center gap-3 mt-1.5">
-          <span className="flex items-center gap-1 text-[12px] text-[#ca7a18] font-bold">
+          <span className="flex items-center gap-1 text-[12px] text-[#d97706] font-bold">
             <Star size={11} fill="currentColor" /> {spot.rating}
-            <span className="text-[#aa8d7a] font-medium">({spot.reviewCount})</span>
+            <span className="text-[#94A3B8] font-medium">({spot.reviewCount})</span>
           </span>
-          <span className="flex items-center gap-1 text-[12px] text-[#8c6d59] font-semibold">
+          <span className="flex items-center gap-1 text-[12px] text-[#64748B] font-semibold">
             <MapPin size={11} /> {spot.distance}
           </span>
         </div>
