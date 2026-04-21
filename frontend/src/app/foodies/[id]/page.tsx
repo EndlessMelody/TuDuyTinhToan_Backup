@@ -9,6 +9,7 @@ import {
   Text,
   Avatar,
   Button,
+  Grid,
 } from "@/components/OnceUI";
 
 // ── Premium Icons (lucide-react) ──
@@ -48,6 +49,9 @@ import ClientOnly from "@/components/common/ClientOnly";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api";
 import { useUserVector } from "@/context/UserVectorContext";
+import { BadgeSummary } from "@/types/gamification";
+import BadgeCard from "@/components/features/gamification/BadgeCard";
+import { useBadges } from "@/hooks/useBadges";
 import { useChat } from "@/context/ChatContext";
 import type { Friend } from "@/components/features/foodies/FriendRow";
 import { useMediaUpload } from "@/hooks/useMediaUpload";
@@ -132,7 +136,7 @@ interface UserProfile {
     followers: number;
     following: number;
   };
-  badges: { icon: string; label: string; color: string }[];
+  badges: BadgeSummary[];
 }
 
 interface MutualFriend {
@@ -557,6 +561,7 @@ export default function FoodieProfilePage() {
   const [actionBusy, setActionBusy] = useState(false);
 
   const userId = parseInt(id, 10);
+  const { badges, loading: badgesLoading } = useBadges(userId);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -566,7 +571,7 @@ export default function FoodieProfilePage() {
         apiGet<UserProfile>(`/api/v1/users/${userId}`),
         apiGet<SocialContext>(`/api/v1/users/${userId}/social-context`),
       ]);
-      setProfile(prof);
+      setProfile({ ...prof, badges: [] }); // badges are now handled by useBadges hook
       setSocial(ctx);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load profile");
@@ -1349,46 +1354,24 @@ export default function FoodieProfilePage() {
         )}
 
         {/* ── Badges ── */}
-        {profile.badges.length > 0 && (
+        {(badges.length > 0 || badgesLoading) && (
           <Card>
             <SectionLabel
               icon={<Trophy size={15} strokeWidth={2.25} />}
               label="Achievements"
               color="#D97706"
             />
-            <Row style={{ gap: 10, flexWrap: "wrap" }}>
-              {profile.badges.map((badge, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, scale: 0.85 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.04, duration: 0.25 }}
-                >
-                  <Row
-                    style={{
-                      alignItems: "center",
-                      gap: 7,
-                      padding: "8px 14px",
-                      borderRadius: 20,
-                      backgroundColor: `${badge.color}10`,
-                      border: `1.5px solid ${badge.color}28`,
-                    }}
-                  >
-                    <span style={{ fontSize: 16 }}>{badge.icon}</span>
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: badge.color,
-                      }}
-                    >
-                      {badge.label}
-                    </Text>
-                  </Row>
-                </motion.div>
-              ))}
-            </Row>
+            {badgesLoading ? (
+              <Row padding="24" horizontal="center">
+                <div className="sk" style={{ height: 100, width: '100%', borderRadius: 16 }} />
+              </Row>
+            ) : (
+              <Grid columns="repeat(auto-fill, minmax(250px, 1fr))" gap="16">
+                {badges.map((badge, i) => (
+                  <BadgeCard key={badge.id || i} badge={badge} delay={i * 0.05} />
+                ))}
+              </Grid>
+            )}
           </Card>
         )}
       </div>

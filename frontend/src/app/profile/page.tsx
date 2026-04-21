@@ -62,6 +62,8 @@ import { supabase } from "@/lib/supabase";
 import { useUserVector } from "@/context/UserVectorContext";
 import { CreatePostModal } from "@/components/modals/CreatePostModal";
 import { apiGet, apiUploadMedia, ApiError } from "@/lib/api";
+import { useBadges } from "@/hooks/useBadges";
+import BadgeCard from "@/components/features/gamification/BadgeCard";
 
 // ═══════════ PROFILE PAGE ═══════════ //
 
@@ -144,26 +146,15 @@ export default function ProfilePage() {
   }, []);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("Posts");
-  const { user, loading, refetch } = useAuth();
+  const { user, refetch } = useAuth();
   const { radarData } = useUserVector();
-  const [totalBadges, setTotalBadges] = useState<number>(0);
+  const { badges, totalBadges, loading: badgesLoading } = useBadges();
   const [friendsList, setFriendsList] = useState<FriendItem[]>([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
   const [userPosts, setUserPosts] = useState<PostItem[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
   const [postsTotal, setPostsTotal] = useState(0);
 
-  React.useEffect(() => {
-    const fetchTotalBadges = async () => {
-      try {
-        const badgesData = await apiGet<any[]>("/api/v1/badges/");
-        setTotalBadges(badgesData.length);
-      } catch (err) {
-        console.error("Failed to fetch total badges", err);
-      }
-    };
-    fetchTotalBadges();
-  }, []);
 
   React.useEffect(() => {
     const fetchFriends = async () => {
@@ -2365,23 +2356,23 @@ export default function ProfilePage() {
                       </Text>
                     </Column>
                     <div style={{ padding: '8px 16px', borderRadius: '12px', background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.05)' }}>
-                      <Text variant="body-strong-xs">{(user?.badges || []).length} / {totalBadges}</Text>
+                      <Text variant="body-strong-xs">{badges.length} / {totalBadges}</Text>
                     </div>
                   </Row>
 
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', /* Phép thuật tự động co giãn */
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                       gap: '20px',
                       width: '100%'
                     }}
                   >
-                    {(user?.badges || []).map((badge: any, index: number) => (
+                    {badges.map((badge: any, index: number) => (
                       <BadgeCard key={badge.id || index} badge={badge} delay={index * 0.05} />
                     ))}
 
-                    {(!user?.badges || user.badges.length === 0) && (
+                    {badges.length === 0 && !badgesLoading && (
                       <Column fillWidth horizontal="center" vertical="center" padding="64" gap="16" background="neutral-alpha-weak" radius="xl" style={{ border: '2px dashed rgba(0,0,0,0.05)', gridColumn: '1 / -1' }}>
                         <div style={{ opacity: 0.2 }}>
                           <Award size={48} />
@@ -3339,162 +3330,9 @@ export default function ProfilePage() {
             toast.success("Foodie Feed post published successfully.");
             return;
           }
-
           toast.success("Discover reel published. Open Discover to view it.");
         }}
       />
     </div>
   );
-}
-// ═══════════════════════════════════════════════════════════════════════
-//  BADGE CARD COMPONENT
-// ═══════════════════════════════════════════════════════════════════════
-const BadgeCard = ({ badge, delay }: { badge: any; delay: number }) => {
-  const IconMap: any = {
-    Star, Utensils, Award, Heart, TrendingUp, Flame, Cake, Gem, Feather, PartyPopper, Users, Handshake, Shield, Medal, Trophy
-  };
-
-  const IconComponent = IconMap[badge.icon_name] || Award;
-
-  const rarityStyles: any = {
-    Common: { border: 'rgba(0,0,0,0.05)', glow: 'transparent', text: 'neutral-strong', bg: 'rgba(0,0,0,0.02)' },
-    Rare: { border: 'rgba(0,122,255,0.2)', glow: 'rgba(0,122,255,0.1)', text: 'info-strong', bg: 'rgba(0,122,255,0.03)' },
-    Epic: { border: 'rgba(175,82,222,0.3)', glow: 'rgba(175,82,222,0.15)', text: 'brand-strong', bg: 'rgba(175,82,222,0.05)' },
-    Legendary: { border: 'rgba(251,191,36,0.5)', glow: 'rgba(251,191,36,0.25)', text: 'warning-strong', bg: 'rgba(251,191,36,0.08)', animate: true }
-  };
-
-  const style = rarityStyles[badge.rarity] || rarityStyles.Common;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.9, y: 10 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: 0.4, delay }}
-      whileHover={{ y: -5, scale: 1.02 }}
-      style={{
-        position: 'relative',
-        width: '100%', // Khóa cứng width 100% của ô Grid
-        height: '100%',
-        display: 'block', // Ép motion.div hiển thị dạng khối
-        zIndex: 1
-      }}
-    >
-      {/* Hào quang (Glow Aura) */}
-      {(badge.rarity === 'Epic' || badge.rarity === 'Legendary') && (
-        <div
-          style={{
-            position: 'absolute',
-            top: -4, left: -4, right: -4, bottom: -4, // Xài top/left thay vì inset cho chắc cú
-            background: style.glow,
-            filter: 'blur(20px)',
-            borderRadius: '24px',
-            zIndex: -1,
-          }}
-        />
-      )}
-
-      {/* RỘNG 100%, KHÔNG XÀI <Column> NỮA ĐỂ CHỐNG BÓP MÉO */}
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'flex-start', // Đẩy nội dung lên trên
-          width: '100%',
-          height: '100%',
-          minWidth: 0, // Hack CSS Flexbox chống tràn
-          padding: '20px',
-          gap: '12px',
-          borderRadius: '24px', // Tương đương radius="xl"
-          background: style.bg,
-          border: `1px solid ${style.border}`,
-          backdropFilter: 'blur(10px)',
-          textAlign: 'center',
-          boxShadow: badge.rarity === 'Legendary' ? '0 10px 30px rgba(251,191,36,0.15)' : 'none',
-          boxSizing: 'border-box'
-        }}
-      >
-        {/* KHUNG CHỨA ICON */}
-        <div
-          style={{
-            width: '60px',
-            height: '60px',
-            minWidth: '60px', // Đóng đinh chiều rộng
-            minHeight: '60px', // Đóng đinh chiều cao
-            flexShrink: 0, // Cấm tuyệt đối việc thu nhỏ
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '50%',
-            background: '#fff',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-            color: badge.accent_color || '#007AFF',
-            position: 'relative'
-          }}
-        >
-          {badge.rarity === 'Legendary' && (
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-              style={{
-                position: 'absolute',
-                top: -4, left: -4, right: -4, bottom: -4, // Không xài inset nữa
-                borderRadius: '50%', // Ép cứng hình tròn
-                border: '2px dashed #FBBF24',
-                opacity: 0.8,
-                boxSizing: 'border-box'
-              }}
-            />
-          )}
-          <IconComponent size={28} />
-        </div>
-
-        {/* KHUNG CHỮ */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '4px',
-          width: '100%'
-        }}>
-          <Text variant="body-strong-s">{badge.name}</Text>
-
-          <div style={{
-            padding: '2px 8px',
-            borderRadius: '100px',
-            background: style.border,
-            marginBottom: '4px'
-          }}>
-            <Text variant="body-default-xs" style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>
-              {badge.rarity}
-            </Text>
-          </div>
-
-          {badge.description && (
-            <div style={{ width: '100%' }}>
-              <Text
-                variant="body-default-xs"
-                onBackground="neutral-weak"
-                style={{
-                  fontSize: '11px',
-                  lineHeight: '1.4',
-                  wordWrap: 'break-word', // Chuẩn trị liệu ép chữ
-                  whiteSpace: 'normal',
-                  display: 'block'
-                }}
-              >
-                {badge.description}
-              </Text>
-            </div>
-          )}
-        </div>
-
-        {badge.earned_at && (
-          <Text variant="body-default-xs" style={{ color: 'rgba(0,0,0,0.3)', marginTop: 'auto' }}>
-            {new Date(badge.earned_at).toLocaleDateString('vi-VN')}
-          </Text>
-        )}
-      </div>
-    </motion.div>
-  );
-};
+}
