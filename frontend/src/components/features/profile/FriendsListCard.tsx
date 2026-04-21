@@ -17,7 +17,7 @@ export interface FriendItem {
   friendship_id?: number | null;
 }
 
-interface FriendsListCardProps {
+export interface FriendsListCardProps {
   friendsList: FriendItem[];
   friendsLoading: boolean;
   onSeeAll: () => void;
@@ -299,8 +299,8 @@ export const FriendsListCard: React.FC<FriendsListCardProps> = ({
                   {friend.title
                     ? `${friend.title}`
                     : friend.location
-                    ? `📍 ${friend.location}`
-                    : `@${friend.username}`}
+                      ? `📍 ${friend.location}`
+                      : `@${friend.username}`}
                 </span>
               </div>
 

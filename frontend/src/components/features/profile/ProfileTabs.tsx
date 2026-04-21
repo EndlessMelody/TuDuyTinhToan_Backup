@@ -7,7 +7,7 @@ import { PostsTab } from "./tab-contents/PostsTab";
 import { ReviewsTab } from "./tab-contents/ReviewsTab";
 import { AchievementsTab } from "./tab-contents/AchievementsTab";
 import { VisitedTab } from "./tab-contents/VisitedTab";
-import { PostItem } from "@/app/profile/page";
+import { PostItem } from "./tab-contents/PostsTab";
 
 interface ProfileTabsProps {
   postsLoading: boolean;

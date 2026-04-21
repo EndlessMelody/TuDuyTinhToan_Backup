@@ -4,7 +4,29 @@ import React from "react";
 import { motion } from "framer-motion";
 import { ImageIcon, Utensils, MapPin, Star, Heart, MessageCircle } from "lucide-react";
 import { Text } from "@/components/OnceUI";
-import { PostItem } from "@/app/profile/page";
+
+export interface PostItem {
+  id: number;
+  user_id?: number;
+  user?: { id: number; display_name?: string; avatar_url?: string };
+  location_id?: number;
+  location?: {
+    id: number;
+    name: string;
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+  };
+  review: string;
+  rating?: number | null;
+  image_url?: string | null;
+  tags?: string[] | null;
+  likes_count: number;
+  comments_count: number;
+  is_liked: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
 
 interface PostsTabProps {
   postsLoading: boolean;
