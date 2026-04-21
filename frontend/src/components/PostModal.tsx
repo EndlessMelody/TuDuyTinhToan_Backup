@@ -341,7 +341,29 @@ export default function PostModal({
                             >
                               <p style={{ margin: 0, fontSize: "0.8rem", lineHeight: 1.5, color: "#1C1C1E" }}>
                                 <span style={{ fontWeight: 700, marginRight: "5px" }}>{name}</span>
-                                {c.content}
+                                {(c.user?.title || c.user?.level) && (
+                                  <span
+                                    style={{
+                                      backgroundColor: c.user?.title ? "rgba(255, 107, 53, 0.12)" : "rgba(0, 0, 0, 0.05)",
+                                      color: c.user?.title ? "#ff6b35" : "#888",
+                                      padding: "2px 6px",
+                                      borderRadius: "6px",
+                                      fontSize: "0.6rem",
+                                      fontWeight: 700,
+                                      marginRight: "6px",
+                                      textTransform: c.user?.title ? "uppercase" : "none",
+                                      letterSpacing: "0.4px",
+                                      display: "inline-block",
+                                      verticalAlign: "middle",
+                                      lineHeight: "1",
+                                      marginTop: "-2px",
+                                      border: c.user?.title ? "1px solid rgba(255, 107, 53, 0.2)" : "1px solid rgba(0, 0, 0, 0.08)"
+                                    }}
+                                  >
+                                    {c.user?.title || `Lv. ${c.user?.level || 1}`}
+                                  </span>
+                                )}
+                                <span>{c.content}</span>
                               </p>
                             </div>
                             <div style={{ display: "flex", gap: "12px", marginTop: "5px", paddingLeft: "4px" }}>
