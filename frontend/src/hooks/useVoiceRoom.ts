@@ -15,13 +15,16 @@ export interface VoiceRoomState {
   isConnected: boolean;
   isConnecting: boolean;
   isMuted: boolean;
+  isDeafened: boolean;
   localStream: MediaStream | null;
   error: string | null;
   speakingUsers: Set<number>;
+  mutedUsers: Set<number>;
   remoteStreams: Map<number, MediaStream>;
   connect: () => Promise<void>;
   disconnect: () => void;
   toggleMute: () => void;
+  toggleDeafen: () => void;
 }
 
 export function useVoiceRoom(
@@ -31,10 +34,13 @@ export function useVoiceRoom(
 ): VoiceRoomState {
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  // Default voice state on join: muted + deafened until user opts in.
+  const [isMuted, setIsMuted] = useState(true);
+  const [isDeafened, setIsDeafened] = useState(true);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [speakingUsers, setSpeakingUsers] = useState<Set<number>>(new Set());
+  const [mutedUsers, setMutedUsers] = useState<Set<number>>(new Set());
   const [remoteStreams, setRemoteStreams] = useState<Map<number, MediaStream>>(
     new Map(),
   );
@@ -42,10 +48,47 @@ export function useVoiceRoom(
   const wsRef = useRef<WebSocket | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<number, RTCPeerConnection>>(new Map());
+  const remoteAudioElsRef = useRef<Map<number, HTMLAudioElement>>(new Map());
   const analyserRef = useRef<AnalyserNode | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const rafRef = useRef<number | null>(null);
   const speakingTimeoutRef = useRef<Map<number, NodeJS.Timeout>>(new Map());
+
+  const attachRemoteAudio = useCallback(
+    (remoteUserId: number, remoteStream: MediaStream) => {
+      let audioEl = remoteAudioElsRef.current.get(remoteUserId);
+      if (!audioEl) {
+        audioEl = new Audio();
+        audioEl.autoplay = true;
+        audioEl.preload = "auto";
+        audioEl.setAttribute("playsinline", "true");
+        remoteAudioElsRef.current.set(remoteUserId, audioEl);
+      }
+
+      if (audioEl.srcObject !== remoteStream) {
+        audioEl.srcObject = remoteStream;
+      }
+
+      audioEl.muted = isDeafened;
+      audioEl.volume = 1;
+
+      const playPromise = audioEl.play();
+      if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch(() => {
+          // Playback can fail before the browser grants media playback permissions.
+        });
+      }
+    },
+    [isDeafened],
+  );
+
+  const cleanupRemoteAudio = useCallback((remoteUserId: number) => {
+    const audioEl = remoteAudioElsRef.current.get(remoteUserId);
+    if (!audioEl) return;
+    audioEl.pause();
+    audioEl.srcObject = null;
+    remoteAudioElsRef.current.delete(remoteUserId);
+  }, []);
 
   // ── Voice activity detection (VAD) on local mic ──────────────────────────
   const startVAD = useCallback(
@@ -110,6 +153,7 @@ export function useVoiceRoom(
           setRemoteStreams((prev) =>
             new Map(prev).set(remoteUserId, remoteStream),
           );
+          attachRemoteAudio(remoteUserId, remoteStream);
         }
       };
 
@@ -139,7 +183,7 @@ export function useVoiceRoom(
       peerConnectionsRef.current.set(remoteUserId, pc);
       return pc;
     },
-    [],
+    [attachRemoteAudio],
   );
 
   // ── Handle incoming WebSocket messages ────────────────────────────────
@@ -206,7 +250,13 @@ export function useVoiceRoom(
             next.delete(leftUserId);
             return next;
           });
+          cleanupRemoteAudio(leftUserId);
           setSpeakingUsers((prev) => {
+            const next = new Set(prev);
+            next.delete(leftUserId);
+            return next;
+          });
+          setMutedUsers((prev) => {
             const next = new Set(prev);
             next.delete(leftUserId);
             return next;
@@ -276,6 +326,12 @@ export function useVoiceRoom(
         case "mute_toggle":
           // Update mute state for remote user
           const muteUserId = payload.user_id as number;
+          setMutedUsers((prev) => {
+            const next = new Set(prev);
+            if (payload.is_muted as boolean) next.add(muteUserId);
+            else next.delete(muteUserId);
+            return next;
+          });
           setSpeakingUsers((prev) => {
             const next = new Set(prev);
             if (payload.is_muted as boolean) {
@@ -313,7 +369,7 @@ export function useVoiceRoom(
           break;
       }
     },
-    [createPeerConnection],
+    [createPeerConnection, cleanupRemoteAudio],
   );
 
   // ── Connect ───────────────────────────────────────────────────────────────
@@ -321,6 +377,12 @@ export function useVoiceRoom(
     if (isConnected || isConnecting) return;
     setIsConnecting(true);
     setError(null);
+
+    if (!token) {
+      setError("Missing auth token for voice connection");
+      setIsConnecting(false);
+      return;
+    }
 
     try {
       // Get local media stream
@@ -330,6 +392,9 @@ export function useVoiceRoom(
       });
       streamRef.current = stream;
       setLocalStream(stream);
+      stream.getAudioTracks().forEach((track) => {
+        track.enabled = !isMuted;
+      });
       startVAD(stream);
 
       // Connect to WebSocket signaling server
@@ -340,6 +405,20 @@ export function useVoiceRoom(
       ws.onopen = () => {
         setIsConnected(true);
         setIsConnecting(false);
+        setMutedUsers((prev) => {
+          const next = new Set(prev);
+          if (isMuted) next.add(userId);
+          else next.delete(userId);
+          return next;
+        });
+
+        // Broadcast initial local mute state so others render status correctly.
+        ws.send(
+          JSON.stringify({
+            type: "mute_toggle",
+            payload: { is_muted: isMuted },
+          }),
+        );
       };
 
       ws.onmessage = (event) => {
@@ -357,8 +436,17 @@ export function useVoiceRoom(
         setIsConnecting(false);
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         setIsConnected(false);
+        setIsConnecting(false);
+
+        if (event.code === 4001) {
+          setError("Voice auth failed (invalid token)");
+        } else if (event.code === 4002) {
+          setError("You must join the room before voice chat");
+        } else if (event.code !== 1000 && event.reason) {
+          setError(event.reason);
+        }
       };
     } catch (err: unknown) {
       const message =
@@ -371,6 +459,8 @@ export function useVoiceRoom(
     isConnecting,
     roomId,
     token,
+    isMuted,
+    userId,
     startVAD,
     handleWebSocketMessage,
   ]);
@@ -390,6 +480,13 @@ export function useVoiceRoom(
     streamRef.current = null;
     setLocalStream(null);
 
+    // Stop and release remote audio outputs
+    remoteAudioElsRef.current.forEach((audioEl) => {
+      audioEl.pause();
+      audioEl.srcObject = null;
+    });
+    remoteAudioElsRef.current.clear();
+
     // Cleanup VAD
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     analyserRef.current?.disconnect();
@@ -403,9 +500,11 @@ export function useVoiceRoom(
 
     // Reset state
     setSpeakingUsers(new Set());
+    setMutedUsers(new Set());
     setRemoteStreams(new Map());
     setIsConnected(false);
-    setIsMuted(false);
+    setIsMuted(true);
+    setIsDeafened(true);
   }, []);
 
   // ── Mute toggle ───────────────────────────────────────────────────────────
@@ -414,6 +513,13 @@ export function useVoiceRoom(
       const next = !prev;
       streamRef.current?.getAudioTracks().forEach((t) => {
         t.enabled = !next;
+      });
+
+      setMutedUsers((prevMuted) => {
+        const updated = new Set(prevMuted);
+        if (next) updated.add(userId);
+        else updated.delete(userId);
+        return updated;
       });
 
       // Broadcast mute state via WebSocket
@@ -428,7 +534,32 @@ export function useVoiceRoom(
 
       return next;
     });
+  }, [userId]);
+
+  // ── Deafen toggle (speaker on/off) ──────────────────────────────────────
+  const toggleDeafen = useCallback(() => {
+    setIsDeafened((prev) => {
+      const next = !prev;
+      remoteAudioElsRef.current.forEach((audioEl) => {
+        audioEl.muted = next;
+        if (!next) {
+          const playPromise = audioEl.play();
+          if (playPromise && typeof playPromise.catch === "function") {
+            playPromise.catch(() => {
+              // Ignore play errors; user can retry by toggling speaker.
+            });
+          }
+        }
+      });
+      return next;
+    });
   }, []);
+
+  useEffect(() => {
+    remoteStreams.forEach((stream, remoteUserId) => {
+      attachRemoteAudio(remoteUserId, stream);
+    });
+  }, [remoteStreams, attachRemoteAudio]);
 
   // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => {
@@ -442,12 +573,15 @@ export function useVoiceRoom(
     isConnected,
     isConnecting,
     isMuted,
+    isDeafened,
     localStream,
     error,
     speakingUsers,
+    mutedUsers,
     remoteStreams,
     connect,
     disconnect,
     toggleMute,
+    toggleDeafen,
   };
 }

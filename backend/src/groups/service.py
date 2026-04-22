@@ -174,6 +174,28 @@ async def leave_group(db: AsyncSession, group_id: int, user_id: int) -> dict:
     return {"status": "left"}
 
 
+async def delete_group(db: AsyncSession, group_id: int, user_id: int) -> dict:
+    """Delete a group room. Only the room owner (host) can do this."""
+    group_q = await db.execute(select(Group).where(Group.id == group_id))
+    group = group_q.scalars().first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Lobby không tồn tại")
+
+    member_q = await db.execute(
+        select(GroupMember).where(
+            GroupMember.group_id == group_id,
+            GroupMember.user_id == user_id,
+        )
+    )
+    member = member_q.scalars().first()
+    if not member or not member.is_host:
+        raise HTTPException(status_code=403, detail="Chỉ chủ phòng mới có quyền xóa lobby")
+
+    await db.delete(group)
+    await db.commit()
+    return {"status": "deleted", "group_id": group_id}
+
+
 async def set_ready(db: AsyncSession, group_id: int, user_id: int, is_ready: bool) -> dict:
     result = await db.execute(
         select(GroupMember).where(GroupMember.group_id == group_id, GroupMember.user_id == user_id)

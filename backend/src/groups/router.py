@@ -67,6 +67,15 @@ async def leave_group(
     return await service.leave_group(db, group_id, user_id)
 
 
+@router.delete("/{group_id}", summary="Xóa lobby (chỉ chủ phòng)")
+async def delete_group(
+    group_id: int,
+    user_id: int = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    return await service.delete_group(db, group_id, user_id)
+
+
 @router.patch("/{group_id}/ready", summary="Toggle trạng thái ready")
 async def set_ready(
     group_id: int,

@@ -8,7 +8,7 @@ import React, {
   useMemo,
 } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft,
@@ -35,12 +35,14 @@ import {
   Pause,
   StopCircle,
   ThumbsUp,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useVoiceRoom } from "@/hooks/useVoiceRoom";
+import { useVoiceRoom, type VoiceRoomState } from "@/hooks/useVoiceRoom";
 import { useMediaUpload } from "@/hooks/useMediaUpload";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
-import { apiGet, apiPost, apiPatch } from "@/lib/api";
+import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 
@@ -1493,13 +1495,17 @@ function RichChatPanel({
 
 function VoiceBar({
   isMuted,
+  isDeafened,
   isInCall,
   onToggleMute,
+  onToggleDeafen,
   onToggleCall,
 }: {
   isMuted: boolean;
+  isDeafened: boolean;
   isInCall: boolean;
   onToggleMute: () => void;
+  onToggleDeafen: () => void;
   onToggleCall: () => void;
 }) {
   return (
@@ -1527,9 +1533,29 @@ function VoiceBar({
           className="text-[12px] font-semibold"
           style={{ color: isInCall ? "#1FAD45" : "#8E8E93" }}
         >
-          {isInCall ? "Connected" : "Voice Chat"}
+          {isInCall
+            ? isDeafened
+              ? "Connected (Speaker Off)"
+              : "Connected"
+            : "Voice Chat"}
         </span>
       </div>
+
+      <motion.button
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.92 }}
+        onClick={onToggleDeafen}
+        disabled={!isInCall}
+        className="w-8 h-8 rounded-[10px] flex items-center justify-center transition-colors disabled:opacity-40"
+        style={{
+          backgroundColor: isDeafened
+            ? "rgba(255,149,0,0.14)"
+            : "rgba(52,199,89,0.1)",
+          color: isDeafened ? "#FF9500" : "#34C759",
+        }}
+      >
+        {isDeafened ? <VolumeX size={14} /> : <Volume2 size={14} />}
+      </motion.button>
 
       <motion.button
         whileHover={{ scale: 1.08 }}
@@ -1570,18 +1596,180 @@ function CountdownDisplay({ seconds }: { seconds: number }) {
   );
 }
 
+function VoiceChatPanel({
+  members,
+  voice,
+  myUserId,
+}: {
+  members: RoomMember[];
+  voice: VoiceRoomState;
+  myUserId: number | null;
+}) {
+  return (
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="px-4 py-3 border-b border-[#E5E5EA] bg-white/70">
+        <div className="text-[11px] font-bold text-[#8E8E93] uppercase tracking-wider">
+          Voice Participants
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-3 grid grid-cols-2 gap-3 no-scrollbar">
+        {members.map((m) => {
+          const isMe = m.id === myUserId;
+          const isSpeaking = voice.speakingUsers.has(m.id);
+          const isMuted = isMe ? voice.isMuted : voice.mutedUsers.has(m.id);
+          return (
+            <div
+              key={m.id}
+              className="rounded-[16px] border p-3 flex flex-col items-center justify-center gap-2"
+              style={{
+                aspectRatio: "1 / 1",
+                background: isSpeaking
+                  ? "linear-gradient(135deg, rgba(255,107,53,0.12), rgba(255,107,53,0.04))"
+                  : "#fff",
+                borderColor: isSpeaking
+                  ? "rgba(255,107,53,0.35)"
+                  : "rgba(0,0,0,0.08)",
+              }}
+            >
+              <div
+                className="relative rounded-full overflow-hidden"
+                style={{
+                  width: 72,
+                  height: 72,
+                  boxShadow: isSpeaking
+                    ? "0 0 0 3px rgba(255,107,53,0.45), 0 0 18px rgba(255,107,53,0.7)"
+                    : "0 0 0 2px rgba(0,0,0,0.08)",
+                  transition: "box-shadow 0.22s ease",
+                }}
+              >
+                <img
+                  src={m.avatar}
+                  alt={m.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+
+              <div className="text-center min-w-0 w-full">
+                <div className="text-[12px] font-bold text-[#1C1C1E] truncate">
+                  {m.name}
+                </div>
+                <div className="text-[10px] text-[#8E8E93] mt-1">
+                  {isSpeaking ? "Speaking..." : "Idle"}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                <span
+                  className="text-[10px] font-semibold px-2 py-1 rounded-full"
+                  style={{
+                    backgroundColor: isMuted
+                      ? "rgba(255,59,48,0.12)"
+                      : "rgba(52,199,89,0.12)",
+                    color: isMuted ? "#FF3B30" : "#1FAD45",
+                  }}
+                >
+                  {isMuted ? "Mic Off" : "Mic On"}
+                </span>
+                <span
+                  className="text-[10px] font-semibold px-2 py-1 rounded-full"
+                  style={{
+                    backgroundColor: m.is_ready
+                      ? "rgba(52,199,89,0.12)"
+                      : "rgba(142,142,147,0.14)",
+                    color: m.is_ready ? "#1FAD45" : "#636366",
+                  }}
+                >
+                  {m.is_ready ? "Ready" : "Unready"}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div
+        className="px-4 py-3 border-t border-[#E5E5EA] flex items-center justify-between"
+        style={{ backgroundColor: "#F9F9FB" }}
+      >
+        <div
+          className="text-[12px] font-semibold"
+          style={{ color: voice.error ? "#FF3B30" : "#8E8E93" }}
+        >
+          {voice.error
+            ? voice.error
+            : voice.isConnected
+              ? voice.isDeafened
+                ? "Connected - Speaker Off"
+                : "Connected"
+              : "Not connected"}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={voice.toggleDeafen}
+            className="w-9 h-9 rounded-[10px] flex items-center justify-center"
+            style={{
+              backgroundColor: voice.isDeafened
+                ? "rgba(255,149,0,0.15)"
+                : "rgba(52,199,89,0.12)",
+              color: voice.isDeafened ? "#FF9500" : "#34C759",
+            }}
+            title={voice.isDeafened ? "Speaker Off" : "Speaker On"}
+          >
+            {voice.isDeafened ? <VolumeX size={16} /> : <Volume2 size={16} />}
+          </button>
+
+          <button
+            onClick={voice.toggleMute}
+            disabled={!voice.isConnected}
+            className="w-9 h-9 rounded-[10px] flex items-center justify-center disabled:opacity-40"
+            style={{
+              backgroundColor: voice.isMuted
+                ? "rgba(255,59,48,0.14)"
+                : "rgba(52,199,89,0.12)",
+              color: voice.isMuted ? "#FF3B30" : "#34C759",
+            }}
+            title={voice.isMuted ? "Mic Off" : "Mic On"}
+          >
+            {voice.isMuted ? <MicOff size={16} /> : <Mic size={16} />}
+          </button>
+
+          <button
+            onClick={() => {
+              if (voice.isConnected) {
+                voice.disconnect();
+              } else {
+                void voice.connect();
+              }
+            }}
+            className="w-9 h-9 rounded-[10px] flex items-center justify-center text-white"
+            style={{
+              backgroundColor: voice.isConnected ? "#FF3B30" : "#34C759",
+            }}
+            title={voice.isConnected ? "Disconnect" : "Connect"}
+          >
+            {voice.isConnected ? <PhoneOff size={16} /> : <Phone size={16} />}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function GroupRoomPage() {
   const params = useParams();
+  const router = useRouter();
   const roomId = String(params?.id ?? "");
   const { user } = useAuth();
 
   const [room, setRoom] = useState<RoomData | null>(null);
   const [loadingRoom, setLoadingRoom] = useState(true);
   const [members, setMembers] = useState<RoomMember[]>([]);
-  const [activeTab, setActiveTab] = useState<"chat" | "members">("chat");
+  const [activeTab, setActiveTab] = useState<"text" | "voice">("text");
   const [meReady, setMeReady] = useState(false);
+  const [deletingRoom, setDeletingRoom] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [codeCopied, setCodeCopied] = useState(false);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -1653,6 +1841,10 @@ export default function GroupRoomPage() {
         const data = await apiGet<RoomData>(`/api/v1/groups/${roomId}`);
         setRoom(data);
         setMembers(data.members.map(mapMember));
+        if (user?.id) {
+          const myMember = data.members.find((m) => m.user_id === user.id);
+          if (myMember) setMeReady(myMember.is_ready);
+        }
       } catch {
         // silently ignore
       }
@@ -1660,31 +1852,36 @@ export default function GroupRoomPage() {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [roomId, loadingRoom]);
+  }, [roomId, loadingRoom, user?.id]);
 
   const readyCount = members.filter((m) => m.is_ready).length;
   const allReady = readyCount === members.length && members.length > 0;
   const isHost = members.find((m) => m.is_host)?.id === myUserIdRef.current;
 
   const handleToggleReady = useCallback(async () => {
+    if (!user?.id) return;
     const next = !meReady;
     setMeReady(next);
     setMembers((ms) =>
-      ms.map((m) =>
-        myUserIdRef.current !== null && m.id === myUserIdRef.current
-          ? { ...m, is_ready: next }
-          : m,
-      ),
+      ms.map((m) => (m.id === user.id ? { ...m, is_ready: next } : m)),
     );
     try {
       await apiPatch(`/api/v1/groups/${roomId}/ready`, { is_ready: next });
+      const data = await apiGet<RoomData>(`/api/v1/groups/${roomId}`);
+      setRoom(data);
+      setMembers(data.members.map(mapMember));
+      const mine = data.members.find((m) => m.user_id === user.id);
+      if (mine) setMeReady(mine.is_ready);
     } catch (err: unknown) {
       toast.error(
         err instanceof Error ? err.message : "Failed to update ready state.",
       );
       setMeReady(!next);
+      setMembers((ms) =>
+        ms.map((m) => (m.id === user.id ? { ...m, is_ready: !next } : m)),
+      );
     }
-  }, [meReady, roomId]);
+  }, [meReady, roomId, user?.id]);
 
   const handleLaunch = useCallback(() => {
     if (!allReady) {
@@ -1703,6 +1900,36 @@ export default function GroupRoomPage() {
       });
     }, 1000);
   }, [allReady]);
+
+  const handleDeleteRoom = useCallback(async () => {
+    if (!isHost) {
+      toast.error("Only the room owner can delete this room.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Delete this room for everyone? This action cannot be undone.",
+    );
+    if (!confirmed) return;
+
+    setDeletingRoom(true);
+    try {
+      await apiDelete(`/api/v1/groups/${roomId}`);
+
+      if (pollRef.current) clearInterval(pollRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+      voice.disconnect();
+
+      toast.success("Room deleted.");
+      router.push("/group-rooms");
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete room.",
+      );
+    } finally {
+      setDeletingRoom(false);
+    }
+  }, [isHost, roomId, router, voice]);
 
   const handleCopyCode = () => {
     if (room?.invite_code) {
@@ -1908,8 +2135,10 @@ export default function GroupRoomPage() {
             {/* Voice Chat Bar */}
             <VoiceBar
               isMuted={voice.isMuted}
+              isDeafened={voice.isDeafened}
               isInCall={voice.isConnected}
               onToggleMute={voice.toggleMute}
+              onToggleDeafen={voice.toggleDeafen}
               onToggleCall={() => {
                 if (voice.isConnected) {
                   voice.disconnect();
@@ -1983,6 +2212,24 @@ export default function GroupRoomPage() {
                 </motion.button>
               )}
             </div>
+
+            {isHost && (
+              <motion.button
+                whileHover={{ scale: deletingRoom ? 1 : 1.01 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleDeleteRoom}
+                disabled={deletingRoom || countdown !== null}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-[14px] text-[13px] font-bold transition-all disabled:opacity-50"
+                style={{
+                  background: "rgba(255,59,48,0.1)",
+                  color: "#FF3B30",
+                  border: "1px solid rgba(255,59,48,0.28)",
+                }}
+              >
+                <X size={14} />{" "}
+                {deletingRoom ? "Deleting Room..." : "Delete Room"}
+              </motion.button>
+            )}
           </div>
 
           {/* ── WAITING PLACEHOLDER ── */}
@@ -2028,26 +2275,32 @@ export default function GroupRoomPage() {
           style={{ width: 520, backgroundColor: "#FAFAFA" }}
         >
           {/* Tab switcher */}
-          <div className="flex border-b border-[#E5E5EA] shrink-0">
-            {(["chat", "members"] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-3 text-[13px] font-semibold transition-colors"
-                style={
-                  activeTab === tab
-                    ? { color: "#ff6b35", borderBottom: "2px solid #ff6b35" }
-                    : { color: "#8E8E93" }
-                }
-              >
-                {tab === "chat" ? (
-                  <MessageSquare size={14} />
-                ) : (
-                  <Users size={14} />
-                )}
-                {tab === "chat" ? "Chat" : `Members (${members.length})`}
-              </button>
-            ))}
+          <div className="p-2 border-b border-[#E5E5EA] shrink-0">
+            <div className="flex rounded-full p-1 bg-[#F2F2F7] border border-[#E5E5EA]">
+              {(["text", "voice"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[13px] font-semibold rounded-full transition-all"
+                  style={
+                    activeTab === tab
+                      ? {
+                          color: "#ff6b35",
+                          backgroundColor: "#fff",
+                          boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+                        }
+                      : { color: "#8E8E93" }
+                  }
+                >
+                  {tab === "text" ? (
+                    <MessageSquare size={14} />
+                  ) : (
+                    <Mic size={14} />
+                  )}
+                  {tab === "text" ? "Text Chat" : "Voice Chat"}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Tab content */}
@@ -2056,9 +2309,9 @@ export default function GroupRoomPage() {
             style={{ position: "relative" }}
           >
             <AnimatePresence mode="wait">
-              {activeTab === "chat" ? (
+              {activeTab === "text" ? (
                 <motion.div
-                  key="chat"
+                  key="text"
                   initial={{ opacity: 0, x: 10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
@@ -2073,45 +2326,18 @@ export default function GroupRoomPage() {
                 </motion.div>
               ) : (
                 <motion.div
-                  key="members"
+                  key="voice"
                   initial={{ opacity: 0, x: 10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
                   transition={{ duration: 0.15 }}
-                  className="overflow-y-auto h-full px-2 py-3 flex flex-col gap-1 no-scrollbar"
+                  style={{ height: "100%" }}
                 >
-                  <p className="text-[11px] font-bold text-[#8E8E93] uppercase tracking-wider px-2 mb-1">
-                    In Room — {members.length}
-                  </p>
-                  {members.map((m) => (
-                    <MemberRow
-                      key={m.id}
-                      member={{
-                        ...m,
-                        is_speaking: voice.speakingUsers.has(
-                          m.id === myUserIdRef.current ? 0 : m.id,
-                        ),
-                      }}
-                      isMe={m.id === myUserIdRef.current}
-                    />
-                  ))}
-
-                  {/* Empty slots */}
-                  {Array.from({
-                    length: Math.max(0, room.max_spots - members.length),
-                  }).map((_, i) => (
-                    <div
-                      key={`empty-${i}`}
-                      className="flex items-center gap-3 px-3 py-2.5 opacity-40"
-                    >
-                      <div className="w-9 h-9 rounded-full border-2 border-dashed border-[#C7C7CC] flex items-center justify-center">
-                        <Users size={13} className="text-[#C7C7CC]" />
-                      </div>
-                      <span className="text-[13px] text-[#C7C7CC]">
-                        Waiting for explorer...
-                      </span>
-                    </div>
-                  ))}
+                  <VoiceChatPanel
+                    members={members}
+                    voice={voice}
+                    myUserId={myUserIdRef.current}
+                  />
                 </motion.div>
               )}
             </AnimatePresence>
