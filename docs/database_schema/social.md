@@ -1,5 +1,7 @@
 # Social Schema
 
+[← Back to Index](README.md)
+
 ## Table `friendships`
 
 ### Columns

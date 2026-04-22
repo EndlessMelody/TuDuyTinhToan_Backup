@@ -1,5 +1,7 @@
 # Interactions Schema
 
+[← Back to Index](README.md)
+
 ## Table `interactions`
 
 ### Columns

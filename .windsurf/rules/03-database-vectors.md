@@ -19,12 +19,13 @@ trigger: always_on
 
 ### Model Definition
 
+> 👉 **CRITICAL WARNING:** The following are **abbreviated examples** solely to demonstrate `pgvector` syntax and relationships. 
+> For the **exact, authoritative list of columns and constraints**, you MUST refer to `docs/database_schema/README.md`.
+
 ```python
 # backend/src/users/models.py
-from datetime import datetime
 from typing import List, Optional
-
-from sqlalchemy import Integer, String, DateTime, ForeignKey, Table, Column, Float
+from sqlalchemy import Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from pgvector.sqlalchemy import Vector
 
@@ -33,87 +34,25 @@ from ..db.base import Base
 
 class User(Base):
     """User model with preference vector."""
-    
     __tablename__ = "users"
     
-    # Primary key
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    
-    # Auth fields
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
-    username: Mapped[str] = mapped_column(String(100), unique=True, index=True)
-    hashed_password: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    
-    # Profile fields
-    avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    bio: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    # ... refer to docs/database_schema/core.md for actual columns ...
     
     # Vector field - 15-dimensional preference vector
     preference_vector: Mapped[Optional[List[float]]] = mapped_column(
         Vector(15),
-        nullable=True,
-        comment="15-dim vector: [price, noise, nature, food_type, modern, ...]"
+        nullable=True
     )
-    
-    # Timestamps
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=datetime.utcnow
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow
-    )
-    
-    # Relationships
-    hosted_groups: Mapped[List["Group"]] = relationship(
-        "Group",
-        back_populates="host",
-        lazy="selectin"
-    )
-    
-    groups: Mapped[List["Group"]] = relationship(
-        "Group",
-        secondary="group_members",
-        back_populates="members",
-        lazy="selectin"
-    )
-    
-    swipes: Mapped[List["Swipe"]] = relationship(
-        "Swipe",
-        back_populates="user",
-        lazy="selectin",
-        cascade="all, delete-orphan"
-    )
-
-
-# Association table for many-to-many
-class GroupMember(Base):
-    """Association table: User <-> Group membership."""
-    
-    __tablename__ = "group_members"
-    
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"),
-        primary_key=True
-    )
-    group_id: Mapped[int] = mapped_column(
-        ForeignKey("groups.id", ondelete="CASCADE"),
-        primary_key=True
-    )
-    joined_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    is_ready: Mapped[bool] = mapped_column(default=False)
 ```
 
 ### Location Model with Vector
 
 ```python
 # backend/src/locations/models.py
-from typing import List, Optional
-
-from sqlalchemy import Integer, String, Float, Boolean, JSON, Index
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from typing import List
+from sqlalchemy import Integer, Index
+from sqlalchemy.orm import Mapped, mapped_column
 from pgvector.sqlalchemy import Vector
 
 from ..db.base import Base
@@ -121,50 +60,13 @@ from ..db.base import Base
 
 class Location(Base):
     """Location/Restaurant model with embedding vector."""
-    
     __tablename__ = "locations"
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    # ... refer to docs/database_schema/core.md for actual columns ...
     
-    # Basic info
-    name: Mapped[str] = mapped_column(String(200), index=True)
-    description: Mapped[Optional[str]] = mapped_column(String(2000))
-    address: Mapped[str] = mapped_column(String(500))
-    city: Mapped[str] = mapped_column(String(100), index=True)
-    country: Mapped[str] = mapped_column(String(100))
-    
-    # Geolocation
-    latitude: Mapped[float] = mapped_column(Float)
-    longitude: Mapped[float] = mapped_column(Float)
-    
-    # Attributes (structured data)
-    price_level: Mapped[int] = mapped_column(Integer)  # 1-4 scale
-    noise_level: Mapped[int] = mapped_column(Integer)  # 1-5 scale
-    rating: Mapped[float] = mapped_column(Float)  # 0-5
-    review_count: Mapped[int] = mapped_column(Integer, default=0)
-    
-    # Tags as JSON array
-    tags: Mapped[List[str]] = mapped_column(JSON, default=list)
-    
-    # Images
-    image_urls: Mapped[List[str]] = mapped_column(JSON, default=list)
-    
-    # 15-dimensional embedding vector (matches user preference_vector)
-    embedding: Mapped[List[float]] = mapped_column(
-        Vector(15),
-        comment="15-dim vector encoding: [price_norm, noise_norm, nature_score, food_type_onehot...]"
-    )
-    
-    # Status
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    
-    # Timestamps
-    created_at = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = mapped_column(
-        DateTime(timezone=True),
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow
-    )
+    # 15-dimensional embedding vector
+    embedding: Mapped[List[float]] = mapped_column(Vector(15))
     
     # Vector index for fast similarity search
     __table_args__ = (
@@ -175,70 +77,6 @@ class Location(Base):
             postgresql_with={'lists': 100}
         ),
     )
-```
-
-### Group Model
-
-```python
-# backend/src/groups/models.py
-from datetime import datetime
-from typing import List, Optional
-
-from sqlalchemy import Integer, String, Boolean, DateTime, ForeignKey, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from ..db.base import Base
-
-
-class Group(Base):
-    """Group lobby room model."""
-    
-    __tablename__ = "groups"
-    
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    
-    name: Mapped[str] = mapped_column(String(100))
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    
-    # Visibility
-    is_public: Mapped[bool] = mapped_column(Boolean, default=True)
-    invite_code: Mapped[Optional[str]] = mapped_column(
-        String(16),
-        unique=True,
-        nullable=True,
-        index=True
-    )
-    
-    # Host relationship
-    host_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"),
-        index=True
-    )
-    host: Mapped["User"] = relationship(
-        "User",
-        back_populates="hosted_groups",
-        lazy="selectin"
-    )
-    
-    # Members (many-to-many through group_members)
-    members: Mapped[List["User"]] = relationship(
-        "User",
-        secondary="group_members",
-        back_populates="groups",
-        lazy="selectin"
-    )
-    
-    # Timestamps
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow
-    )
-    
-    @property
-    def member_count(self) -> int:
-        """Dynamic member count."""
-        return len(self.members) if self.members else 0
 ```
 
 ---

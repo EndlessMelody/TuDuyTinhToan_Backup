@@ -1,5 +1,7 @@
 # Database Schema Design
 
+[← Back to Index](README.md)
+
 ## Table `badges`
 
 ### Columns

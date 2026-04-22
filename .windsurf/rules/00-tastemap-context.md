@@ -7,10 +7,10 @@ trigger: always_on
 ## Project Overview
 
 **TasteMap** is an AI-powered social food discovery and journey planning platform. It bridges the gap between social media and expert culinary guidance using vector-based preference learning and group conflict resolution algorithms.
-
+Development Guidelines
 **Core Value Proposition:**
 - Replaces static restaurant lists with an immersive discovery engine
-- Learns user preferences through interactive "swipes" (AIPicks)
+- Learns user preferences through interactiveDevelopment Guidelines "swipes" (AIPicks)
 - Resolves group dining conflicts using Minimax algorithms
 - Provides cinematic tour building with optimized itineraries
 
@@ -145,51 +145,20 @@ Score(S) = W₁ · Sim(U⃗, P⃗) + W₂ · C_weather - W₃ · D
 
 ---
 
-## API Patterns
+## API & Database Patterns
 
-**Base URL:** `http://localhost:8000/api/v1`
+👉 **Single Source of Truth:** 
+To view the complete list of REST API Endpoints, Parameters, Request Bodies, Response Schemas, and the Database Tables (including pgvector), you **MUST** refer to the documentation:
+- **API Documentation Index:** `docs/api/README.md`
+- **Database Schema Index:** `docs/database_schema/README.md`
 
-**Key Endpoints:**
-```
-POST   /auth/sync           # User synchronization
-GET    /locations          # Location discovery with vector search
-POST   /swipes             # Record swipe (updates user vector)
-GET    /recommendations    # AI recommendations
-POST   /groups             # Create group lobby
-POST   /groups/join-by-code # Join private room
-GET    /groups/{id}        # Room details
-POST   /tours              # Build optimized tour
-```
+Do NOT assume endpoints or tables exist without checking the above documentation indexes.
 
-**Response Format:**
-```json
-{
-  "success": true,
-  "data": { ... },
-  "message": "optional status message"
-}
-```
-
----
-
-## Database Patterns
-
-**Two-Pass Filtering:**
-1. **First Pass (pgvector):** ANN index retrieval of top 100 candidates
-2. **Second Pass (Python/numpy):** Dynamic scoring with real-time variables
-
-**Key Tables:**
-- `users` - User profiles with preference vectors
-- `locations` - Places with embedding vectors
-- `groups` - Lobby rooms (is_public, invite_code)
-- `swipes` - User interaction history
-- `tours` - Saved itineraries
-
----
 
 ## Development Guidelines
 
 ### Priority Hierarchy
+0. **THE GOLDEN RULE (Docs-First):** NEVER write functional code before updating and getting approval for documentation. You MUST follow `07-docs-first.md` strictly.
 1. **Semantic Clarity:** Use Once UI primitives, never `<div>`
 2. **Mathematical Rigor:** All ranking/preference logic must use defined formulas
 3. **Vector-First Thinking:** Both users and locations are n-dimensional vectors
@@ -198,6 +167,7 @@ POST   /tours              # Build optimized tour
 ### When Implementing Features
 1. Always check this context file first
 2. Follow domain-specific rules:
+   - Docs & Flow → `07-docs-first.md` (MANDATORY FIRST STEP)
    - UI → `01-frontend-ui.md`
    - API → `02-backend-api.md`
    - DB → `03-database-vectors.md`
