@@ -22,51 +22,31 @@ import {
   Sparkles,
   Clock,
   DollarSign,
-  Route,
   Undo2,
   Map as MapIcon,
-  User,
   Users,
-  PieChart,
   Activity,
-  Info,
   X,
-  Bell,
-  MessageSquare,
   Star,
-  Check,
-  Heart,
-  Share2,
   Navigation2,
   Timer,
   Zap,
-  Plus,
-  Minus,
-  ChevronRight,
   RotateCcw,
+  CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 
 // Tour Builder tokens & components
 import { surface, accent, text, border, radius, shadow } from "./tokens";
-import {
-  TimelineNode,
-  TimelineConnector,
-  StatPill,
-  StatusBadge,
-  RouteChip,
-} from "./components";
-import { useUserVector } from "@/context/UserVectorContext";
-import { FloatingInsight, FlavorAura } from "@/components/FloatingInsight";
-import { RouteChip as RouteChipComponent } from "./components/RouteChip";
-import { StatusBadge as StatusBadgeComponent } from "./components/StatusBadge";
+import { StatPill, RouteChip } from "./components";
 import { StopCard } from "./components/StopCard";
 import { TourSkeleton, EmptyState } from "./components/TourSkeleton";
 import ClientOnly from "@/components/common/ClientOnly";
+import { useUserVector } from "@/context/UserVectorContext";
+import { FloatingInsight, FlavorAura } from "@/components/FloatingInsight";
 import { useAuth } from "@/hooks/useAuth";
-import { apiGet } from "@/lib/api";
+import { apiGet, apiPost, apiDelete } from "@/lib/api";
 import { toast } from "sonner";
 import { useTourBuilderStore, TourNode } from "@/store/useTourBuilderStore";
 
@@ -97,17 +77,7 @@ const MapWidget = dynamic(() => import("@/components/MapWidget"), {
   ),
 });
 
-const TOTAL_NODES = 4;
-
-type CardData = TourNode;
-
-const PARTICLES = Array.from({ length: 20 }, () => ({
-  x0: Math.random() * 1200 - 600,
-  y0: Math.random() * 800 - 400,
-  x1: Math.random() * 1200 - 600,
-  y1: Math.random() * 800 - 400,
-  dur: 3 + Math.random() * 4,
-}));
+// ──── Constants ──────────────────────────────────────────────────────────────
 
 const LOADING_MESSAGES = [
   "Mapping your taste profile...",
@@ -118,83 +88,263 @@ const LOADING_MESSAGES = [
   "Almost ready to launch!",
 ];
 
-// ═══════════ CARD DATA ═══════════ //
-// Note: Initial deck queue is populated in the store (Phase 1)
+const PARTICLES = Array.from({ length: 20 }, () => ({
+  x0: Math.random() * 1200 - 600,
+  y0: Math.random() * 800 - 400,
+  x1: Math.random() * 1200 - 600,
+  y1: Math.random() * 800 - 400,
+  dur: 3 + Math.random() * 4,
+}));
+
+// ──── Helpers ────────────────────────────────────────────────────────────────
+
+/** Map raw feed card schema → TourNode for the Zustand store. */
+function mapFeedCardToTourNode(card: any, index: number): TourNode {
+  return {
+    id: String(card.id),
+    venue_id: card.id,
+    title: card.name,
+    subtitle: `${card.category ?? "Place"} • ${card.address ?? "HCM City"}`,
+    tags: card.tags ?? [],
+    match: Math.floor(80 + Math.random() * 19), // Frontend display only; real match from recommendations
+    distance: card.distance_km ? `${card.distance_km.toFixed(1)}km` : "—",
+    price: card.price_range ?? "$$",
+    img:
+      card.image_url ??
+      "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=600&h=900&fit=crop",
+    color: index % 2 === 0 ? "#FF6B35" : "#2A9D8F",
+    location: [card.lat ?? 10.897, card.lng ?? 106.772],
+    time_spent: 45,
+    order_index: index,
+  };
+}
+
+// ──── Page ───────────────────────────────────────────────────────────────────
 
 export default function TourBuilderPage() {
-  const pathname = usePathname();
-
   const {
     deckQueue: deck,
-    selectedNodes: filledNodes,
+    tourDraft,
+    nextCursor,
+    hasMore,
     lastDiscarded,
-    addSelectedNode,
+    appendDeckQueue,
     setDeckQueue,
+    setNextCursor,
+    setHasMore,
     popDeckQueue,
     setLastDiscarded,
     undoDiscard,
+    addToTourDraft,
+    removeFromTourDraft,
     status,
     setStatus,
+    resetTour,
   } = useTourBuilderStore();
 
+  const { user } = useAuth();
+  const { radarData, isPulsing, updateVector, flushSwipeQueue } = useUserVector();
+
   const [isTourReady, setIsTourReady] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]);
   const [discardDir, setDiscardDir] = useState<"left" | "right" | null>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { user } = useAuth();
-  const { radarData, isPulsing, updateVector } = useUserVector();
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]);
-  const [stopCount, setStopCount] = useState(TOTAL_NODES);
+  // ── Card Fetching ──
 
-  // Fetch Venues Logic
-  useEffect(() => {
-    async function fetchVenues() {
-      // Prevent running if we already have cards or we're not idle
-      if (deck.length > 0 || status !== "idle") return;
-
+  const fetchCards = useCallback(
+    async (cursor: string | null = null) => {
+      if (!hasMore && cursor !== null) return;
       try {
-        setStatus("loading");
-        // We use GET /api/v1/locations/ as our base for Phase 2 implementation.
-        // It brings back LocationResponse[] which satisfies our TourNode requirements.
-        const res = await apiGet<{ items: any[] }>(
-          "/api/v1/locations/?limit=15&offset=0",
-        );
+        if (!cursor) setStatus("loading");
+        const url = `/api/v1/feed/cards?category=food&limit=10${cursor ? `&cursor=${cursor}` : ""}`;
+        const res = await apiGet<{ cards: any[]; next_cursor: string | null; has_more: boolean }>(url);
+        const mapped = res.cards.map((c, i) => mapFeedCardToTourNode(c, (deck.length || 0) + i));
 
-        const mappedNodes: TourNode[] = res.items.map((loc, i) => ({
-          id: String(loc.id),
-          venue_id: loc.id,
-          title: loc.name,
-          subtitle: `${loc.category || "Place"} • ${loc.city || "HCM City"}`,
-          tags: loc.characteristics
-            ? Object.keys(loc.characteristics).slice(0, 3)
-            : ["Trending"],
-          match: Math.floor(80 + Math.random() * 19),
-          distance: `${(Math.random() * 5 + 0.5).toFixed(1)}km`,
-          price: loc.price_range || "$$",
-          img:
-            loc.image_url ||
-            "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=600&h=900&fit=crop",
-          color: i % 2 === 0 ? "#FF6B35" : "#2A9D8F",
-          location: [loc.lat, loc.lng],
-          time_spent: 45,
-          order_index: i,
-        }));
+        if (cursor) {
+          appendDeckQueue(mapped);
+        } else {
+          setDeckQueue(mapped);
+        }
 
-        setDeckQueue(mappedNodes);
+        setNextCursor(res.next_cursor);
+        setHasMore(res.has_more);
         setStatus("idle");
       } catch (error: any) {
         setStatus("error");
-        toast.error(
-          "Failed to fetch venues: " + (error.message || "Unknown error"),
-        );
+        toast.error("Failed to fetch venues: " + (error?.message ?? "Unknown error"));
       }
-    }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [hasMore]
+  );
 
-    fetchVenues();
+  // Initial load
+  useEffect(() => {
+    if (deck.length === 0 && status === "idle") {
+      fetchCards(null);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Pre-fetch when deck is running low
+  useEffect(() => {
+    if (deck.length < 5 && hasMore && status === "idle") {
+      fetchCards(nextCursor);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deck.length, hasMore, status]);
+
+  // ── Swipe Actions ──
+
+  const activeCard = deck[0] ?? null;
+  const activeColor = activeCard?.color ?? "#ff6b35";
+
+  // Auto-dismiss undo toast after 5s
+  useEffect(() => {
+    if (lastDiscarded) {
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = setTimeout(() => setLastDiscarded(null), 5000);
+    }
+    return () => {
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    };
+  }, [lastDiscarded, setLastDiscarded]);
+
+  const handleUndo = useCallback(() => {
+    if (!lastDiscarded) return;
+    undoDiscard();
+  }, [lastDiscarded, undoDiscard]);
+
+  /**
+   * Skip: swipe LEFT — vector learns −α·P. Card not added to draft.
+   */
+  const handleSkip = useCallback(() => {
+    if (!activeCard) return;
+    const card = activeCard;
+    updateVector(card.venue_id, card.tags, "skip");
+    setDiscardDir("left");
+    setTimeout(() => {
+      popDeckQueue();
+      setDiscardDir(null);
+      setLastDiscarded(card);
+    }, 300);
+  }, [activeCard, updateVector, popDeckQueue, setLastDiscarded]);
+
+  /**
+   * Like: swipe RIGHT — vector learns +α·P. Card not added to draft.
+   */
+  const handleLike = useCallback(() => {
+    if (!activeCard) return;
+    const card = activeCard;
+    updateVector(card.venue_id, card.tags, "select");
+    setDiscardDir("right");
+    setTimeout(() => {
+      popDeckQueue();
+      setDiscardDir(null);
+    }, 300);
+  }, [activeCard, updateVector, popDeckQueue]);
+
+  /**
+   * Super Like (★): vector learns +α·P AND adds to tourDraft.
+   * Doc ref: discovery_swipe.md §3.1 — Super Like IS a Like.
+   */
+  const handleSuperLike = useCallback(() => {
+    if (!activeCard) return;
+    const card = activeCard;
+    updateVector(card.venue_id, card.tags, "select"); // same as Like
+    addToTourDraft(card);
+    setDiscardDir("right");
+    setTimeout(() => {
+      popDeckQueue();
+      setDiscardDir(null);
+    }, 300);
+    toast.success(`★ ${card.title} added to your tour!`);
+  }, [activeCard, updateVector, addToTourDraft, popDeckQueue]);
+
+  // Drag gesture
+  const x = useMotionValue(0);
+  const leftGlowOpacity = useTransform(x, [0, -150], [0, 1]);
+  const rightGlowOpacity = useTransform(x, [0, 150], [0, 1]);
+
+  const handleDragEnd = useCallback(
+    (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+      const { offset, velocity } = info;
+      const THRESHOLD = 140;
+      if (offset.x > THRESHOLD || velocity.x > 500) {
+        handleLike();
+        return;
+      }
+      if (offset.x < -THRESHOLD || velocity.x < -500) {
+        handleSkip();
+        return;
+      }
+    },
+    [handleLike, handleSkip]
+  );
+
+  // Keyboard support
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isGenerating || isTourReady) return;
+      if (e.key === "ArrowRight") handleLike();
+      if (e.key === "ArrowLeft") handleSkip();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleLike, handleSkip, isGenerating, isTourReady]);
+
+  // ── Tour Finalization ──
+
+  /**
+   * Build My Tour:
+   * 1. Flush pending swipe batch
+   * 2. POST /api/v1/tours/
+   * 3. POST /api/v1/tours/{id}/stops concurrently via Promise.all()
+   * 4. POST /api/v1/tours/{id}/optimize
+   * 5. Render tour map view
+   *
+   * Doc ref: discovery_swipe.md §4.1
+   */
+  const handleFinalizeTour = useCallback(async () => {
+    if (tourDraft.length === 0) {
+      toast.warning("Star at least 1 location to build a tour! ★");
+      return;
+    }
+
+    setIsGenerating(true);
+
+    try {
+      // Step 1: Flush remaining swipes before saving tour
+      await flushSwipeQueue();
+
+      // Step 2: Create tour entity
+      const tour = await apiPost<{ id: number }>("/api/v1/tours/", {});
+
+      // Step 3: Add all stops CONCURRENTLY — Promise.all avoids N×round-trip waterfall
+      await Promise.all(
+        tourDraft.map((stop) =>
+          apiPost(`/api/v1/tours/${tour.id}/stops`, { location_id: stop.venue_id })
+        )
+      );
+
+      // Step 4: Optimize route
+      await apiPost(`/api/v1/tours/${tour.id}/optimize`, {
+        start_lat: tourDraft[0]?.location[0] ?? 10.897,
+        start_lng: tourDraft[0]?.location[1] ?? 106.772,
+      });
+
+      // Step 5: Render result
+      setIsGenerating(false);
+      setIsTourReady(true);
+    } catch (error: any) {
+      setIsGenerating(false);
+      toast.error("Failed to build tour: " + (error?.message ?? "Unknown error"));
+    }
+  }, [tourDraft, flushSwipeQueue]);
+
+  // Rotate loading messages
   useEffect(() => {
     if (!isGenerating) return;
     let i = 0;
@@ -205,144 +355,40 @@ export default function TourBuilderPage() {
     return () => clearInterval(interval);
   }, [isGenerating]);
 
-  const nextEmptyIndex = filledNodes.findIndex((n) => n === null);
-  const activeCard = deck[0] ?? null;
-  const activeColor = activeCard?.color ?? "#ff6b35";
+  // ── Tour DNA (based on tourDraft tags) ──
 
-  // Dynamic Tour DNA calculation
-  const getTourDNA = useCallback(() => {
-    const selectedFoods = filledNodes.filter((n) => n !== null) as NonNullable<
-      (typeof filledNodes)[0]
-    >[];
-    if (selectedFoods.length === 0)
+  const tourDNA = React.useMemo(() => {
+    if (tourDraft.length === 0)
       return [{ label: "Empty", value: 100, color: "rgba(0,0,0,0.05)" }];
 
     const tagCounts: Record<string, number> = {};
-    selectedFoods.forEach((food) => {
-      food.tags?.forEach((tag) => {
+    tourDraft.forEach((node) => {
+      node.tags.forEach((tag) => {
         tagCounts[tag] = (tagCounts[tag] || 0) + 1;
       });
     });
 
-    const totalTags = Object.values(tagCounts).reduce((a, b) => a + b, 0);
-    const topTags = Object.entries(tagCounts)
+    const total = Object.values(tagCounts).reduce((a, b) => a + b, 0);
+    return Object.entries(tagCounts)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 3)
       .map(([label, count], i) => ({
         label,
-        value: (count / totalTags) * 100,
-        color:
-          i === 0
-            ? accent.primary
-            : i === 1
-              ? accent.secondary
-              : accent.warning,
+        value: (count / total) * 100,
+        color: i === 0 ? accent.primary : i === 1 ? accent.secondary : accent.warning,
       }));
+  }, [tourDraft]);
 
-    return topTags;
-  }, [filledNodes]);
-
-  const tourDNA = getTourDNA();
-
-  // Auto-dismiss undo after 5s
-  useEffect(() => {
-    if (lastDiscarded) {
-      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
-      undoTimerRef.current = setTimeout(() => setLastDiscarded(null), 5000);
-    }
-    return () => {
-      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
-    };
-  }, [lastDiscarded]);
-
-  const handleUndo = useCallback(() => {
-    if (!lastDiscarded) return;
-    undoDiscard();
-  }, [lastDiscarded, undoDiscard]);
-
-  const handleManualAction = useCallback(
-    (direction: "select" | "skip") => {
-      if (!activeCard) return;
-      const card = activeCard;
-
-      if (direction === "select" && nextEmptyIndex !== -1) {
-        updateVector(card.venue_id, card.tags || [], "select");
-        setDiscardDir("right");
-        addSelectedNode(card, nextEmptyIndex);
-        setTimeout(() => {
-          popDeckQueue();
-          setDiscardDir(null);
-        }, 300);
-      } else if (direction === "skip") {
-        updateVector(card.venue_id, card.tags || [], "skip");
-        setDiscardDir("left");
-        setTimeout(() => {
-          popDeckQueue();
-          setDiscardDir(null);
-          setLastDiscarded(card);
-        }, 300);
-      }
-    },
-    [
-      activeCard,
-      nextEmptyIndex,
-      updateVector,
-      addSelectedNode,
-      popDeckQueue,
-      setLastDiscarded,
-    ],
-  );
-
-  // ─── Drag Logic ─── //
-  const handleDragEnd = useCallback(
-    (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-      const { offset, velocity } = info;
-      const swipeThreshold = 140;
-
-      // Swipe RIGHT -> CHOOSE (SELECT)
-      if (offset.x > swipeThreshold || velocity.x > 500) {
-        handleManualAction("select");
-        return;
-      }
-
-      // Swipe LEFT -> SKIP
-      if (offset.x < -swipeThreshold || velocity.x < -500) {
-        handleManualAction("skip");
-        return;
-      }
-    },
-    [handleManualAction],
-  );
-
-  // Keyboard Support
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (isGenerating || isTourReady) return;
-      if (e.key === "ArrowRight") handleManualAction("select");
-      if (e.key === "ArrowLeft") handleManualAction("skip");
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleManualAction, isGenerating, isTourReady]);
-
-  const x = useMotionValue(0);
-  const leftGlowOpacity = useTransform(x, [0, -150], [0, 1]);
-  const rightGlowOpacity = useTransform(x, [0, 150], [0, 1]);
+  // ────────────────────────────────────────────────────────────────────────────
+  // TOUR READY VIEW
+  // ────────────────────────────────────────────────────────────────────────────
 
   if (isTourReady) {
-    const stops = filledNodes.filter((n): n is CardData => n !== null);
-    const totalCost = stops.reduce((sum, s) => {
-      const n = parseInt(s.price.replace(/[^0-9]/g, ""), 10) || 0;
-      return sum + n;
-    }, 0);
-    const totalMinutes = stops.reduce((sum, s) => {
-      const p = parseInt(s.price.replace(/[^0-9]/g, ""), 10) || 0;
-      return sum + (p < 50 ? 20 : p < 120 ? 40 : 60);
-    }, 0);
+    const stops = tourDraft;
+    const totalMinutes = stops.length * 45;
     const hrs = Math.floor(totalMinutes / 60);
     const mins = totalMinutes % 60;
-    const durationLabel =
-      hrs > 0 ? `${hrs}h ${mins > 0 ? `${mins}m` : ""}` : `${mins}m`;
+    const durationLabel = hrs > 0 ? `${hrs}h ${mins > 0 ? `${mins}m` : ""}` : `${mins}m`;
     const totalXP = stops.reduce((sum, s) => sum + s.match, 0);
 
     return (
@@ -354,37 +400,52 @@ export default function TourBuilderPage() {
           height: "100%",
           position: "relative",
           backgroundColor: surface.page,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
         }}
       >
-        <ClientOnly>
-          <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
-            <MapWidget
-              mapId="tour-final-background"
-              points={filledNodes
-                .filter((n) => n !== null)
-                .map((n) => n!.location as [number, number])}
-              center={[10.897, 106.772]}
-              zoom={13}
-            />
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
+        {/* Header */}
+        <Row
+          fillWidth
+          vertical="center"
+          style={{
+            padding: "16px 28px",
+            justifyContent: "space-between",
+            backgroundColor: "rgba(255,255,255,0.85)",
+            backdropFilter: "blur(32px)",
+            borderBottom: `1px solid ${border.subtle}`,
+            flexShrink: 0,
+          }}
+        >
+          <Row vertical="center" style={{ gap: 12 }}>
             <button
+              onClick={() => {
+                setIsTourReady(false);
+                resetTour();
+              }}
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 7,
-                padding: "10px 20px",
+                gap: 6,
+                padding: "8px 14px",
                 borderRadius: 12,
-                backgroundColor: surface.base,
-                border: `1px solid ${border.medium}`,
+                backgroundColor: "rgba(0,0,0,0.05)",
+                border: "none",
                 cursor: "pointer",
                 fontSize: 13,
                 fontWeight: 700,
                 color: text.primary,
+                fontFamily: "inherit",
               }}
             >
-              <Share2 size={14} /> Share
+              <RotateCcw size={14} /> Start Over
             </button>
+          </Row>
+          <Heading variant="heading-strong-m" style={{ color: text.primary }}>
+            🗺 Your Flavor Journey
+          </Heading>
+          <Row style={{ gap: 10 }}>
             <button
               style={{
                 display: "flex",
@@ -398,26 +459,44 @@ export default function TourBuilderPage() {
                 fontSize: 13,
                 fontWeight: 800,
                 color: "white",
-                boxShadow: `0 4px 16px ${accent.primaryGlow}`,
+                boxShadow: `0 4px 16px ${accent.primary}50`,
               }}
             >
               <Navigation2 size={14} /> Start Tour
             </button>
-          </div>
-        </ClientOnly>
-        {/* ── Split Body ── */}
+          </Row>
+        </Row>
+
+        {/* Body: Map + Sidebar */}
         <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-          {/* LEFT: Map */}
-          <div style={{ flex: "1 1 55%", position: "relative", minWidth: 0 }}>
+          {/* Map */}
+          <div style={{ flex: "1 1 60%", position: "relative", minWidth: 0 }}>
             <ClientOnly>
               <MapWidget
-                mapId="tour-final-background"
-                points={stops.map((n) => n.location)}
-                center={stops[0]?.location ?? [10.897, 106.772]}
+                mapId="tour-final-map"
+                spots={stops.map((n) => ({
+                  id: n.venue_id,
+                  name: n.title,
+                  lat: n.location[0],
+                  lon: n.location[1],
+                  category: "place",
+                  emoji: "📍",
+                  accent: n.color,
+                  rating: 5,
+                  reviewCount: 0,
+                  priceLevel: 2,
+                  isOpen: true,
+                  closesAt: "",
+                  distance: n.distance,
+                  img: n.img,
+                  description: n.subtitle,
+                  tags: n.tags
+                }))}
+                center={(stops[0]?.location ?? [10.897, 106.772]) as [number, number]}
                 zoom={13}
               />
             </ClientOnly>
-            {/* Stat pills floating over map */}
+            {/* Stat pills */}
             <div
               style={{
                 position: "absolute",
@@ -431,10 +510,6 @@ export default function TourBuilderPage() {
               {[
                 { icon: <MapPin size={13} />, label: `${stops.length} Stops` },
                 { icon: <Timer size={13} />, label: durationLabel },
-                {
-                  icon: <DollarSign size={13} />,
-                  label: `${totalCost.toLocaleString()}k`,
-                },
                 { icon: <Zap size={13} />, label: `+${totalXP} XP` },
               ].map((s) => (
                 <div
@@ -445,7 +520,7 @@ export default function TourBuilderPage() {
                     gap: 5,
                     padding: "6px 12px",
                     borderRadius: 20,
-                    backgroundColor: "rgba(255,255,255,0.9)",
+                    backgroundColor: "rgba(255,255,255,0.92)",
                     backdropFilter: "blur(16px)",
                     border: `1px solid ${border.subtle}`,
                     fontSize: 11,
@@ -461,16 +536,11 @@ export default function TourBuilderPage() {
             </div>
           </div>
 
-          {/* RIGHT: Stop Detail Panel */}
+          {/* Sidebar */}
           <motion.div
             initial={{ x: 40, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            transition={{
-              type: "spring",
-              stiffness: 260,
-              damping: 22,
-              delay: 0.1,
-            }}
+            transition={{ type: "spring", stiffness: 260, damping: 22, delay: 0.1 }}
             style={{
               width: 360,
               flexShrink: 0,
@@ -481,7 +551,6 @@ export default function TourBuilderPage() {
               overflow: "hidden",
             }}
           >
-            {/* Panel header */}
             <div
               style={{
                 padding: "20px 24px 14px",
@@ -513,7 +582,6 @@ export default function TourBuilderPage() {
               </h3>
             </div>
 
-            {/* Stop list */}
             <div
               style={{
                 flex: 1,
@@ -524,143 +592,111 @@ export default function TourBuilderPage() {
                 gap: 0,
               }}
             >
-              {stops.map((stop, i) => {
-                const stopMins =
-                  parseInt(stop.price.replace(/[^0-9]/g, ""), 10) < 50
-                    ? 20
-                    : parseInt(stop.price.replace(/[^0-9]/g, ""), 10) < 120
-                      ? 40
-                      : 60;
-                return (
-                  <React.Fragment key={stop.id}>
-                    <motion.div
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.15 + i * 0.08 }}
+              {stops.map((stop, i) => (
+                <React.Fragment key={stop.id}>
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.15 + i * 0.08 }}
+                    style={{
+                      display: "flex",
+                      gap: 12,
+                      alignItems: "flex-start",
+                      padding: "12px 0",
+                    }}
+                  >
+                    <div
                       style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: "50%",
+                        background: stop.color,
                         display: "flex",
-                        gap: 12,
-                        alignItems: "flex-start",
-                        padding: "12px 0",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                        fontSize: 12,
+                        fontWeight: 900,
+                        color: "white",
+                        marginTop: 4,
                       }}
                     >
-                      {/* Number chip */}
-                      <div
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: "50%",
-                          background: stop.color,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                          fontSize: 12,
-                          fontWeight: 900,
-                          color: "white",
-                          marginTop: 4,
-                        }}
-                      >
-                        {i + 1}
-                      </div>
-                      {/* Thumb */}
-                      <div
-                        style={{
-                          width: 52,
-                          height: 52,
-                          borderRadius: 12,
-                          overflow: "hidden",
-                          flexShrink: 0,
-                        }}
-                      >
-                        <img
-                          src={stop.img}
-                          alt={stop.title}
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                          }}
-                        />
-                      </div>
-                      {/* Info */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p
-                          style={{
-                            margin: 0,
-                            fontSize: 13,
-                            fontWeight: 800,
-                            color: text.primary,
-                            letterSpacing: "-0.3px",
-                          }}
-                        >
-                          {stop.title}
-                        </p>
-                        <p
-                          style={{
-                            margin: "2px 0 6px",
-                            fontSize: 11,
-                            color: text.tertiary,
-                          }}
-                        >
-                          {stop.subtitle}
-                        </p>
-                        <div style={{ display: "flex", gap: 8 }}>
-                          <span
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 3,
-                              fontSize: 10,
-                              fontWeight: 700,
-                              color: text.secondary,
-                            }}
-                          >
-                            <Clock size={10} /> ~{stopMins}m
-                          </span>
-                          <span
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 3,
-                              fontSize: 10,
-                              fontWeight: 700,
-                              color: text.secondary,
-                            }}
-                          >
-                            <DollarSign size={10} /> {stop.price}
-                          </span>
-                          <span
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 3,
-                              fontSize: 10,
-                              fontWeight: 700,
-                              color: accent.warning,
-                            }}
-                          >
-                            <Sparkles size={10} /> {stop.match}%
-                          </span>
-                        </div>
-                      </div>
-                    </motion.div>
-                    {i < stops.length - 1 && (
-                      <div
-                        style={{
-                          marginLeft: 14,
-                          width: 1,
-                          height: 16,
-                          background: `linear-gradient(to bottom, ${border.medium}, transparent)`,
-                        }}
+                      {i + 1}
+                    </div>
+                    <div
+                      style={{
+                        width: 52,
+                        height: 52,
+                        borderRadius: 12,
+                        overflow: "hidden",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <img
+                        src={stop.img}
+                        alt={stop.title}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
                       />
-                    )}
-                  </React.Fragment>
-                );
-              })}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 13,
+                          fontWeight: 800,
+                          color: text.primary,
+                          letterSpacing: "-0.3px",
+                        }}
+                      >
+                        {stop.title}
+                      </p>
+                      <p
+                        style={{ margin: "2px 0 6px", fontSize: 11, color: text.tertiary }}
+                      >
+                        {stop.subtitle}
+                      </p>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <span
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 3,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: text.secondary,
+                          }}
+                        >
+                          <Clock size={10} /> ~45m
+                        </span>
+                        <span
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 3,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: accent.warning,
+                          }}
+                        >
+                          <Sparkles size={10} /> {stop.match}%
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                  {i < stops.length - 1 && (
+                    <div
+                      style={{
+                        marginLeft: 14,
+                        width: 1,
+                        height: 16,
+                        background: `linear-gradient(to bottom, ${border.medium}, transparent)`,
+                      }}
+                    />
+                  )}
+                </React.Fragment>
+              ))}
             </div>
 
-            {/* Summary footer */}
             <div
               style={{
                 padding: "16px 24px",
@@ -673,27 +709,12 @@ export default function TourBuilderPage() {
             >
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 {[
-                  {
-                    label: "Duration",
-                    value: durationLabel,
-                    color: accent.secondary,
-                  },
-                  { label: "Budget", value: `${totalCost}k`, color: "#059669" },
-                  {
-                    label: "XP Earned",
-                    value: `+${totalXP}`,
-                    color: accent.warning,
-                  },
+                  { label: "Duration", value: durationLabel, color: accent.secondary },
+                  { label: "Stops", value: `${stops.length}`, color: "#059669" },
+                  { label: "XP Earned", value: `+${totalXP}`, color: accent.warning },
                 ].map((s) => (
                   <div key={s.label} style={{ textAlign: "center" }}>
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: 16,
-                        fontWeight: 900,
-                        color: s.color,
-                      }}
-                    >
+                    <p style={{ margin: 0, fontSize: 16, fontWeight: 900, color: s.color }}>
                       {s.value}
                     </p>
                     <p
@@ -711,27 +732,6 @@ export default function TourBuilderPage() {
                   </div>
                 ))}
               </div>
-              <Link href="/discover" style={{ textDecoration: "none" }}>
-                <button
-                  style={{
-                    width: "100%",
-                    padding: "12px",
-                    borderRadius: 14,
-                    background: `linear-gradient(135deg, ${accent.primary}, #0057D9)`,
-                    border: "none",
-                    cursor: "pointer",
-                    fontSize: 13,
-                    fontWeight: 800,
-                    color: "white",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 8,
-                  }}
-                >
-                  <Navigation2 size={15} /> Open in Full Map
-                </button>
-              </Link>
             </div>
           </motion.div>
         </div>
@@ -739,10 +739,14 @@ export default function TourBuilderPage() {
     );
   }
 
+  // ────────────────────────────────────────────────────────────────────────────
+  // SWIPE ENGINE VIEW
+  // ────────────────────────────────────────────────────────────────────────────
+
   return (
     <Column
       fillHeight
-      gap="0"
+      gap={0}
       style={{
         flex: 1,
         backgroundColor: "#F8FAFF",
@@ -754,6 +758,7 @@ export default function TourBuilderPage() {
         justifyContent: "space-between",
       }}
     >
+      {/* Ambient colour glow from current card */}
       <AnimatePresence>
         <motion.div
           key={activeColor}
@@ -770,317 +775,114 @@ export default function TourBuilderPage() {
         />
       </AnimatePresence>
 
-      {/* 1. TOP IDENTITY BAR - FLEX SHRINK 0 */}
+      {/* ── TOP BAR ── */}
       <div style={{ width: "100%", zIndex: 100, flexShrink: 0 }}>
         <Row
           fillWidth
-          horizontal="between"
           vertical="center"
           style={{
             height: "80px",
-            paddingTop: "0",
-            paddingBottom: "0",
+            justifyContent: "space-between",
             paddingLeft: "40px",
             paddingRight: "40px",
             backgroundColor: "rgba(255, 255, 255, 0.65)",
             backdropFilter: "blur(32px) saturate(180%)",
-            borderBottomWidth: "1px",
-            borderBottomStyle: "solid",
-            borderBottomColor: "rgba(0, 122, 255, 0.08)",
+            borderBottom: `1px solid rgba(0,122,255,0.08)`,
             borderRadius: "0 0 32px 32px",
             boxShadow: "0 8px 32px rgba(0,0,0,0.02)",
             gap: "24px",
           }}
         >
-          {/* LEFT: Navigation & Status */}
+          {/* Left: Back nav */}
           <Row style={{ flex: 1, alignItems: "center", gap: "16px" }}>
             <Link href="/discover">
               <Row
                 vertical="center"
                 style={{
                   height: "44px",
-                  paddingTop: "0",
-                  paddingBottom: "0",
                   paddingLeft: "20px",
                   paddingRight: "20px",
                   borderRadius: "16px",
-                  backgroundColor: "rgba(255, 255, 255, 0.4)",
-                  borderWidth: "1px",
-                  borderStyle: "solid",
-                  borderColor: "rgba(0, 122, 255, 0.1)",
+                  backgroundColor: "rgba(255,255,255,0.4)",
+                  border: `1px solid rgba(0,122,255,0.1)`,
                   cursor: "pointer",
                   gap: "8px",
-                  transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.03)",
-                }}
-                onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
-                  e.currentTarget.style.backgroundColor =
-                    "rgba(0, 122, 255, 0.08)";
-                  e.currentTarget.style.borderColor = "rgba(0, 122, 255, 0.2)";
-                  e.currentTarget.style.transform = "translateY(-1px)";
-                }}
-                onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
-                  e.currentTarget.style.backgroundColor =
-                    "rgba(255, 255, 255, 0.4)";
-                  e.currentTarget.style.borderColor = "rgba(0, 122, 255, 0.1)";
-                  e.currentTarget.style.transform = "translateY(0)";
                 }}
               >
-                <ChevronLeft
-                  size={18}
-                  color={accent.primary}
-                  strokeWidth={2.5}
-                />
-                <Text
-                  style={{
-                    fontWeight: 800,
-                    color: accent.primary,
-                    fontSize: "0.9rem",
-                  }}
-                >
+                <ChevronLeft size={18} color={accent.primary} strokeWidth={2.5} />
+                <Text style={{ fontWeight: 800, color: accent.primary, fontSize: "0.9rem" }}>
                   Discover
                 </Text>
               </Row>
             </Link>
+          </Row>
 
+          {/* Centre: AI pill */}
+          <Row horizontal="center" style={{ flex: 2, minWidth: 0 }}>
             <div
               style={{
-                width: "1px",
-                height: "32px",
-                backgroundColor: "rgba(0,0,0,0.06)",
-                marginTop: "0",
-                marginBottom: "0",
-                marginLeft: "4px",
-                marginRight: "4px",
+                display: "flex",
+                alignItems: "center",
+                gap: "14px",
+                padding: "6px 28px 6px 14px",
+                backgroundColor: "rgba(255,255,255,0.45)",
+                borderRadius: "100px",
+                border: `1px solid rgba(0,122,255,0.15)`,
+                width: "100%",
+                maxWidth: "560px",
+                boxShadow: "0 4px 20px rgba(0,122,255,0.08)",
               }}
-            />
-
-            <Row style={{ gap: "8px" }}>
-              <IconButton
-                icon={<Bell size={18} color={accent.primary} />}
+            >
+              <div
                 style={{
-                  width: "44px",
-                  height: "44px",
-                  borderRadius: "16px",
-                  backgroundColor: "rgba(255, 255, 255, 0.4)",
-                  borderWidth: "1px",
-                  borderStyle: "solid",
-                  borderColor: "rgba(0, 122, 255, 0.1)",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.02)",
-                  paddingTop: "0",
-                  paddingBottom: "0",
-                  paddingLeft: "0",
-                  paddingRight: "0",
-                }}
-              />
-              <IconButton
-                icon={<MessageSquare size={18} color={accent.secondary} />}
-                style={{
-                  width: "44px",
-                  height: "44px",
-                  borderRadius: "16px",
-                  backgroundColor: "rgba(255, 255, 255, 0.4)",
-                  borderWidth: "1px",
-                  borderStyle: "solid",
-                  borderColor: "rgba(0, 122, 255, 0.1)",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.02)",
-                  paddingTop: "0",
-                  paddingBottom: "0",
-                  paddingLeft: "0",
-                  paddingRight: "0",
-                }}
-              />
-            </Row>
-          </Row>
-
-          {/* CENTER: AI INSIGHT PILL (DYNAMIC ISLAND) */}
-          <Row horizontal="center" style={{ flex: 2, minWidth: 0 }}>
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={
-                  filledNodes.filter(Boolean).length === 0
-                    ? "empty"
-                    : "building"
-                }
-                initial={{ opacity: 0, y: -4, scale: 0.99 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 4, scale: 0.99 }}
-                transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                style={{
+                  width: 38,
+                  height: 38,
+                  flexShrink: 0,
                   display: "flex",
                   alignItems: "center",
-                  gap: "14px",
-                  padding: "6px 28px 6px 14px",
-                  backgroundColor: "rgba(255, 255, 255, 0.45)",
-                  borderRadius: "100px",
-                  border: `1px solid rgba(0, 122, 255, 0.15)`,
-                  width: "100%",
-                  maxWidth: "580px",
-                  boxShadow:
-                    "0 4px 20px rgba(0, 122, 255, 0.08), inset 0 2px 4px rgba(255,255,255,0.8)",
-                  overflow: "hidden",
-                  position: "relative",
+                  justifyContent: "center",
+                  backgroundColor: "white",
+                  borderRadius: "50%",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
                 }}
               >
-                {/* Pulsing Backglow */}
-                <motion.div
-                  animate={{ opacity: [0.1, 0.2, 0.1] }}
-                  transition={{
-                    duration: 3,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    background: `radial-gradient(circle at 20% 50%, ${accent.primary}20, transparent 70%)`,
-                    pointerEvents: "none",
-                  }}
-                />
-
-                <div
-                  style={{
-                    width: "38px",
-                    height: "38px",
-                    flexShrink: 0,
-                    position: "relative",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: "white",
-                    borderRadius: "50%",
-                    padding: "4px",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
-                  }}
-                >
-                  <motion.div
-                    animate={{ rotate: 360, scale: [1, 1.05, 1] }}
-                    transition={{
-                      rotate: { duration: 4, repeat: Infinity, ease: "linear" },
-                      scale: {
-                        duration: 2.5,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                      },
-                    }}
-                    style={{
-                      position: "absolute",
-                      inset: -3,
-                      borderRadius: "50%",
-                      border: `1.5px solid transparent`,
-                      borderTopColor: accent.primary,
-                      borderRightColor: accent.secondary,
-                      opacity: 0.5,
-                    }}
-                  />
-                  <ClientOnly>
-                    <FlavorAura data={radarData} isPulsing={true} size={30} />
-                  </ClientOnly>
-                </div>
-
-                <Column style={{ gap: "1px", minWidth: 0, zIndex: 1 }}>
-                  <Row vertical="center" style={{ gap: "8px" }}>
-                    <motion.div
-                      animate={{
-                        scale: [1, 1.4, 1],
-                        backgroundColor: [
-                          accent.primary,
-                          accent.secondary,
-                          accent.primary,
-                        ],
-                      }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                      style={{
-                        width: "5px",
-                        height: "5px",
-                        borderRadius: "50%",
-                      }}
-                    />
-                    <Text
-                      style={{
-                        fontSize: "0.6rem",
-                        fontWeight: 900,
-                        color: accent.primary,
-                        letterSpacing: "1.2px",
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      AI Thought Engine
-                    </Text>
-                  </Row>
-                  <Text
-                    style={{
-                      fontSize: "0.85rem",
-                      fontWeight: 700,
-                      color: text.primary,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      letterSpacing: "-0.2px",
-                    }}
-                  >
-                    {filledNodes.filter(Boolean).length === 0
-                      ? "Analyzing your group's collective palate..."
-                      : filledNodes.filter(Boolean).length < TOTAL_NODES
-                        ? "DNA Syncing. Optimizing route for maximum group satisfaction."
-                        : "Route DNA Fully Sequenced. Ready to launch."}
-                  </Text>
-                </Column>
-              </motion.div>
-            </AnimatePresence>
-          </Row>
-
-          {/* RIGHT: ELITE PROFILE INFO */}
-          <Row
-            horizontal="end"
-            style={{ flex: 1, alignItems: "center", gap: "16px" }}
-          >
-            <Column style={{ gap: "2px", alignItems: "flex-end", hide: "s" }}>
-              <Text
-                style={{
-                  color: text.primary,
-                  fontSize: "0.9rem",
-                  fontWeight: 900,
-                  letterSpacing: "-0.3px",
-                }}
-              >
-                {user?.display_name || user?.username || "Explorer"}
-              </Text>
-              <Row vertical="center" style={{ gap: "6px" }}>
-                <div
-                  style={{
-                    width: "6px",
-                    height: "6px",
-                    borderRadius: "50%",
-                    backgroundColor: "#00D1B2",
-                    boxShadow: "0 0 8px #00D1B2",
-                  }}
-                />
+                <ClientOnly>
+                  <FlavorAura data={radarData} isPulsing={isPulsing} size={30} />
+                </ClientOnly>
+              </div>
+              <Column style={{ gap: "1px", minWidth: 0 }}>
                 <Text
                   style={{
-                    color: "rgba(0,0,0,0.45)",
-                    fontSize: "0.7rem",
-                    fontWeight: 700,
+                    fontSize: "0.6rem",
+                    fontWeight: 900,
+                    color: accent.primary,
+                    letterSpacing: "1.2px",
                     textTransform: "uppercase",
-                    letterSpacing: "0.5px",
                   }}
                 >
-                  {user?.title || "Taste Explorer"}
+                  AI Thought Engine · Learning
                 </Text>
-              </Row>
-            </Column>
+                <Text
+                  style={{
+                    fontSize: "0.85rem",
+                    fontWeight: 700,
+                    color: text.primary,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {tourDraft.length === 0
+                    ? "Swipe to start training your taste profile..."
+                    : `${tourDraft.length} stop${tourDraft.length > 1 ? "s" : ""} pinned — keep swiping!`}
+                </Text>
+              </Column>
+            </div>
+          </Row>
 
+          {/* Right: user info */}
+          <Row horizontal="end" style={{ flex: 1, alignItems: "center", gap: "16px" }}>
             <div style={{ position: "relative", flexShrink: 0 }}>
-              <motion.div
-                animate={{ rotate: -360 }}
-                transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-                style={{
-                  position: "absolute",
-                  inset: -4,
-                  borderRadius: "50%",
-                  border: "1px dashed rgba(0, 122, 255, 0.2)",
-                }}
-              />
               <div
                 style={{
                   width: "46px",
@@ -1088,7 +890,7 @@ export default function TourBuilderPage() {
                   borderRadius: "50%",
                   padding: "2px",
                   background: `linear-gradient(135deg, ${accent.primary}, ${accent.secondary})`,
-                  boxShadow: "0 4px 12px rgba(0, 122, 255, 0.2)",
+                  boxShadow: "0 4px 12px rgba(0,122,255,0.2)",
                 }}
               >
                 <div
@@ -1102,12 +904,8 @@ export default function TourBuilderPage() {
                 >
                   <img
                     src={user?.avatar_url || ""}
-                    alt={user?.display_name || "User Avatar"}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
+                    alt={user?.display_name || "User"}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
                   />
                 </div>
               </div>
@@ -1116,7 +914,7 @@ export default function TourBuilderPage() {
         </Row>
       </div>
 
-      {/* 2. CINEMATIC STAGE (NO TAILWIND) */}
+      {/* ── SWIPE STAGE ── */}
       <div
         style={{
           position: "relative",
@@ -1129,67 +927,62 @@ export default function TourBuilderPage() {
           overflow: "hidden",
         }}
       >
-        {/* Background Glows (Layer 0) */}
+        {/* Skip glow (left) */}
         <motion.div
           style={{
             position: "absolute",
             inset: 0,
             zIndex: 0,
-            background:
-              "radial-gradient(circle at left, rgba(255,192,203,0.5) 0%, transparent 70%)",
+            background: "radial-gradient(circle at left, rgba(255,100,100,0.35) 0%, transparent 55%)",
             opacity: leftGlowOpacity,
             display: "flex",
             alignItems: "center",
             justifyContent: "flex-start",
             paddingLeft: "80px",
+            pointerEvents: "none",
           }}
         >
-          <Column horizontal="center" style={{ gap: "16px" }}>
+          <Column horizontal="center" style={{ gap: 16 }}>
             <div
               style={{
-                width: "80px",
-                height: "80px",
+                width: 80,
+                height: 80,
                 borderRadius: "50%",
-                backgroundColor: "rgba(255, 100, 100, 0.1)",
+                backgroundColor: "rgba(255,100,100,0.12)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                border: "2px solid rgba(255, 100, 100, 0.2)",
+                border: "2px solid rgba(255,100,100,0.25)",
               }}
             >
-              <X size={40} color="rgba(255, 100, 100, 0.8)" strokeWidth={3} />
+              <X size={40} color="rgba(255,100,100,0.8)" strokeWidth={3} />
             </div>
-            <Text
-              style={{
-                fontSize: "1rem",
-                fontWeight: 900,
-                color: "rgba(255, 100, 100, 0.8)",
-                letterSpacing: "4px",
-              }}
-            >
+            <Text style={{ fontSize: "1rem", fontWeight: 900, color: "rgba(255,100,100,0.8)", letterSpacing: "4px" }}>
               SKIP
             </Text>
           </Column>
         </motion.div>
+
+        {/* Like glow (right) */}
         <motion.div
           style={{
             position: "absolute",
             inset: 0,
             zIndex: 0,
-            background:
-              "radial-gradient(circle at right, rgba(173,216,230,0.5) 0%, transparent 70%)",
+            background: `radial-gradient(circle at right, ${accent.primary}25 0%, transparent 55%)`,
             opacity: rightGlowOpacity,
             display: "flex",
             alignItems: "center",
             justifyContent: "flex-end",
             paddingRight: "80px",
+            pointerEvents: "none",
           }}
         >
-          <Column horizontal="center" style={{ gap: "16px" }}>
+          <Column horizontal="center" style={{ gap: 16 }}>
             <div
               style={{
-                width: "80px",
-                height: "80px",
+                width: 80,
+                height: 80,
                 borderRadius: "50%",
                 backgroundColor: `${accent.primary}10`,
                 display: "flex",
@@ -1198,36 +991,18 @@ export default function TourBuilderPage() {
                 border: `2px solid ${accent.primary}25`,
               }}
             >
-              <Star
-                size={40}
-                color={accent.primary}
-                fill={accent.primary}
-                strokeWidth={2.5}
-              />
+              <Star size={40} color={accent.primary} fill={accent.primary} strokeWidth={2.5} />
             </div>
-            <Text
-              style={{
-                fontSize: "1rem",
-                fontWeight: 900,
-                color: accent.primary,
-                letterSpacing: "4px",
-              }}
-            >
-              CHOOSE
+            <Text style={{ fontSize: "1rem", fontWeight: 900, color: accent.primary, letterSpacing: "4px" }}>
+              LIKE
             </Text>
           </Column>
         </motion.div>
 
-        {/* Foreground Layer (Layer 10) */}
+        {/* Card + Star overlay */}
         <motion.div
           drag="x"
-          style={{
-            x,
-            zIndex: 10,
-            position: "relative",
-            width: "760px",
-            height: "480px",
-          }}
+          style={{ x, zIndex: 10, position: "relative", width: "760px", height: "480px" }}
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.8}
           onDragEnd={handleDragEnd}
@@ -1239,13 +1014,7 @@ export default function TourBuilderPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                }}
+                style={{ width: "100%", height: "100%", position: "absolute", top: 0, left: 0 }}
               >
                 <TourSkeleton />
               </motion.div>
@@ -1261,6 +1030,7 @@ export default function TourBuilderPage() {
                   alignItems: "center",
                 }}
               >
+                {/* Next card (slightly behind) */}
                 {deck[1] && (
                   <motion.div
                     key={`bg-${deck[1].id}`}
@@ -1275,20 +1045,14 @@ export default function TourBuilderPage() {
                       overflow: "hidden",
                       backgroundColor: "white",
                       boxShadow: "0 20px 60px rgba(0,0,0,0.1)",
-                      border: "1px solid rgba(0,0,0,0.05)",
                     }}
                   >
                     <StopCard card={deck[1] as any} />
-                    <div
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        backgroundColor: "rgba(255,255,255,0.4)",
-                        backdropFilter: "blur(4px)",
-                      }}
-                    />
+                    <div style={{ position: "absolute", inset: 0, backgroundColor: "rgba(255,255,255,0.4)", backdropFilter: "blur(4px)" }} />
                   </motion.div>
                 )}
+
+                {/* Top card with Star button overlay */}
                 <div
                   style={{
                     perspective: "2000px",
@@ -1297,11 +1061,74 @@ export default function TourBuilderPage() {
                     display: "flex",
                     justifyContent: "center",
                     alignItems: "center",
+                    zIndex: 5,
+                    position: "relative",
                   }}
                 >
-                  <motion.div style={{ width: "100%", height: "100%" }}>
-                    <StopCard card={deck[0] as any} />
-                  </motion.div>
+                  <StopCard card={deck[0] as any} />
+
+                  {/* ★ Star / Super Like button — Option B: overlaid on card */}
+                  <motion.button
+                    whileHover={{ scale: 1.12 }}
+                    whileTap={{ scale: 0.92 }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSuperLike();
+                    }}
+                    style={{
+                      position: "absolute",
+                      bottom: 24,
+                      right: 24,
+                      zIndex: 20,
+                      width: 52,
+                      height: 52,
+                      borderRadius: "50%",
+                      border: "none",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: `linear-gradient(135deg, #F59E0B, #D97706)`,
+                      boxShadow: "0 6px 24px rgba(245,158,11,0.45)",
+                      fontFamily: "inherit",
+                    }}
+                    title="Super Like — Add to Tour"
+                  >
+                    <Star size={22} color="white" fill="white" />
+                  </motion.button>
+
+                  {/* Undo toast */}
+                  <AnimatePresence>
+                    {lastDiscarded && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 24 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 24 }}
+                        style={{
+                          position: "absolute",
+                          bottom: 24,
+                          left: "50%",
+                          transform: "translateX(-50%)",
+                          zIndex: 30,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          padding: "10px 18px",
+                          borderRadius: 100,
+                          backgroundColor: "rgba(30,30,30,0.9)",
+                          backdropFilter: "blur(12px)",
+                          boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+                          cursor: "pointer",
+                        }}
+                        onClick={handleUndo}
+                      >
+                        <Undo2 size={14} color="white" />
+                        <Text style={{ color: "white", fontSize: "0.8rem", fontWeight: 700 }}>
+                          Undo skip
+                        </Text>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
             ) : (
@@ -1319,68 +1146,54 @@ export default function TourBuilderPage() {
                   justifyContent: "center",
                 }}
               >
-                <EmptyState
-                  filledCount={filledNodes.filter(Boolean).length}
-                  totalCount={TOTAL_NODES}
-                />
+                <EmptyState filledCount={tourDraft.length} totalCount={0} />
               </motion.div>
             )}
           </AnimatePresence>
         </motion.div>
       </div>
 
-      {/* 3. FUNCTIONAL FOOTER - FLEX SHRINK 0 */}
+      {/* ── FOOTER CONTROLS ── */}
       <div
         style={{
           width: "100%",
           zIndex: 100,
           flexShrink: 0,
-          paddingTop: "8px",
-          paddingBottom: "8px",
-          paddingLeft: "60px",
-          paddingRight: "60px",
+          padding: "8px 60px",
           backgroundColor: "white",
-          backdropFilter: "blur(40px)",
-          borderTopWidth: "1px",
-          borderTopStyle: "solid",
-          borderTopColor: "rgba(0,0,0,0.08)",
+          borderTop: `1px solid rgba(0,0,0,0.08)`,
           borderRadius: "24px 24px 0 0",
           boxShadow: "0 -10px 40px rgba(0,0,0,0.04)",
         }}
       >
         <Row
           fillWidth
-          horizontal="between"
           vertical="center"
-          style={{ height: "100px", gap: "48px" }}
+          style={{ height: "100px", gap: "48px", justifyContent: "space-between" }}
         >
-          {/* LEFT: STATUS */}
+          {/* Left: Tour Draft counter */}
           <Row style={{ gap: "20px", alignItems: "center", width: "380px" }}>
-            <motion.div
-              whileHover={{ scale: 1.05 }}
+            <div
               style={{
                 display: "flex",
                 flexDirection: "column",
                 gap: "2px",
-                paddingTop: "8px",
-                paddingBottom: "8px",
-                paddingLeft: "20px",
-                paddingRight: "20px",
-                backgroundColor: "#F0F9FF",
+                padding: "8px 20px",
+                backgroundColor: tourDraft.length > 0 ? "#FFF7ED" : "#F0F9FF",
                 borderRadius: "16px",
-                border: `1px solid ${accent.primary}20`,
+                border: `1px solid ${tourDraft.length > 0 ? "#F59E0B20" : `${accent.primary}20`}`,
               }}
             >
               <Row vertical="center" style={{ gap: "8px" }}>
-                <Users size={16} color={accent.primary} />
+                <Star size={16} color={tourDraft.length > 0 ? "#D97706" : accent.primary} fill={tourDraft.length > 0 ? "#D97706" : "none"} />
                 <Text
                   style={{
                     fontSize: "0.85rem",
                     fontWeight: 900,
-                    color: accent.primary,
+                    color: tourDraft.length > 0 ? "#D97706" : accent.primary,
                   }}
                 >
-                  1 MEMBER
+                  {tourDraft.length} PINNED
                 </Text>
               </Row>
               <Text
@@ -1391,54 +1204,33 @@ export default function TourBuilderPage() {
                   textAlign: "center",
                 }}
               >
-                ACTIVE GROUP
+                TOUR DRAFT
               </Text>
-            </motion.div>
-            <div
-              style={{
-                width: "1px",
-                height: "32px",
-                backgroundColor: "rgba(0,0,0,0.08)",
-              }}
-            />
+            </div>
+            <div style={{ width: "1px", height: "32px", backgroundColor: "rgba(0,0,0,0.08)" }} />
             <Column style={{ gap: "4px" }}>
-              <Text
-                style={{
-                  fontSize: "0.85rem",
-                  fontWeight: 900,
-                  color: text.primary,
-                }}
-              >
-                {filledNodes.filter(Boolean).length} FOODS SELECTED
+              <Text style={{ fontSize: "0.85rem", fontWeight: 900, color: text.primary }}>
+                {deck.length} CARDS LEFT
               </Text>
-              <Text
-                style={{
-                  fontSize: "0.6rem",
-                  fontWeight: 600,
-                  color: "rgba(0,0,0,0.4)",
-                  textTransform: "uppercase",
-                }}
-              >
+              <Text style={{ fontSize: "0.6rem", fontWeight: 600, color: "rgba(0,0,0,0.4)", textTransform: "uppercase" }}>
                 Open-ended Exploration
               </Text>
             </Column>
           </Row>
 
-          {/* CENTER: ACTIONS */}
+          {/* Centre: Action buttons */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
               gap: "16px",
-              paddingTop: "8px",
-              paddingBottom: "8px",
-              paddingLeft: "16px",
-              paddingRight: "16px",
+              padding: "8px 16px",
               backgroundColor: "rgba(0,0,0,0.03)",
               borderRadius: "100px",
-              border: `2px solid rgba(0,0,0,0.05)`,
+              border: "2px solid rgba(0,0,0,0.05)",
             }}
           >
+            {/* Undo */}
             <IconButton
               icon={<Undo2 size={22} color="white" />}
               onClick={handleUndo}
@@ -1446,101 +1238,76 @@ export default function TourBuilderPage() {
                 width: "48px",
                 height: "48px",
                 borderRadius: "50%",
-                backgroundColor: "#64748B",
-                paddingTop: "0",
-                paddingBottom: "0",
-                paddingLeft: "0",
-                paddingRight: "0",
+                backgroundColor: lastDiscarded ? "#64748B" : "rgba(0,0,0,0.12)",
+                cursor: lastDiscarded ? "pointer" : "default",
+                padding: 0,
               }}
             />
+            {/* Skip */}
             <Button
-              onClick={() => handleManualAction("skip")}
+              onClick={handleSkip}
               style={{
                 borderRadius: "30px",
                 backgroundColor: "#F3E8FF",
                 color: "#7E22CE",
                 border: "none",
                 fontWeight: 900,
-                paddingTop: "0",
-                paddingBottom: "0",
-                paddingLeft: "28px",
-                paddingRight: "28px",
+                padding: "0 28px",
                 height: "48px",
               }}
             >
               SKIP
             </Button>
+            {/* Like */}
             <Button
-              onClick={() => handleManualAction("select")}
+              onClick={handleLike}
               style={{
                 borderRadius: "30px",
                 backgroundColor: accent.primary,
                 color: "white",
                 fontWeight: 900,
-                paddingTop: "0",
-                paddingBottom: "0",
-                paddingLeft: "32px",
-                paddingRight: "32px",
+                padding: "0 28px",
                 height: "48px",
               }}
             >
-              CHOOSE
+              LIKE
             </Button>
-            <IconButton
-              icon={
-                <Star
-                  size={24}
-                  color="white"
-                  fill={filledNodes.some((n) => n !== null) ? "white" : "none"}
-                />
-              }
-              onClick={() => {
-                if (filledNodes.some((n) => n !== null)) {
-                  setIsGenerating(true);
-                  setTimeout(() => {
-                    setIsGenerating(false);
-                    setIsTourReady(true);
-                  }, 3000);
-                }
-              }}
+            {/* Build Tour */}
+            <motion.button
+              whileHover={tourDraft.length > 0 ? { scale: 1.04 } : {}}
+              onClick={handleFinalizeTour}
               style={{
-                width: "48px",
+                padding: "0 20px",
                 height: "48px",
-                borderRadius: "50%",
-                backgroundColor: filledNodes.some((n) => n !== null)
-                  ? "#10B981"
-                  : "rgba(0,0,0,0.1)",
+                borderRadius: "30px",
+                border: "none",
+                cursor: tourDraft.length > 0 ? "pointer" : "default",
+                fontSize: 13,
+                fontWeight: 900,
+                color: "white",
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                background:
+                  tourDraft.length > 0
+                    ? `linear-gradient(135deg, #10B981, #059669)`
+                    : "rgba(0,0,0,0.1)",
+                boxShadow: tourDraft.length > 0 ? "0 4px 16px rgba(16,185,129,0.4)" : "none",
+                transition: "all 0.2s",
+                fontFamily: "inherit",
               }}
-            />
+            >
+              <CheckCircle2 size={16} />
+              BUILD TOUR
+            </motion.button>
           </div>
 
-          {/* RIGHT: MAP & DNA */}
-          <Row
-            style={{
-              gap: "24px",
-              alignItems: "center",
-              width: "380px",
-              justifyContent: "flex-end",
-            }}
-          >
+          {/* Right: Tour DNA bar */}
+          <Row style={{ gap: "24px", alignItems: "center", width: "380px", justifyContent: "flex-end" }}>
             <Column style={{ gap: "8px", width: "180px" }}>
-              <Row
-                horizontal="between"
-                vertical="center"
-                style={{ width: "100%" }}
-              >
-                <Text style={{ fontSize: "0.65rem", fontWeight: 850 }}>
-                  TOUR DNA PROFILE
-                </Text>
-                <Text
-                  style={{
-                    fontSize: "0.6rem",
-                    color: accent.secondary,
-                    fontWeight: 800,
-                  }}
-                >
-                  LIVE
-                </Text>
+              <Row vertical="center" style={{ width: "100%", justifyContent: "space-between" }}>
+                <Text style={{ fontSize: "0.65rem", fontWeight: 850 }}>TOUR DNA PROFILE</Text>
+                <Text style={{ fontSize: "0.6rem", color: accent.secondary, fontWeight: 800 }}>LIVE</Text>
               </Row>
               <div
                 style={{
@@ -1552,12 +1319,12 @@ export default function TourBuilderPage() {
                   display: "flex",
                 }}
               >
-                {tourDNA.map((segment) => (
+                {tourDNA.map((seg) => (
                   <motion.div
-                    key={segment.label}
+                    key={seg.label}
                     initial={{ width: 0 }}
-                    animate={{ width: `${segment.value}%` }}
-                    style={{ height: "100%", backgroundColor: segment.color }}
+                    animate={{ width: `${seg.value}%` }}
+                    style={{ height: "100%", backgroundColor: seg.color }}
                   />
                 ))}
               </div>
@@ -1568,18 +1335,32 @@ export default function TourBuilderPage() {
                 height: "80px",
                 borderRadius: "16px",
                 backgroundColor: "#F8FAFF",
-                border: "1px solid rgba(0,0,0,0.06)",
+                border: `1px solid rgba(0,0,0,0.06)`,
                 overflow: "hidden",
-                position: "relative",
               }}
             >
               <ClientOnly>
                 <MapWidget
                   mapId="tour-curation-footer"
-                  points={filledNodes
-                    .filter((n): n is CardData => n !== null)
-                    .map((n) => n.location)}
-                  center={activeCard ? activeCard.location : [10.897, 106.772]}
+                  spots={tourDraft.map((n) => ({
+                    id: n.venue_id,
+                    name: n.title,
+                    lat: n.location[0],
+                    lon: n.location[1],
+                    category: "place",
+                    emoji: "📍",
+                    accent: n.color,
+                    rating: 5,
+                    reviewCount: 0,
+                    priceLevel: 2,
+                    isOpen: true,
+                    closesAt: "",
+                    distance: n.distance,
+                    img: n.img,
+                    description: n.subtitle,
+                    tags: n.tags
+                  }))}
+                  center={(activeCard ? activeCard.location : [10.897, 106.772]) as [number, number]}
                   zoom={14}
                   showBanner={false}
                 />
@@ -1589,18 +1370,13 @@ export default function TourBuilderPage() {
         </Row>
       </div>
 
-      {/* ═══════════ IMMERSIVE GENERATOR LOADING ═══════════ */}
+      {/* ── GENERATING OVERLAY ── */}
       <AnimatePresence>
         {isGenerating && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{
-              opacity: 0,
-              scale: 1.05,
-              filter: "blur(20px)",
-              transition: { duration: 0.8 },
-            }}
+            exit={{ opacity: 0, scale: 1.05, filter: "blur(20px)", transition: { duration: 0.8 } }}
             style={{
               position: "fixed",
               inset: 0,
@@ -1614,21 +1390,12 @@ export default function TourBuilderPage() {
               overflow: "hidden",
             }}
           >
-            {/* Drifting Bio-Particles */}
             {PARTICLES.map((p, i) => (
               <motion.div
                 key={i}
                 initial={{ x: p.x0, y: p.y0, opacity: 0 }}
-                animate={{
-                  x: [null, p.x1],
-                  y: [null, p.y1],
-                  opacity: [0, 0.4, 0],
-                }}
-                transition={{
-                  duration: p.dur,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
+                animate={{ x: [null, p.x1], y: [null, p.y1], opacity: [0, 0.4, 0] }}
+                transition={{ duration: p.dur, repeat: Infinity, ease: "easeInOut" }}
                 style={{
                   position: "absolute",
                   width: "4px",
@@ -1640,52 +1407,15 @@ export default function TourBuilderPage() {
                 }}
               />
             ))}
-
             <div style={{ position: "relative", zIndex: 10 }}>
-              {/* Scanning Aura */}
               <motion.div
-                animate={{ scale: [1, 2, 1], opacity: [0.1, 0.3, 0.1] }}
-                transition={{
-                  duration: 4,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-                style={{
-                  position: "absolute",
-                  inset: -40,
-                  borderRadius: "50%",
-                  background: `radial-gradient(circle, ${accent.primary}40 0%, transparent 70%)`,
-                  zIndex: -1,
-                }}
-              />
-
-              <motion.div
-                animate={{ y: [0, -10, 0], rotate: [0, 5, -5, 0] }}
-                transition={{
-                  duration: 4,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
+                animate={{ y: [0, -10, 0] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
               >
-                <Activity
-                  size={64}
-                  color={accent.primary}
-                  style={{
-                    filter: `drop-shadow(0 0 20px ${accent.primary}40)`,
-                  }}
-                />
+                <Activity size={64} color={accent.primary} style={{ filter: `drop-shadow(0 0 20px ${accent.primary}40)` }} />
               </motion.div>
             </div>
-
-            <Column
-              horizontal="center"
-              style={{
-                gap: "16px",
-                marginTop: "40px",
-                zIndex: 10,
-                width: "100vw",
-              }}
-            >
+            <Column horizontal="center" style={{ gap: "16px", marginTop: "40px", zIndex: 10, width: "100vw" }}>
               <AnimatePresence mode="wait">
                 <motion.div
                   key={loadingMessage}
@@ -1702,93 +1432,16 @@ export default function TourBuilderPage() {
                       backgroundSize: "200% auto",
                       WebkitBackgroundClip: "text",
                       WebkitTextFillColor: "transparent",
-                      animation: "shimmer 3s linear infinite",
                     }}
                   >
                     {loadingMessage}
                   </Heading>
                 </motion.div>
               </AnimatePresence>
-
-              <div
-                style={{
-                  width: "200px",
-                  height: "1px",
-                  backgroundColor: "rgba(0,0,0,0.1)",
-                  position: "relative",
-                  overflow: "hidden",
-                }}
-              >
-                <motion.div
-                  animate={{ left: ["-100%", "100%"] }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    bottom: 0,
-                    width: "40%",
-                    background: `linear-gradient(90deg, transparent, ${accent.primary}, transparent)`,
-                  }}
-                />
-              </div>
             </Column>
           </motion.div>
         )}
       </AnimatePresence>
     </Column>
-  );
-}
-
-function DraggableCard({
-  card,
-  onDragEnd,
-  x,
-}: {
-  card: TourNode;
-  onDragEnd: (e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => void;
-  x: any;
-}) {
-  const y = useMotionValue(0);
-  const rotate = useTransform(x, [-400, 400], [-8, 8]);
-  const rotateX = useTransform(y, [-300, 300], [10, -10]);
-  const rotateY = useTransform(x, [-400, 400], [-10, 10]);
-  const scale = useTransform(y, [0, 300], [1, 0.85]);
-
-  return (
-    <div
-      style={{
-        perspective: "2000px",
-        width: "100%",
-        height: "100%",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <motion.div
-        drag
-        dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-        dragElastic={0.6}
-        onDragEnd={onDragEnd}
-        style={{
-          x,
-          y,
-          rotate,
-          rotateX,
-          rotateY,
-          scale,
-          width: "100%",
-          height: "100%",
-          position: "relative",
-          transformStyle: "preserve-3d",
-        }}
-      >
-        <StopCard card={card as any} />
-      </motion.div>
-    </div>
   );
 }

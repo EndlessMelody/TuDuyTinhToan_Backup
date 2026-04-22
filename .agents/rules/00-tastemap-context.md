@@ -145,14 +145,15 @@ Score(S) = W₁ · Sim(U⃗, P⃗) + W₂ · C_weather - W₃ · D
 
 ---
 
-## API & Database Patterns
+## System Workflows, API & Database Patterns
 
 👉 **Single Source of Truth:** 
-To view the complete list of REST API Endpoints, Parameters, Request Bodies, Response Schemas, and the Database Tables (including pgvector), you **MUST** refer to the documentation:
+To view the complete System Workflows, REST API Endpoints, Parameters, Request Bodies, Response Schemas, and the Database Tables (including pgvector), you **MUST** refer to the documentation:
+- **System Workflows Index:** `docs/flows/README.md`
 - **API Documentation Index:** `docs/api/README.md`
 - **Database Schema Index:** `docs/database_schema/README.md`
 
-Do NOT assume endpoints or tables exist without checking the above documentation indexes.
+Do NOT assume endpoints, tables, or business logic flows exist without checking the above documentation indexes.
 
 
 ## Development Guidelines
