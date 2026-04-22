@@ -164,6 +164,20 @@ async def process_swipe_batch(
     except ValueError:
         pass # UUID Guest User -> không đồng bộ PostgreSQL
         
+    # 5. Smart Cache Invalidation: Xóa cache Feed để force AI tính lại vòng lặp mới
+    try:
+        feed_pattern = f"feed:*:{user_id}:*"
+        cursor_scan = 0
+        while True:
+            cursor_scan, keys = await redis.scan(cursor=cursor_scan, match=feed_pattern, count=100)
+            if keys:
+                await redis.delete(*keys)
+            if cursor_scan == 0:
+                break
+    except Exception as e:
+        import logging
+        logging.warning(f"[SWIPE] Failed to clear feed cache for user {user_id}: {e}")
+        
     return {
         "status": "success",
         "processed_count": processed_count,
