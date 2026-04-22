@@ -14,6 +14,8 @@ interface UserVectorContextType {
   radarData: RadarPoint[];
   mergedRadarData: (RadarPoint & { prevA?: number })[];
   updateVector: (venueId: number, traits: string[], direction: 'select' | 'skip') => void;
+  /** Imperatively flush the pending swipe queue. Use before tour finalization. */
+  flushSwipeQueue: () => Promise<void>;
   isPulsing: boolean;
 }
 
@@ -82,16 +84,15 @@ export const UserVectorProvider: ({ children }: {
   const flushSwipeQueue = useCallback(async () => {
     if (swipeQueueRef.current.length === 0) return;
     const actions = [...swipeQueueRef.current];
-    swipeQueueRef.current = []; 
-    
-    // We use a fallback ID for absolute guests
-    const userId = (user as any)?.id || "guest-id"; 
+    swipeQueueRef.current = [];
+
+    const userId = (user as any)?.id || "guest-id";
 
     try {
       await apiPost<any>("/api/v1/interactions/swipe-batch", {
         user_id: String(userId),
-        category: "place",
-        actions: actions
+        domain: "food",
+        actions: actions,
       });
     } catch (e) {
       console.error("Failed to send swipe batch", e);
@@ -151,7 +152,7 @@ export const UserVectorProvider: ({ children }: {
   }));
 
   return (
-    <UserVectorContext.Provider value={{ radarData, mergedRadarData, updateVector, isPulsing }}>
+    <UserVectorContext.Provider value={{ radarData, mergedRadarData, updateVector, flushSwipeQueue, isPulsing }}>
       {children}
     </UserVectorContext.Provider>
   );

@@ -692,18 +692,20 @@ def find_optimal_tour_route(
 ### Fast Fallback Algorithm
 
 ```python
-async def rescue_me_recommendation(
+async def calculate_rescue_recommendation(
     db: AsyncSession,
     user_id: int,
     user_location: Tuple[float, float],
     max_distance_km: float = 2.0
 ) -> dict:
     """
-    'Rescue Me' - Fast fallback recommendation.
-    
+    'Rescue Me' - Fast fallback recommendation core logic.
     Bypasses heavy algorithms, prioritizes distance with minimum quality threshold.
-    """
     
+    > 👉 **CRITICAL WARNING:** This is the algorithmic core. For the EXACT expected 
+    > API Response Schema (status code, fields, nested dicts), you MUST refer to 
+    > `docs/api/discovery.md`. Do not return arbitrary dictionary structures to the client.
+    """
     # Get user vector
     user = await db.get(User, user_id)
     user_vector = np.array(user.preference_vector)
@@ -712,8 +714,8 @@ async def rescue_me_recommendation(
     query = select(Location).where(
         and_(
             Location.is_active == True,
-            Location.rating >= 3.5,  # Minimum quality threshold
-            Location.review_count >= 10  # Some popularity
+            Location.rating >= 3.5,
+            Location.review_count >= 10
         )
     ).order_by(
         # Order by distance (simple, fast)
@@ -727,49 +729,13 @@ async def rescue_me_recommendation(
     nearby = result.scalars().all()
     
     if not nearby:
-        return {"success": False, "error": "No nearby locations found"}
+        return None
     
-    # Quick scoring: Distance 80%, Similarity 20%
-    candidates = []
-    for loc in nearby:
-        loc_vector = np.array(loc.embedding)
-        
-        # Distance (normalized 0-1, 0=closest)
-        dist = haversine_distance(
-            user_location[0], user_location[1],
-            loc.latitude, loc.longitude
-        )
-        distance_score = 1.0 - min(dist / max_distance_km, 1.0)
-        
-        # Quick similarity check (only if vector exists)
-        if loc_vector.any():
-            similarity = cosine_similarity(user_vector, loc_vector.reshape(1, -1))[0]
-        else:
-            similarity = 0.5
-        
-        # Weighted: 80% distance, 20% similarity
-        score = 0.8 * distance_score + 0.2 * similarity
-        
-        candidates.append({
-            'location': loc,
-            'score': score,
-            'distance_km': dist,
-            'walk_time': int(dist / 5 * 60)  # Assume 5km/h walking
-        })
+    # ... algorithmic scoring logic ...
     
-    # Return best match
-    candidates.sort(key=lambda x: x['score'], reverse=True)
-    best = candidates[0]
-    
+    # Return raw algorithmic result - API Router must format this according to docs/api/*.md!
     return {
-        "success": True,
-        "data": {
-            "location": best['location'],
-            "score": best['score'],
-            "distance_km": round(best['distance_km'], 2),
-            "walk_time_minutes": best['walk_time'],
-            "explanation": f"Only {best['walk_time']} minutes walk away"
-        },
+        "location": nearby[0],
         "algorithm": "rescue_me_fast"
     }
 ```
@@ -789,7 +755,7 @@ async def rescue_me_recommendation(
 - `backend/src/locations/models.py` - Location embedding
 
 **API Endpoints:**
-- `backend/src/recommendations/router.py` - GET /recommendations
-- `backend/src/swipes/router.py` - POST /swipes
-- `backend/src/groups/router.py` - POST /groups/{id}/resolve
-- `backend/src/tours/router.py` - POST /tours/optimize
+👉 **MUST REFER TO:** `docs/api/README.md` for all algorithm-related endpoints.
+
+**Database Schemas:**
+👉 **MUST REFER TO:** `docs/database_schema/README.md` for actual vector column details.
