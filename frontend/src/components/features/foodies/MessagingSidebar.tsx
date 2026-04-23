@@ -43,6 +43,8 @@ import {
   Trash2,
   Edit2,
   Film,
+  Play,
+  Pause,
 } from "lucide-react";
 
 import { Friend } from "./FriendRow";
@@ -116,6 +118,159 @@ function formatVoiceDuration(duration: unknown): string {
   const secondsPart = String(rounded % 60).padStart(2, "0");
   return `${minutesPart}:${secondsPart}`;
 }
+
+type VoiceMessagePlayerProps = {
+  src: string;
+  isMe: boolean;
+  durationHint?: unknown;
+};
+
+const VoiceMessagePlayer: React.FC<VoiceMessagePlayerProps> = ({
+  src,
+  isMe,
+  durationHint,
+}) => {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  const hintedDurationSeconds =
+    typeof durationHint === "number" ? durationHint : Number(durationHint);
+  const hasHintedDuration =
+    Number.isFinite(hintedDurationSeconds) && hintedDurationSeconds > 0;
+  const totalDuration =
+    duration > 0 ? duration : hasHintedDuration ? hintedDurationSeconds : 0;
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    return () => {
+      audio?.pause();
+    };
+  }, []);
+
+  const handleTogglePlayback = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (audio.paused) {
+      void audio.play();
+      setIsPlaying(true);
+    } else {
+      audio.pause();
+      setIsPlaying(false);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    const mediaDuration = audioRef.current?.duration ?? 0;
+    if (Number.isFinite(mediaDuration) && mediaDuration > 0) {
+      setDuration(mediaDuration);
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    const nextTime = audioRef.current?.currentTime ?? 0;
+    setCurrentTime(nextTime);
+  };
+
+  const handleEnded = () => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+  };
+
+  const handleSeek: React.ChangeEventHandler<HTMLInputElement> = (event) => {
+    const nextTime = Number(event.target.value);
+    if (!Number.isFinite(nextTime)) return;
+
+    if (audioRef.current) {
+      audioRef.current.currentTime = nextTime;
+    }
+    setCurrentTime(nextTime);
+  };
+
+  return (
+    <Column
+      style={{
+        gap: 8,
+        minWidth: 220,
+      }}
+    >
+      <audio
+        ref={audioRef}
+        src={src}
+        preload="metadata"
+        onLoadedMetadata={handleLoadedMetadata}
+        onTimeUpdate={handleTimeUpdate}
+        onEnded={handleEnded}
+        style={{ display: "none" }}
+      >
+        Your browser does not support audio playback.
+      </audio>
+
+      <Row vertical="center" style={{ gap: 10, alignItems: "center" }}>
+        <button
+          type="button"
+          onClick={handleTogglePlayback}
+          aria-label={isPlaying ? "Pause voice message" : "Play voice message"}
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 999,
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: isMe
+              ? "rgba(255,255,255,0.2)"
+              : "rgba(255,107,53,0.14)",
+            color: isMe ? "#ffffff" : "var(--dsc-accent-warm)",
+            flexShrink: 0,
+          }}
+        >
+          {isPlaying ? (
+            <Pause size={14} strokeWidth={2.6} />
+          ) : (
+            <Play size={14} strokeWidth={2.6} />
+          )}
+        </button>
+
+        <input
+          type="range"
+          min={0}
+          max={Math.max(totalDuration, 0.1)}
+          step={0.05}
+          value={Math.min(currentTime, Math.max(totalDuration, 0.1))}
+          onChange={handleSeek}
+          aria-label="Voice message timeline"
+          style={{
+            flex: 1,
+            margin: 0,
+            cursor: totalDuration > 0 ? "pointer" : "default",
+            accentColor: isMe ? "#ffffff" : "#ff6b35",
+            opacity: totalDuration > 0 ? 1 : 0.65,
+          }}
+        />
+
+        <Text
+          style={{
+            fontSize: 11,
+            color: isMe ? "rgba(255,255,255,0.9)" : "var(--dsc-text-subtle)",
+            fontVariantNumeric: "tabular-nums",
+            whiteSpace: "nowrap",
+            minWidth: 78,
+            textAlign: "right",
+          }}
+        >
+          {formatVoiceDuration(currentTime)} /{" "}
+          {formatVoiceDuration(totalDuration)}
+        </Text>
+      </Row>
+    </Column>
+  );
+};
 
 // border-radius per position in consecutive group
 function bubbleRadius(
@@ -224,6 +379,9 @@ export const MessagingSidebar: React.FC<MessagingSidebarProps> = ({
 }) => {
   const router = useRouter();
   const [message, setMessage] = useState("");
+  const [hoveredMessageKey, setHoveredMessageKey] = useState<string | null>(
+    null,
+  );
   const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [emojiQuery, setEmojiQuery] = useState("");
@@ -238,6 +396,8 @@ export const MessagingSidebar: React.FC<MessagingSidebarProps> = ({
     sending,
     sendMessage,
     refetch: refetchMessages,
+    loadMore,
+    hasMore,
   } = useMessages(activeUser?.id ?? null);
   const {
     uploadFile,
@@ -1060,7 +1220,7 @@ export const MessagingSidebar: React.FC<MessagingSidebarProps> = ({
         style={{
           minHeight: 0,
           overflowY: "auto",
-          padding: "24px 32px",
+          padding: "32px 48px",
           gap: 2,
           backgroundColor: "var(--dsc-bg)",
         }}
@@ -1116,6 +1276,35 @@ export const MessagingSidebar: React.FC<MessagingSidebarProps> = ({
           </Column>
         ) : (
           <>
+            {hasMore && (
+              <Row horizontal="center" style={{ width: "100%", padding: "8px 0", marginBottom: 16 }}>
+                <button
+                  type="button"
+                  onClick={loadMore}
+                  style={{
+                    padding: "6px 16px",
+                    borderRadius: 20,
+                    border: "1px solid var(--dsc-border)",
+                    backgroundColor: "var(--dsc-surface-muted)",
+                    color: "var(--dsc-text)",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "var(--dsc-surface)";
+                    e.currentTarget.style.borderColor = "var(--dsc-accent-warm)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "var(--dsc-surface-muted)";
+                    e.currentTarget.style.borderColor = "var(--dsc-border)";
+                  }}
+                >
+                  Load previous messages
+                </button>
+              </Row>
+            )}
             <AnimatePresence initial={false}>
               {enriched.map((msg, idx) => {
                 const isMe = msg.sender === "me";
@@ -1160,6 +1349,12 @@ export const MessagingSidebar: React.FC<MessagingSidebarProps> = ({
                       initial={{ opacity: 0, y: 10, scale: 0.985 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -8, scale: 0.985 }}
+                      onMouseEnter={() => setHoveredMessageKey(messageKey)}
+                      onMouseLeave={() => {
+                        setHoveredMessageKey((prev) =>
+                          prev === messageKey ? null : prev,
+                        );
+                      }}
                       transition={{
                         type: "spring",
                         stiffness: 420,
@@ -1190,7 +1385,7 @@ export const MessagingSidebar: React.FC<MessagingSidebarProps> = ({
                       </div>
 
                       {/* Bubble */}
-                      <div style={{ maxWidth: "68%" }}>
+                      <div style={{ maxWidth: "75%" }}>
                         <div
                           style={{
                             padding:
@@ -1250,97 +1445,15 @@ export const MessagingSidebar: React.FC<MessagingSidebarProps> = ({
                             <Column
                               style={{
                                 gap: 8,
-                                padding: "8px 10px",
+                                padding: "8px 10px 10px",
                                 minWidth: 220,
                               }}
                             >
-                              <Row
-                                vertical="center"
-                                style={{
-                                  justifyContent: "space-between",
-                                  gap: 10,
-                                  padding: "0 2px",
-                                }}
-                              >
-                                <Row vertical="center" style={{ gap: 8 }}>
-                                  <div
-                                    style={{
-                                      width: 22,
-                                      height: 22,
-                                      borderRadius: 999,
-                                      background: isMe
-                                        ? "rgba(255,255,255,0.22)"
-                                        : "rgba(255,107,53,0.14)",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                    }}
-                                  >
-                                    <Mic
-                                      size={13}
-                                      strokeWidth={2.35}
-                                      color={
-                                        isMe
-                                          ? "rgba(255,255,255,0.95)"
-                                          : "var(--dsc-accent-warm)"
-                                      }
-                                    />
-                                  </div>
-
-                                  <Row vertical="center" style={{ gap: 3 }}>
-                                    {[0.45, 0.8, 0.55, 0.95, 0.6].map(
-                                      (heightScale, barIdx) => (
-                                        <span
-                                          key={`voice-bar-${barIdx}`}
-                                          style={{
-                                            display: "block",
-                                            width: 3,
-                                            height: `${
-                                              Math.round(12 * heightScale) + 4
-                                            }px`,
-                                            borderRadius: 999,
-                                            background: isMe
-                                              ? "rgba(255,255,255,0.85)"
-                                              : "var(--dsc-accent-warm)",
-                                            opacity: 0.88,
-                                          }}
-                                        />
-                                      ),
-                                    )}
-                                  </Row>
-                                </Row>
-
-                                <Text
-                                  style={{
-                                    fontSize: 11,
-                                    color: isMe
-                                      ? "rgba(255,255,255,0.82)"
-                                      : "var(--dsc-text-subtle)",
-                                    fontVariantNumeric: "tabular-nums",
-                                  }}
-                                >
-                                  {formatVoiceDuration(
-                                    msg.media_meta?.duration,
-                                  )}
-                                </Text>
-                              </Row>
-
-                              <audio
+                              <VoiceMessagePlayer
                                 src={msg.media_url}
-                                controls
-                                preload="metadata"
-                                style={{
-                                  width: "100%",
-                                  height: 34,
-                                  display: "block",
-                                  borderRadius: 999,
-                                  accentColor: isMe
-                                    ? "#ffffff"
-                                    : "var(--dsc-accent-warm)",
-                                }}
-                              >
-                                Your browser does not support audio playback.
-                              </audio>
+                                isMe={isMe}
+                                durationHint={msg.media_meta?.duration}
+                              />
 
                               {msg.text && (
                                 <Text
@@ -1507,8 +1620,17 @@ export const MessagingSidebar: React.FC<MessagingSidebarProps> = ({
                               style={{
                                 gap: 8,
                                 marginTop: 4,
-                                opacity: 0.6,
-                                transition: "opacity 0.15s",
+                                opacity:
+                                  hoveredMessageKey === messageKey ? 0.95 : 0,
+                                transform:
+                                  hoveredMessageKey === messageKey
+                                    ? "translateY(0)"
+                                    : "translateY(-2px)",
+                                pointerEvents:
+                                  hoveredMessageKey === messageKey
+                                    ? "auto"
+                                    : "none",
+                                transition: "opacity 0.15s, transform 0.15s",
                               }}
                             >
                               {canEditMessage && (
@@ -1592,7 +1714,7 @@ export const MessagingSidebar: React.FC<MessagingSidebarProps> = ({
         fillWidth
         vertical="center"
         style={{
-          padding: "8px 14px",
+          padding: "16px 24px",
           borderTop: "1px solid var(--dsc-border)",
           backgroundColor: "var(--dsc-surface)",
           flexShrink: 0,

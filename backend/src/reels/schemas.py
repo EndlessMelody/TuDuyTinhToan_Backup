@@ -13,6 +13,8 @@ class UserStub(BaseModel):
     id: int
     username: Optional[str] = None
     avatar_url: Optional[str] = None
+    title: Optional[str] = None
+    level: Optional[int] = None
 
 
 class ReelResponse(BaseModel):

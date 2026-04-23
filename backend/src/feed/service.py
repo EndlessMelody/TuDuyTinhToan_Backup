@@ -1,47 +1,40 @@
 """
 Feed Service — Tinder-style swipe cards with Flip Card support.
 
-RULE: Distance calculation happens entirely in the DB using a SQLAlchemy
-Haversine approximation, NOT in a Python loop:
-    dist_km ≈ sqrt( (Δlat * 111)^2 + (Δlng * 111 * cos(lat_rad))^2 )
-
-This avoids loading thousands of rows into Python memory.
+Implementing Two-Pass Filtering (Vector-First) as per 04-ai-algorithm.md:
+1. Pass 1: Pgvector Cosine Distance Retrieval
+2. Pass 2: Python Contextual Scoring (Similarity vs Geographic Distance)
 """
 import json
+import logging
+import math
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, text
-from sqlalchemy.sql.expression import literal
 
 from src.locations.models import Location
 from src.posts.models import Post
+from src.users.models import User
 from src.db.redis import RedisClient
 
-
-# Radius of Earth in km used for Haversine: 1 degree lat ≈ 111 km
+logger = logging.getLogger(__name__)
 
 CACHE_TTL_SECONDS = 300  # 5 minutes cache for feed
 
-def _haversine_distance_column(user_lat: float, user_lng: float):
-    """
-    Build a SQLAlchemy column expression for approximate Haversine distance.
-    Formula: sqrt( (Δlat*111)^2 + (Δlng*111*cos(lat_rad))^2 )
-    No PostGIS required — uses standard Postgres math functions.
-    """
-    delta_lat = Location.lat - user_lat
-    delta_lng = Location.lng - user_lng
-    lat_rad = func.radians(Location.lat)
-    dist_sq = (
-        func.pow(delta_lat * 111.0, 2)
-        + func.pow(delta_lng * 111.0 * func.cos(lat_rad), 2)
-    )
-    return func.sqrt(dist_sq)
 
+def _haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Calculate distance between two coordinates in kilometers."""
+    R = 6371  # Earth's radius in km
+    lat1_rad = math.radians(lat1)
+    lat2_rad = math.radians(lat2)
+    delta_lat = math.radians(lat2 - lat1)
+    delta_lon = math.radians(lon2 - lon1)
+    a = (math.sin(delta_lat / 2) ** 2 +
+         math.cos(lat1_rad) * math.cos(lat2_rad) *
+         math.sin(delta_lon / 2) ** 2)
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
 
-import logging
-
-logger = logging.getLogger(__name__)
 
 async def get_feed_cards(
     db: AsyncSession,
@@ -53,93 +46,137 @@ async def get_feed_cards(
     cursor: Optional[str] = None,
 ) -> dict:
     """
-    Lấy batch thẻ để Frontend render.
-    - Nếu có lat/lng: tính distance_km trong DB (Haversine), sắp xếp gần trước.
-    - Nếu không có lat/lng: random order, distance_km = null.
-    - Trả về photos và reviews_preview để flip card không cần gọi thêm API.
+    Lấy batch thẻ để Frontend render bằng luồng Two-Pass Filtering.
     """
-    logger.info(f"[FEED] Getting cards: category={category}, limit={limit}, lat={lat}, lng={lng}")
+    logger.info(f"[FEED] Getting cards: category={category}, limit={limit}, lat={lat}, lng={lng}, cursor={cursor}")
     
-    # Generate cache key
-    cache_key = f"feed:{category}:{limit}:{lat}:{lng}:{user_id or 'anon'}"
-    
-    # Try to get from cache (skip cache if cursor is provided)
-    if not cursor:
+    offset = 0
+    if cursor:
         try:
-            cached = await RedisClient.get(cache_key)
-            if cached:
-                logger.info(f"[FEED] Cache hit for {cache_key}")
-                return json.loads(cached)
-        except Exception as e:
-            logger.warning(f"[FEED] Redis cache error: {e}")
+            offset = int(cursor)
+        except ValueError:
+            logger.warning(f"[FEED] Invalid offset cursor: {cursor}")
     
-    if lat is not None and lng is not None:
-        dist_col = _haversine_distance_column(lat, lng).label("distance_km")
-        query = (
-            select(Location, dist_col)
-            .where((Location.category == category) | (Location.category.is_(None)))
-            .order_by(dist_col)
-            .limit(limit)
-        )
-        result = await db.execute(query)
-        rows = result.all()
+    # ─────────────────────────────────────────
+    # 0. Smart Cache Check
+    # ─────────────────────────────────────────
+    # Cache key phụ thuộc vào user_id và offset. 
+    # Khi user swipe, key 'feed:*:{user_id}:*' sẽ bị xoá để lấy lại feed mới.
+    cache_key = f"feed:{category}:{limit}:{lat}:{lng}:{user_id or 'anon'}:{offset}"
+    
+    try:
+        cached = await RedisClient.get(cache_key)
+        if cached:
+            logger.info(f"[FEED] Cache hit for {cache_key}")
+            return json.loads(cached)
+    except Exception as e:
+        logger.warning(f"[FEED] Redis cache error: {e}")
 
-        cards = []
-        for row in rows:
-            loc, distance_km = row
-            reviews = await _get_reviews_preview(db, loc.id)
-            cards.append(_build_card(loc, distance_km=round(float(distance_km), 2), reviews=reviews))
-    else:
-        # Show all locations regardless of category (treat NULL as 'place')
-        # Use ID-based cursor for consistent pagination
-        base_query = (
-            select(Location)
-            .where((Location.category == category) | (Location.category.is_(None)))
-        )
+    # ─────────────────────────────────────────
+    # 1. Khởi tạo User Vector (Fallback)
+    # ─────────────────────────────────────────
+    user_vector = [0.5] * 15
+    if user_id:
+        try:
+            uid_int = int(user_id)
+            user = await db.get(User, uid_int)
+            if user:
+                if category == "food" and user.food_vector is not None:
+                    # Convert pgvector string to list if necessary, or just pass directly
+                    user_vector = list(user.food_vector) if isinstance(user.food_vector, list) else user.food_vector
+                elif user.place_vector is not None:
+                    user_vector = list(user.place_vector) if isinstance(user.place_vector, list) else user.place_vector
+        except ValueError:
+            pass
+            
+    # Đảm bảo user_vector format hợp lệ cho SQLAlchemy
+    if isinstance(user_vector, str):
+        import ast
+        user_vector = ast.literal_eval(user_vector)
+
+    # ─────────────────────────────────────────
+    # 2. Pass 1: Vector Database Retrieval
+    # ─────────────────────────────────────────
+    # Lấy ra số lượng ứng viên đủ lớn (Pool) để chấm điểm lại.
+    pool_size = max(100, offset + limit + 20)
+    
+    # Gọi hàm pgvector cosine_distance (<=>)
+    query = (
+        select(Location, Location.vector.cosine_distance(user_vector).label("cos_dist"))
+        .where((Location.category == category) | (Location.category.is_(None)))
+        .order_by(Location.vector.cosine_distance(user_vector))
+        .limit(pool_size)
+    )
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    if not rows:
+        return {"cards": [], "next_cursor": None, "has_more": False}
+
+    # ─────────────────────────────────────────
+    # 3. Pass 2: Contextual Scoring & Ranking
+    # ─────────────────────────────────────────
+    W1 = 0.7  # Similarity weight
+    W2 = 0.3  # Distance penalty weight
+    MAX_DISTANCE_KM = 50.0
+    
+    scored_items = []
+    
+    for row in rows:
+        loc = row[0]
+        cos_dist = float(row[1]) if row[1] is not None else 1.0
         
-        # Apply cursor filter if provided
-        if cursor:
-            try:
-                cursor_id = int(cursor)
-                base_query = base_query.where(Location.id > cursor_id)
-            except ValueError:
-                logger.warning(f"[FEED] Invalid cursor: {cursor}")
+        # Tính Similarity [0, 1] (cosine_distance = 1 - cosine_similarity)
+        similarity = 1.0 - cos_dist
+        match_percent = max(0, min(100, int(similarity * 100)))
         
-        query = base_query.order_by(Location.id).limit(limit)
-        result = await db.execute(query)
-        locations = result.scalars().all()
-        logger.info(f"[FEED] Query returned {len(locations)} locations for category='{category}' (including NULL)")
-        for loc in locations[:5]:  # Log first 5
-            logger.info(f"[FEED]   - {loc.id}: {loc.name} (cat={loc.category})")
-
-        cards = []
-        for loc in locations:
-            reviews = await _get_reviews_preview(db, loc.id)
-            cards.append(_build_card(loc, distance_km=None, reviews=reviews))
+        # Tính khoảng cách và chuẩn hoá (Normalized Distance)
+        dist_km = None
+        normalized_distance = 0.0
         
-        logger.info(f"[FEED] Returning {len(cards)} cards")
+        if lat is not None and lng is not None and loc.lat is not None and loc.lng is not None:
+            dist_km = _haversine_distance(lat, lng, loc.lat, loc.lng)
+            # Clamp khoảng cách về [0, 1]
+            normalized_distance = min(dist_km / MAX_DISTANCE_KM, 1.0)
+            
+        # Chấm điểm tổng hợp
+        score = (W1 * similarity) - (W2 * normalized_distance)
+        scored_items.append((score, loc, dist_km, match_percent))
+        
+    # Sắp xếp lại theo điểm (cao nhất lên trước)
+    scored_items.sort(key=lambda x: x[0], reverse=True)
+    
+    # ─────────────────────────────────────────
+    # 4. Slice & Trả về
+    # ─────────────────────────────────────────
+    # Cắt lấy đúng số thẻ cần hiển thị cho trang hiện tại
+    page_items = scored_items[offset : offset + limit]
+    
+    cards = []
+    for item in page_items:
+        score, loc, dist_km, match_percent = item
+        reviews = await _get_reviews_preview(db, loc.id)
+        cards.append(_build_card(loc, dist_km, match_percent, reviews))
+        
+    # Tính next_cursor cho lần tải trang tiếp theo
+    has_more = (offset + limit) < len(scored_items)
+    next_cursor = str(offset + limit) if has_more else None
 
-    # Determine next_cursor and has_more
-    next_cursor = None
-    has_more = False
-    if cards:
-        next_cursor = str(cards[-1]["id"])
-        has_more = len(cards) == limit
-
-    result = {
+    response_data = {
         "cards": cards,
         "next_cursor": next_cursor,
         "has_more": has_more
     }
 
-    # Cache the result
+    # Lưu cache
     try:
-        await RedisClient.setex(cache_key, CACHE_TTL_SECONDS, json.dumps(result))
+        await RedisClient.setex(cache_key, CACHE_TTL_SECONDS, json.dumps(response_data))
         logger.info(f"[FEED] Cached {len(cards)} cards for {cache_key}")
     except Exception as e:
         logger.warning(f"[FEED] Failed to cache: {e}")
 
-    return result
+    return response_data
 
 
 async def _get_reviews_preview(db: AsyncSession, location_id: int) -> List[str]:
@@ -152,43 +189,44 @@ async def _get_reviews_preview(db: AsyncSession, location_id: int) -> List[str]:
             .limit(2)
         )
         rows = result.all()
-        # Truncate each review to 120 chars for preview
         return [row[0][:120] for row in rows if row[0]]
     except Exception as e:
         logger.warning(f"[FEED] Error getting reviews for location {location_id}: {e}")
         return []
 
 
-def _build_card(loc: Location, distance_km: Optional[float], reviews: List[str]) -> dict:
-    # Extract tags from characteristics if available
+def _build_card(loc: Location, distance_km: Optional[float], match_percent: int, reviews: List[str]) -> dict:
     tags = []
     if loc.characteristics:
         if isinstance(loc.characteristics, dict):
-            # Get top 3 characteristics with highest scores
             sorted_chars = sorted(
                 [(k, v) for k, v in loc.characteristics.items() if isinstance(v, (int, float))],
                 key=lambda x: x[1],
                 reverse=True
             )[:3]
             tags = [k.replace("_", " ").title() for k, v in sorted_chars]
-    
-    # Default NULL category to 'place'
+            
     category = loc.category if loc.category else "place"
+    
+    # Định dạng khoảng cách để hiển thị đẹp hơn
+    distance_display = None
+    if distance_km is not None:
+        distance_display = round(distance_km, 2)
     
     return {
         "id": loc.id,
         "name": loc.name,
-        "image_url": loc.image_url,  # Let frontend handle null with stock images
+        "image_url": loc.image_url,
         "tags": tags,
         "price_range": loc.price_range,
         "rating": loc.rating,
-        "distance_km": distance_km,
-        "match_percent": None,  # Requires user vector — set by recommendations layer
+        "distance_km": distance_display,
+        "match_percent": match_percent,  # Giá trị chuẩn xác từ AI Two-Pass
         "photos": [loc.image_url] if loc.image_url else [],
         "reviews_preview": reviews,
         "address": loc.address,
         "open_hours": loc.open_hours,
-        "category": category,  # "food" | "place" (defaults to "place" if NULL)
+        "category": category,
         "lat": loc.lat,
         "lng": loc.lng,
     }

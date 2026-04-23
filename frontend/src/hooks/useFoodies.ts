@@ -48,6 +48,7 @@ export interface FoodieFriendRaw {
   title?: string;
   match_score: number;
   friendship_id?: number;
+  last_message_at?: string;
 }
 
 function mapToFriend(f: FoodieFriendRaw): Friend {
@@ -61,6 +62,7 @@ function mapToFriend(f: FoodieFriendRaw): Friend {
     match: f.match_score,
     isOnline: false,
     friendshipId: f.friendship_id,
+    lastMessageAt: f.last_message_at,
   };
 }
 
@@ -71,6 +73,15 @@ export function useFoodies() {
   const [sentRequests, setSentRequests] = useState<SentRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const loadSent = useCallback(async () => {
+    try {
+      const res = await apiGet<{ items: SentRequest[] }>("/api/v1/friends/sent");
+      setSentRequests(res.items ?? []);
+    } catch (e) {
+      console.error("Failed to load sent requests", e);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -97,10 +108,16 @@ export function useFoodies() {
     load();
   }, [load]);
 
-  const sendRequest = useCallback(async (targetUserId: number) => {
-    await apiPost("/api/v1/friends/request", { friend_id: targetUserId });
-    setDiscover((prev) => prev.filter((f) => f.id !== targetUserId));
-  }, []);
+  const sendRequest = useCallback(
+    async (targetUserId: number) => {
+      await apiPost("/api/v1/friends/request", { friend_id: targetUserId });
+      // Xóa khỏi discover ngay lập tức
+      setDiscover((prev) => prev.filter((f) => f.id !== targetUserId));
+      // Tải lại danh sách sent mà không set loading toàn cục
+      loadSent();
+    },
+    [loadSent],
+  );
 
   const acceptRequest = useCallback(
     async (friendshipId: number) => {
