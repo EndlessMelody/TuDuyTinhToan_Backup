@@ -18,7 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiGet, apiPost, apiDelete } from "@/lib/api";
 import { useSocialStore } from "@/store/socialStore";
 import { PostData } from "@/types/dashboard";
 
@@ -38,7 +38,7 @@ export default function PostModal({
     useSocialStore((state) =>
       state.posts.find((p) => p.id === initialData.id),
     ) || initialData;
-  const [isSaved, setIsSaved] = React.useState(false);
+  const [isSaved, setIsSaved] = React.useState(data.isSaved || false);
   const [commentsList, setCommentsList] = React.useState<any[]>([]);
   const [loadingComments, setLoadingComments] = React.useState(false);
   const [newComment, setNewComment] = React.useState("");
@@ -53,10 +53,27 @@ export default function PostModal({
         })
         .catch(console.error)
         .finally(() => setLoadingComments(false));
+
+      // Fetch bookmark status for this post
+      apiGet(`/api/v1/bookmarks?limit=100`)
+        .then((res: any) => {
+          const found = res.items?.find((b: any) => b.post?.id === data.id);
+          if (found) setIsSaved(true);
+        })
+        .catch(console.error);
     } else {
       setCommentsList([]);
     }
   }, [isOpen, data.id]);
+
+  const handleToggleSave = async () => {
+    try {
+      const res: any = await apiPost(`/api/v1/bookmarks/toggle`, { post_id: data.id });
+      setIsSaved(res.action === "created");
+    } catch (err) {
+      console.error("Failed to toggle bookmark:", err);
+    }
+  };
 
   const handlePostComment = async () => {
     if (!newComment.trim() || !data.id || isPostingComment) return;
@@ -457,7 +474,7 @@ export default function PostModal({
                     alignItems: "center",
                     justifyContent: "center",
                   }}
-                  onClick={() => setIsSaved(!isSaved)}
+                  onClick={handleToggleSave}
                 >
                   <Bookmark
                     size={20}

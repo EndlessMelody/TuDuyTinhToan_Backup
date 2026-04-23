@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ReelData } from "@/types/dashboard";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiGet, apiPost, apiDelete } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useSocialStore } from "@/store/socialStore";
 
@@ -42,7 +42,7 @@ export default function ReelModal({
       state.reels.find((r) => r.id === initialData.id),
     ) || initialData;
 
-  const [isSaved, setIsSaved] = React.useState(false);
+  const [isSaved, setIsSaved] = React.useState(data.isSaved || false);
   const [comments, setComments] = React.useState<any[]>([]);
   const [newComment, setNewComment] = React.useState("");
   const [isLoadingComments, setIsLoadingComments] = React.useState(false);
@@ -56,8 +56,26 @@ export default function ReelModal({
         .then((res: any) => setComments(res.items || []))
         .catch(console.error)
         .finally(() => setIsLoadingComments(false));
+
+      // Fetch bookmark status for this reel
+      apiGet(`/api/v1/bookmarks?limit=100`)
+        .then((res: any) => {
+          const found = res.items?.find((b: any) => b.reel?.id === data.id);
+          if (found) setIsSaved(true);
+        })
+        .catch(console.error);
     }
   }, [isOpen, data?.id]);
+
+  const handleToggleSave = async () => {
+    if (!data?.id) return;
+    try {
+      const res: any = await apiPost(`/api/v1/bookmarks/toggle`, { reel_id: data.id });
+      setIsSaved(res.action === "created");
+    } catch (err) {
+      console.error("Failed to toggle bookmark:", err);
+    }
+  };
 
   const handlePostComment = async () => {
     if (!newComment.trim() || !data?.id || isPostingComment) return;
@@ -471,7 +489,7 @@ export default function ReelModal({
                     alignItems: "center",
                     justifyContent: "center",
                   }}
-                  onClick={() => setIsSaved(!isSaved)}
+                  onClick={handleToggleSave}
                 >
                   <Bookmark
                     size={20}

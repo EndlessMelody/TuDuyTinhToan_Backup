@@ -11,6 +11,7 @@ export interface ReelData {
   likes?: number;
   comments?: number;
   isLiked?: boolean;
+  isSaved?: boolean;
 }
 
 export interface PostData {
@@ -27,6 +28,7 @@ export interface PostData {
   likes: number;
   comments: number;
   isLiked?: boolean;
+  isSaved?: boolean;
 }
 
 export interface AIPickData {

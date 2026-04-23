@@ -34,6 +34,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 
+import { apiPost } from "@/lib/api";
 import { GlassCard } from "@/components/primitives";
 import { tokens } from "@/styles/tokens";
 import type { PostData } from "@/types/dashboard";
@@ -57,7 +58,17 @@ export const PostCardV2: React.FC<PostCardV2Props> = ({
   onToggleLike,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
+  const [isSaved, setIsSaved] = useState(post.isSaved || false);
+
+  const handleToggleSave = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const res: any = await apiPost(`/api/v1/bookmarks/toggle`, { post_id: post.id });
+      setIsSaved(res.action === "created");
+    } catch (err) {
+      console.error("Failed to toggle bookmark:", err);
+    }
+  };
 
   const img = post.img?.trim() !== "" ? post.img : FALLBACK_IMG;
   const isLiked = !!post.isLiked;
@@ -407,10 +418,7 @@ export const PostCardV2: React.FC<PostCardV2Props> = ({
             {/* Save */}
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsSaved((v) => !v);
-              }}
+              onClick={handleToggleSave}
               style={{
                 display: "inline-flex",
                 alignItems: "center",

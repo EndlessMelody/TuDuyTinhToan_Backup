@@ -6,7 +6,7 @@ import { Row, Column, Text } from "@/components/OnceUI";
 import { PostsTab } from "./tab-contents/PostsTab";
 import { ReviewsTab } from "./tab-contents/ReviewsTab";
 import { AchievementsTab } from "./tab-contents/AchievementsTab";
-import { VisitedTab } from "./tab-contents/VisitedTab";
+import { BookmarksTab } from "./tab-contents/BookmarksTab";
 import { PostItem } from "./tab-contents/PostsTab";
 
 interface ProfileTabsProps {
@@ -42,7 +42,7 @@ export const ProfileTabs: React.FC<ProfileTabsProps> = ({
           marginBottom: "32px",
         }}
       >
-        {["Posts", "Reviews", "Achievements", "Visited"].map((tab) => (
+        {["Posts", "Reviews", "Achievements", "Taste Vault"].map((tab) => (
           <div
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -105,7 +105,7 @@ export const ProfileTabs: React.FC<ProfileTabsProps> = ({
               badgesLoading={badgesLoading} 
             />
           )}
-          {activeTab === "Visited" && <VisitedTab />}
+          {activeTab === "Taste Vault" && <BookmarksTab />}
         </motion.div>
       </AnimatePresence>
     </Column>
