@@ -27,14 +27,13 @@ import { motion } from "framer-motion";
 import {
   Heart,
   MessageCircle,
-  Bookmark,
   Star,
   MapPin,
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
 
-import { apiPost } from "@/lib/api";
+import { BookmarkButton } from "@/components/common/BookmarkButton";
 import { GlassCard } from "@/components/primitives";
 import { tokens } from "@/styles/tokens";
 import type { PostData } from "@/types/dashboard";
@@ -58,25 +57,6 @@ export const PostCardV2: React.FC<PostCardV2Props> = ({
   onToggleLike,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isSaved, setIsSaved] = useState(post.isSaved || false);
-  const [isSaving, setIsSaving] = useState(false);
-
-  const handleToggleSave = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isSaving) return;
-    setIsSaved((prev) => !prev); // optimistic
-    setIsSaving(true);
-    try {
-      const res: any = await apiPost(`/api/v1/bookmarks/toggle`, { post_id: post.id });
-      setIsSaved(res.action === "created");
-    } catch (err) {
-      setIsSaved((prev) => !prev); // revert
-      console.error("Failed to toggle bookmark:", err);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const img = post.img?.trim() !== "" ? post.img : FALLBACK_IMG;
   const isLiked = !!post.isLiked;
 
@@ -423,35 +403,13 @@ export const PostCardV2: React.FC<PostCardV2Props> = ({
             </div>
 
             {/* Save */}
-            <button
-              type="button"
-              onClick={handleToggleSave}
-              disabled={isSaving}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                padding: 0,
-                border: "none",
-                background: "transparent",
-                cursor: isSaving ? "not-allowed" : "pointer",
-                color: isSaved ? tokens.color.warm : tokens.color.textMuted,
-                transition: "color 150ms var(--dsc-ease-out), opacity 150ms",
-                opacity: isSaving ? 0.5 : 1,
-              }}
-            >
-              <motion.span
-                animate={isSaved ? { scale: [1, 1.35, 1] } : { scale: 1 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-                style={{ display: "inline-flex" }}
-              >
-                <Bookmark
-                  size={16}
-                  strokeWidth={2.4}
-                  color={isSaved ? tokens.color.warm : tokens.color.textMuted}
-                  fill={isSaved ? tokens.color.warm : "none"}
-                />
-              </motion.span>
-            </button>
+            <BookmarkButton
+              entityType="post"
+              entityId={post.id}
+              isBookmarked={post.isSaved ?? false}
+              size={30}
+              iconSize={16}
+            />
           </div>
         </div>
       </GlassCard>

@@ -8,6 +8,7 @@ from typing import Optional
 from src.posts.models import Post, PostLike, Comment
 from src.users.models import User
 from src.locations.models import Location
+from src.bookmarks.models import Bookmark
 from src.posts.schemas import PostCreate, CommentCreate
 from src.challenges import service as challenges_service
 
@@ -63,6 +64,7 @@ async def list_posts(
 
     # Batch fetch likes
     liked_post_ids = set()
+    bookmarked_post_ids = set()
     if viewer_id and posts:
         post_ids = [p.id for p in posts]
         likes_result = await db.execute(
@@ -70,6 +72,11 @@ async def list_posts(
             .where(PostLike.user_id == viewer_id, PostLike.post_id.in_(post_ids))
         )
         liked_post_ids = {row[0] for row in likes_result.all()}
+        bookmarks_result = await db.execute(
+            select(Bookmark.post_id)
+            .where(Bookmark.user_id == viewer_id, Bookmark.post_id.in_(post_ids))
+        )
+        bookmarked_post_ids = {row[0] for row in bookmarks_result.all() if row[0] is not None}
 
     items = []
     for p in posts:
@@ -92,6 +99,7 @@ async def list_posts(
             "likes_count": p.likes_count,
             "comments_count": p.comments_count,
             "is_liked": p.id in liked_post_ids,
+            "is_bookmarked": p.id in bookmarked_post_ids,
             "created_at": p.created_at,
         })
 
@@ -228,9 +236,14 @@ async def _post_to_dict(db: AsyncSession, post: Post, viewer_id: Optional[int]) 
         loc = loc_q.scalars().first()
 
     is_liked = False
+    is_bookmarked = False
     if viewer_id:
         like_q = await db.execute(select(PostLike).where(PostLike.post_id == post.id, PostLike.user_id == viewer_id))
         is_liked = like_q.scalars().first() is not None
+        bookmark_q = await db.execute(
+            select(Bookmark).where(Bookmark.post_id == post.id, Bookmark.user_id == viewer_id)
+        )
+        is_bookmarked = bookmark_q.scalars().first() is not None
 
     return {
         "id": post.id,
@@ -243,6 +256,7 @@ async def _post_to_dict(db: AsyncSession, post: Post, viewer_id: Optional[int]) 
         "likes_count": post.likes_count,
         "comments_count": post.comments_count,
         "is_liked": is_liked,
+        "is_bookmarked": is_bookmarked,
         "created_at": post.created_at,
     }
 

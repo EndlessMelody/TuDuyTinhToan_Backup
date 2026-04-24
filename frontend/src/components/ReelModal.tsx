@@ -2,17 +2,12 @@
 
 import React from "react";
 import {
-  Column,
-  Row,
-  Text,
   Avatar,
-  IconButton,
   Input,
 } from "@/components/OnceUI";
 import {
   Heart,
   MessageCircle,
-  Bookmark,
   Play,
   Send,
   X,
@@ -20,8 +15,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ReelData } from "@/types/dashboard";
-import { apiGet, apiPost, apiDelete } from "@/lib/api";
-import { useAuth } from "@/hooks/useAuth";
+import { apiGet, apiPost } from "@/lib/api";
+import { BookmarkButton } from "@/components/common/BookmarkButton";
 import { useSocialStore } from "@/store/socialStore";
 
 interface ReelModalProps {
@@ -30,21 +25,33 @@ interface ReelModalProps {
   onClose: () => void;
 }
 
+interface SocialComment {
+  id: number;
+  content: string;
+  created_at?: string | null;
+  user?: {
+    display_name?: string | null;
+    username?: string | null;
+    avatar_url?: string | null;
+  } | null;
+}
+
+interface CommentListResponse {
+  items?: SocialComment[];
+}
+
 export default function ReelModal({
   isOpen,
   data: initialData,
   onClose,
 }: ReelModalProps) {
-  const { user: currentUser } = useAuth();
   const updateReel = useSocialStore((state) => state.updateReel);
   const data =
     useSocialStore((state) =>
       state.reels.find((r) => r.id === initialData.id),
     ) || initialData;
 
-  const [isSaved, setIsSaved] = React.useState(data.isSaved || false);
-  const [isSaving, setIsSaving] = React.useState(false);
-  const [comments, setComments] = React.useState<any[]>([]);
+  const [comments, setComments] = React.useState<SocialComment[]>([]);
   const [newComment, setNewComment] = React.useState("");
   const [isLoadingComments, setIsLoadingComments] = React.useState(false);
   const [isPostingComment, setIsPostingComment] = React.useState(false);
@@ -53,38 +60,12 @@ export default function ReelModal({
     if (isOpen && data?.id) {
       apiGet(`/api/v1/reels/${data.id}`).catch(console.error);
       setIsLoadingComments(true);
-      apiGet(`/api/v1/reels/${data.id}/comments`)
-        .then((res: any) => setComments(res.items || []))
+      apiGet<CommentListResponse>(`/api/v1/reels/${data.id}/comments`)
+        .then((res) => setComments(res.items || []))
         .catch(console.error)
         .finally(() => setIsLoadingComments(false));
-
-      // Fetch bookmark status for this reel
-      apiGet(`/api/v1/bookmarks?limit=100`)
-        .then((res: any) => {
-          const found = res.items?.find((b: any) => b.reel?.id === data.id);
-          if (found) setIsSaved(true);
-        })
-        .catch(console.error);
     }
   }, [isOpen, data?.id]);
-
-  const handleToggleSave = async () => {
-    if (!data?.id || isSaving) return;
-    // Optimistic flip — instant feedback
-    setIsSaved((prev) => !prev);
-    setIsSaving(true);
-    try {
-      const res: any = await apiPost(`/api/v1/bookmarks/toggle`, { reel_id: data.id });
-      // Correct state from server truth
-      setIsSaved(res.action === "created");
-    } catch (err) {
-      // Revert on error
-      setIsSaved((prev) => !prev);
-      console.error("Failed to toggle bookmark:", err);
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   const handlePostComment = async () => {
     if (!newComment.trim() || !data?.id || isPostingComment) return;
@@ -92,8 +73,10 @@ export default function ReelModal({
     setIsPostingComment(true);
     setNewComment("");
     try {
-      const res = await apiPost(`/api/v1/reels/${data.id}/comments`, { content });
-      setComments([res, ...comments]);
+      const res = await apiPost<SocialComment>(`/api/v1/reels/${data.id}/comments`, {
+        content,
+      });
+      setComments((prev) => [res, ...prev]);
       updateReel(data.id, { comments: (data.comments || 0) + 1 });
     } catch (err) {
       console.error(err);
@@ -356,7 +339,7 @@ export default function ReelModal({
                     </p>
                   </div>
                 ) : (
-                  comments.map((c: any, idx: number) => {
+                  comments.map((c, idx) => {
                     const name = c.user?.display_name || c.user?.username || "Unknown";
                     const avatarSrc = c.user?.avatar_url ||
                       "https://i.pinimg.com/736x/46/83/99/46839974515f6ca59a6023ef5e061d3e.jpg";
@@ -486,36 +469,14 @@ export default function ReelModal({
                 </div>
 
                 {/* Save */}
-                <motion.button
-                  whileTap={isSaving ? {} : { scale: 0.85 }}
-                  animate={isSaving ? { opacity: 0.5 } : { opacity: 1 }}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: isSaving ? "not-allowed" : "pointer",
-                    padding: "6px",
-                    borderRadius: "50%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "opacity 0.15s",
-                  }}
-                  onClick={handleToggleSave}
-                  disabled={isSaving}
-                >
-                  <motion.span
-                    animate={isSaved ? { scale: [1, 1.35, 1] } : { scale: 1 }}
-                    transition={{ duration: 0.3, ease: "easeOut" }}
-                    style={{ display: "inline-flex" }}
-                  >
-                    <Bookmark
-                      size={20}
-                      color={isSaved ? "#ff6b35" : "#C0C0C0"}
-                      fill={isSaved ? "#ff6b35" : "none"}
-                      strokeWidth={isSaved ? 2.5 : 2}
-                    />
-                  </motion.span>
-                </motion.button>
+                <BookmarkButton
+                  entityType="reel"
+                  entityId={data.id}
+                  isBookmarked={data.isSaved ?? false}
+                  size={36}
+                  iconSize={20}
+                  inactiveColor="#C0C0C0"
+                />
               </div>
 
               {/* Comment Input Footer */}

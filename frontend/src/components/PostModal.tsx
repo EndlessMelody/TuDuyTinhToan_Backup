@@ -3,22 +3,19 @@
 import React from "react";
 import {
   Column,
-  Row,
-  Text,
   Avatar,
-  IconButton,
   Input,
 } from "@/components/OnceUI";
 import {
   Heart,
   MessageCircle,
-  Bookmark,
   MapPin,
   Send,
   X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { apiGet, apiPost, apiDelete } from "@/lib/api";
+import { apiGet, apiPost } from "@/lib/api";
+import { BookmarkButton } from "@/components/common/BookmarkButton";
 import { useSocialStore } from "@/store/socialStore";
 import { PostData } from "@/types/dashboard";
 
@@ -26,6 +23,21 @@ interface PostModalProps {
   isOpen: boolean;
   data: PostData;
   onClose: () => void;
+}
+
+interface SocialComment {
+  id: number;
+  content: string;
+  created_at?: string | null;
+  user?: {
+    display_name?: string | null;
+    username?: string | null;
+    avatar_url?: string | null;
+  } | null;
+}
+
+interface CommentListResponse {
+  items?: SocialComment[];
 }
 
 export default function PostModal({
@@ -38,9 +50,7 @@ export default function PostModal({
     useSocialStore((state) =>
       state.posts.find((p) => p.id === initialData.id),
     ) || initialData;
-  const [isSaved, setIsSaved] = React.useState(data.isSaved || false);
-  const [isSaving, setIsSaving] = React.useState(false);
-  const [commentsList, setCommentsList] = React.useState<any[]>([]);
+  const [commentsList, setCommentsList] = React.useState<SocialComment[]>([]);
   const [loadingComments, setLoadingComments] = React.useState(false);
   const [newComment, setNewComment] = React.useState("");
   const [isPostingComment, setIsPostingComment] = React.useState(false);
@@ -48,42 +58,17 @@ export default function PostModal({
   React.useEffect(() => {
     if (isOpen && data.id) {
       setLoadingComments(true);
-      apiGet(`/api/v1/posts/${data.id}/comments`)
-        .then((res: any) => {
+      apiGet<CommentListResponse>(`/api/v1/posts/${data.id}/comments`)
+        .then((res) => {
           if (res && res.items) setCommentsList(res.items);
         })
         .catch(console.error)
         .finally(() => setLoadingComments(false));
 
-      // Fetch bookmark status for this post
-      apiGet(`/api/v1/bookmarks?limit=100`)
-        .then((res: any) => {
-          const found = res.items?.find((b: any) => b.post?.id === data.id);
-          if (found) setIsSaved(true);
-        })
-        .catch(console.error);
     } else {
       setCommentsList([]);
     }
   }, [isOpen, data.id]);
-
-  const handleToggleSave = async () => {
-    if (isSaving) return;
-    // Optimistic flip — instant feedback
-    setIsSaved((prev) => !prev);
-    setIsSaving(true);
-    try {
-      const res: any = await apiPost(`/api/v1/bookmarks/toggle`, { post_id: data.id });
-      // Correct state from server truth
-      setIsSaved(res.action === "created");
-    } catch (err) {
-      // Revert on error
-      setIsSaved((prev) => !prev);
-      console.error("Failed to toggle bookmark:", err);
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   const handlePostComment = async () => {
     if (!newComment.trim() || !data.id || isPostingComment) return;
@@ -91,7 +76,9 @@ export default function PostModal({
     setIsPostingComment(true);
     setNewComment("");
     try {
-      const res = await apiPost(`/api/v1/posts/${data.id}/comments`, { content });
+      const res = await apiPost<SocialComment>(`/api/v1/posts/${data.id}/comments`, {
+        content,
+      });
       setCommentsList((prev) => [res, ...prev]);
       updatePost(data.id, { comments: (data.comments || 0) + 1 });
     } catch (err) {
@@ -472,36 +459,14 @@ export default function PostModal({
                 </div>
 
                 {/* Save */}
-                <motion.button
-                  whileTap={isSaving ? {} : { scale: 0.85 }}
-                  animate={isSaving ? { opacity: 0.5 } : { opacity: 1 }}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: isSaving ? "not-allowed" : "pointer",
-                    padding: "6px",
-                    borderRadius: "50%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "opacity 0.15s",
-                  }}
-                  onClick={handleToggleSave}
-                  disabled={isSaving}
-                >
-                  <motion.span
-                    animate={isSaved ? { scale: [1, 1.35, 1] } : { scale: 1 }}
-                    transition={{ duration: 0.3, ease: "easeOut" }}
-                    style={{ display: "inline-flex" }}
-                  >
-                    <Bookmark
-                      size={20}
-                      color={isSaved ? "#ff6b35" : "#C0C0C0"}
-                      fill={isSaved ? "#ff6b35" : "none"}
-                      strokeWidth={isSaved ? 2.5 : 2}
-                    />
-                  </motion.span>
-                </motion.button>
+                <BookmarkButton
+                  entityType="post"
+                  entityId={data.id}
+                  isBookmarked={data.isSaved ?? false}
+                  size={36}
+                  iconSize={20}
+                  inactiveColor="#C0C0C0"
+                />
               </div>
 
               {/* Comment Input Footer */}
