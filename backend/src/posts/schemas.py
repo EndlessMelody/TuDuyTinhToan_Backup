@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from src.gamification.schemas import BadgeStub
 from typing import Optional, List
 from datetime import datetime
 
@@ -18,6 +19,7 @@ class UserStub(BaseModel):
     avatar_url: Optional[str] = None
     title: Optional[str] = None
     level: Optional[int] = None
+    primary_badge: Optional[BadgeStub] = None
 
 
 class LocationStub(BaseModel):

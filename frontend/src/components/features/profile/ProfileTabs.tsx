@@ -18,6 +18,7 @@ interface ProfileTabsProps {
   badges: any[];
   totalBadges: number;
   badgesLoading: boolean;
+  isOwner?: boolean;
 }
 
 export const ProfileTabs: React.FC<ProfileTabsProps> = ({
@@ -26,6 +27,7 @@ export const ProfileTabs: React.FC<ProfileTabsProps> = ({
   badges,
   totalBadges,
   badgesLoading,
+  isOwner = false,
 }) => {
   const [activeTab, setActiveTab] = useState("Posts");
 
@@ -183,6 +185,7 @@ export const ProfileTabs: React.FC<ProfileTabsProps> = ({
               badges={badges} 
               totalBadges={totalBadges} 
               badgesLoading={badgesLoading} 
+              isOwner={isOwner}
             />
           )}
           {activeTab === "Taste Vault" && (

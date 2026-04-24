@@ -2,7 +2,8 @@
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func
+from sqlalchemy import func, update
+from sqlalchemy.orm import selectinload
 from typing import Optional
 
 from src.posts.models import Post, PostLike, Comment
@@ -37,8 +38,6 @@ async def create_post(db: AsyncSession, user_id: int, data: PostCreate) -> dict:
     return post 
 
 
-from sqlalchemy.orm import selectinload
-
 async def list_posts(
     db: AsyncSession,
     viewer_id: Optional[int],
@@ -57,7 +56,10 @@ async def list_posts(
     total = count_result.scalar_one() or 0
 
     # Eager load relationships to avoid N+1
-    q = q.options(selectinload(Post.user), selectinload(Post.location))
+    q = q.options(
+        selectinload(Post.user).selectinload(User.primary_badge),
+        selectinload(Post.location)
+    )
     q = q.order_by(Post.created_at.desc()).offset(offset).limit(limit)
     result = await db.execute(q)
     posts = result.scalars().all()
@@ -80,18 +82,19 @@ async def list_posts(
 
     items = []
     for p in posts:
-        location_data = None
-        if p.location:
-            location_data = {"id": p.location.id, "name": p.location.name}
-
-        user_data = None
-        if p.user:
-            user_data = {"id": p.user.id, "display_name": p.user.display_name, "avatar_url": p.user.avatar_url}
-
         items.append({
             "id": p.id,
-            "user": user_data,
-            "location": location_data,
+            "user": {
+                "id": p.user.id,
+                "display_name": p.user.display_name,
+                "avatar_url": p.user.avatar_url,
+                "primary_badge": p.user.primary_badge
+            } if p.user else None,
+            "location": {
+                "id": p.location.id,
+                "name": p.location.name,
+                "address": p.location.address
+            } if p.location else None,
             "review": p.review,
             "rating": p.rating,
             "image_url": p.image_url,
@@ -107,7 +110,14 @@ async def list_posts(
 
 
 async def get_post(db: AsyncSession, post_id: int, viewer_id: Optional[int]) -> dict:
-    result = await db.execute(select(Post).where(Post.id == post_id))
+    result = await db.execute(
+        select(Post)
+        .options(
+            selectinload(Post.user).selectinload(User.primary_badge),
+            selectinload(Post.location)
+        )
+        .where(Post.id == post_id)
+    )
     post = result.scalars().first()
     if not post:
         raise HTTPException(status_code=404, detail="Post không tồn tại")
@@ -126,10 +136,7 @@ async def delete_post(db: AsyncSession, post_id: int, user_id: int):
     return {"status": "deleted"}
 
 
-from sqlalchemy import update
-
 async def toggle_like(db: AsyncSession, post_id: int, user_id: int) -> dict:
-    # Bắt đầu transaction
     result = await db.execute(select(PostLike).where(PostLike.post_id == post_id, PostLike.user_id == user_id))
     like = result.scalars().first()
     
@@ -140,7 +147,6 @@ async def toggle_like(db: AsyncSession, post_id: int, user_id: int) -> dict:
 
     if like:
         await db.delete(like)
-        # Atomic update để tránh race condition
         update_stmt = update(Post).where(Post.id == post_id).values(
             likes_count=func.greatest(0, Post.likes_count - 1)
         ).returning(Post.likes_count)
@@ -149,7 +155,6 @@ async def toggle_like(db: AsyncSession, post_id: int, user_id: int) -> dict:
         liked = False
     else:
         db.add(PostLike(post_id=post_id, user_id=user_id))
-        # Atomic update
         update_stmt = update(Post).where(Post.id == post_id).values(
             likes_count=Post.likes_count + 1
         ).returning(Post.likes_count)
@@ -204,7 +209,6 @@ async def add_comment(db: AsyncSession, user_id: int, data: CommentCreate, post_
     )
     db.add(comment)
 
-    # Atomic update denormalized counter
     if post_id:
         update_stmt = update(Post).where(Post.id == post_id).values(comments_count=Post.comments_count + 1)
         await db.execute(update_stmt)
@@ -216,7 +220,9 @@ async def add_comment(db: AsyncSession, user_id: int, data: CommentCreate, post_
 
     await db.commit()
     await db.refresh(comment)
-    user_q = await db.execute(select(User).where(User.id == user_id))
+    user_q = await db.execute(
+        select(User).options(selectinload(User.primary_badge)).where(User.id == user_id)
+    )
     user = user_q.scalars().first()
     return _comment_to_dict(comment, user)
 
@@ -241,7 +247,6 @@ async def delete_comment(db: AsyncSession, comment_id: int, user_id: int):
 
     await db.delete(comment)
     
-    # Atomic decrement
     if post_id:
         update_stmt = update(Post).where(Post.id == post_id).values(
             comments_count=func.greatest(0, Post.comments_count - subtree_count)
@@ -260,13 +265,6 @@ async def delete_comment(db: AsyncSession, comment_id: int, user_id: int):
 
 
 async def _post_to_dict(db: AsyncSession, post: Post, viewer_id: Optional[int]) -> dict:
-    user_q = await db.execute(select(User).where(User.id == post.user_id))
-    user = user_q.scalars().first()
-    loc = None
-    if post.location_id:
-        loc_q = await db.execute(select(Location).where(Location.id == post.location_id))
-        loc = loc_q.scalars().first()
-
     is_liked = False
     is_bookmarked = False
     if viewer_id:
@@ -279,8 +277,17 @@ async def _post_to_dict(db: AsyncSession, post: Post, viewer_id: Optional[int]) 
 
     return {
         "id": post.id,
-        "user": {"id": user.id, "display_name": user.display_name, "avatar_url": user.avatar_url} if user else None,
-        "location": {"id": loc.id, "name": loc.name} if loc else None,
+        "user": {
+            "id": post.user.id,
+            "display_name": post.user.display_name,
+            "avatar_url": post.user.avatar_url,
+            "primary_badge": post.user.primary_badge
+        } if post.user else None,
+        "location": {
+            "id": post.location.id,
+            "name": post.location.name,
+            "address": post.location.address
+        } if post.location else None,
         "review": post.review,
         "rating": post.rating,
         "image_url": post.image_url,
@@ -297,7 +304,11 @@ async def _build_comment_tree(db: AsyncSession, comments: list[Comment], total: 
     user_ids = {comment.user_id for comment in comments}
     users_by_id: dict[int, User] = {}
     if user_ids:
-        user_q = await db.execute(select(User).where(User.id.in_(user_ids)))
+        user_q = await db.execute(
+            select(User)
+            .options(selectinload(User.primary_badge))
+            .where(User.id.in_(user_ids))
+        )
         users_by_id = {user.id: user for user in user_q.scalars().all()}
 
     comment_map = {
@@ -326,6 +337,7 @@ def _comment_to_dict(comment: Comment, user: Optional[User]) -> dict:
             "avatar_url": user.avatar_url,
             "title": user.title,
             "level": user.level,
+            "primary_badge": user.primary_badge
         } if user else None,
         "content": comment.content,
         "parent_id": comment.parent_id,

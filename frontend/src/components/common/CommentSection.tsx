@@ -15,6 +15,12 @@ interface CommentUser {
   avatar_url?: string | null;
   title?: string | null;
   level?: number | null;
+  primary_badge?: {
+    id: number;
+    name: string;
+    icon_name: string;
+    accent_color: string;
+  } | null;
 }
 
 export interface CommentNode {
@@ -152,59 +158,91 @@ function CommentItem({
               border: isReply ? "1px solid rgba(255, 107, 53, 0.12)" : "none",
             }}
           >
-            <div style={{ fontSize: "0.8rem", lineHeight: 1.5, color: "#1C1C1E" }}>
-              <div style={{ marginBottom: "2px" }}>
-                <span style={{ fontWeight: 700, marginRight: "5px" }}>{name}</span>
-                {(comment.user?.title || comment.user?.level) && (
-                  <span
-                    style={{
-                      backgroundColor: comment.user?.title
-                        ? "rgba(255, 107, 53, 0.12)"
-                        : "rgba(0, 0, 0, 0.05)",
-                      color: comment.user?.title ? "#ff6b35" : "#888",
-                      padding: "2px 6px",
-                      borderRadius: "6px",
-                      fontSize: "0.6rem",
-                      fontWeight: 700,
-                      marginRight: "6px",
-                      textTransform: comment.user?.title ? "uppercase" : "none",
-                      letterSpacing: "0.4px",
-                      display: "inline-block",
-                      verticalAlign: "middle",
-                      lineHeight: "1",
-                      marginTop: "-2px",
-                      border: comment.user?.title
-                        ? "1px solid rgba(255, 107, 53, 0.2)"
-                        : "1px solid rgba(0, 0, 0, 0.08)",
-                    }}
-                  >
-                    {comment.user?.title || `Lv. ${comment.user?.level || 1}`}
-                  </span>
-                )}
-              </div>
-              <div style={{ wordBreak: "break-word" }}>{comment.content}</div>
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: "12px", marginTop: "5px", paddingLeft: "4px" }}>
-            <span style={{ color: "#C0C0C0", fontSize: "0.68rem" }}>
-              {adaptTime(comment.created_at)}
-            </span>
-            <button
-              type="button"
-              onClick={() => onReply(comment)}
+            <div
               style={{
-                color: "#A3A3A3",
-                fontSize: "0.68rem",
-                fontWeight: 700,
-                cursor: "pointer",
-                background: "none",
-                border: "none",
-                padding: 0,
+                display: "flex",
+                alignItems: "center",
+                gap: "5px",
+                flexWrap: "wrap",
               }}
             >
-              Trả lời
-            </button>
+              <span
+                style={{
+                  fontSize: "13.5px",
+                  fontWeight: 600,
+                  color: "#1d1d1f",
+                }}
+              >
+                {name}
+              </span>
+              {(comment.user?.level || comment.user?.title) && (
+                <span
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 500,
+                    color: "#FF6B35",
+                    backgroundColor: "rgba(255, 107, 53, 0.08)",
+                    padding: "1px 6px",
+                    borderRadius: "10px",
+                  }}
+                >
+                  Lv.{comment.user?.level ?? 1} {comment.user?.title}
+                </span>
+              )}
+              {comment.user?.primary_badge && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "3px",
+                    fontSize: "10px",
+                    fontWeight: 600,
+                    color: comment.user.primary_badge.accent_color,
+                    backgroundColor: `${comment.user.primary_badge.accent_color}12`,
+                    padding: "1px 6px",
+                    borderRadius: "10px",
+                    border: `1px solid ${comment.user.primary_badge.accent_color}33`,
+                  }}
+                  title={comment.user.primary_badge.name}
+                >
+                  <span style={{ fontSize: "12px" }}>󱐎</span>
+                  {comment.user.primary_badge.name}
+                </div>
+              )}
+            </div>
+            <div
+              style={{
+                fontSize: "13.5px",
+                lineHeight: "1.5",
+                color: "#333",
+                marginTop: "2px",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+              }}
+            >
+              {comment.content}
+            </div>
           </div>
+        </div>
+        <div style={{ display: "flex", gap: "12px", marginTop: "5px", paddingLeft: "4px" }}>
+          <span style={{ color: "#C0C0C0", fontSize: "0.68rem" }}>
+            {adaptTime(comment.created_at)}
+          </span>
+          <button
+            type="button"
+            onClick={() => onReply(comment)}
+            style={{
+              color: "#A3A3A3",
+              fontSize: "0.68rem",
+              fontWeight: 700,
+              cursor: "pointer",
+              background: "none",
+              border: "none",
+              padding: 0,
+            }}
+          >
+            Trả lời
+          </button>
         </div>
       </motion.div>
 
@@ -421,9 +459,8 @@ export function CommentSection({
             backgroundColor: "#F5F5F7",
             borderRadius: "22px",
             padding: "8px 8px 8px 14px",
-            border: `1.5px solid ${
-              isInputFocused ? "rgba(255,107,53,0.35)" : "transparent"
-            }`,
+            border: `1.5px solid ${isInputFocused ? "rgba(255,107,53,0.35)" : "transparent"
+              }`,
             transition: "border-color 0.2s",
           }}
         >
