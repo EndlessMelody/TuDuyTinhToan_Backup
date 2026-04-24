@@ -219,8 +219,8 @@ export default function ReelModal({
                   }
                   rootStyle={{ flex: 1 }}
                   listStyle={{ padding: "16px 20px" }}
-                  header={
-                    <>
+                  fixedHeader={
+                    <div style={{ padding: "16px 20px", borderBottom: "1px solid #F0F0F0", backgroundColor: "#FFFFFF" }}>
                       <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
                         <Avatar src={data.userAvatar} size="s" />
                         <p style={{ margin: 0, fontSize: "0.83rem", lineHeight: 1.55, color: "#1C1C1E", flex: 1 }}>
@@ -228,8 +228,7 @@ export default function ReelModal({
                           {data.title}
                         </p>
                       </div>
-                      <div style={{ height: "1px", backgroundColor: "#F0F0F0", margin: "16px 0" }} />
-                    </>
+                    </div>
                   }
                   footer={
                     <div

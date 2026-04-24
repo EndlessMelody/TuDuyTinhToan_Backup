@@ -181,8 +181,8 @@ export default function PostModal({
                   }
                   rootStyle={{ flex: 1 }}
                   listStyle={{ padding: "16px 20px" }}
-                  header={
-                    <>
+                  fixedHeader={
+                    <div style={{ padding: "16px 20px", borderBottom: "1px solid #F0F0F0", backgroundColor: "#FFFFFF" }}>
                       <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
                         <Avatar src={data.avatar} size="s" />
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -225,8 +225,7 @@ export default function PostModal({
                           ) : null}
                         </div>
                       </div>
-                      <div style={{ height: "1px", backgroundColor: "#F0F0F0", margin: "16px 0" }} />
-                    </>
+                    </div>
                   }
                   footer={
                     <div

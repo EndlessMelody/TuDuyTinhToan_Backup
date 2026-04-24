@@ -42,6 +42,7 @@ interface CommentSectionProps {
   onCommentAdded?: () => void;
   footer?: React.ReactNode;
   header?: React.ReactNode;
+  fixedHeader?: React.ReactNode;
   rootStyle?: React.CSSProperties;
   listStyle?: React.CSSProperties;
   inputWrapperStyle?: React.CSSProperties;
@@ -230,6 +231,7 @@ export function CommentSection({
   onCommentAdded,
   footer,
   header,
+  fixedHeader,
   rootStyle,
   listStyle,
   inputWrapperStyle,
@@ -318,6 +320,7 @@ export function CommentSection({
         ...rootStyle,
       }}
     >
+      {fixedHeader}
       <div
         className="no-scrollbar"
         style={{
