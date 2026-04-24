@@ -213,7 +213,7 @@ export default function PostCard({ post, onLike, onComment, onSave, onShare, onO
               )}
             </Row>
 
-            <IconButton
+            {/* <IconButton
               onClick={() => onShare(id)}
               variant="tertiary"
               icon={
@@ -223,7 +223,7 @@ export default function PostCard({ post, onLike, onComment, onSave, onShare, onO
                   <line x1="12" y1="2" x2="12" y2="15" />
                 </svg>
               }
-            />
+            /> */}
           </Row>
 
           <IconButton
@@ -277,7 +277,7 @@ export default function PostCard({ post, onLike, onComment, onSave, onShare, onO
                 cursor: "pointer",
                 fontWeight: 500
               }}
-              onClick={() => onComment(id)}
+              onClick={() => onOpen(post)}
             >
               Xem tất cả {comments} bình luận
             </Text>
