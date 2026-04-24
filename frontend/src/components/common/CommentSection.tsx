@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Avatar } from "@/components/OnceUI";
 import { apiGet, apiPost } from "@/lib/api";
 import { MessageCircle, Send, X } from "lucide-react";
+import { FaMedal } from "react-icons/fa";
 
 type CommentEntityType = "post" | "reel";
 
@@ -148,102 +149,106 @@ function CommentItem({
         style={{ display: "flex", gap: "9px", alignItems: "flex-start" }}
       >
         <Avatar src={avatarSrc || DEFAULT_AVATAR} size="s" name={name} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              backgroundColor: isReply ? "#FFF7F2" : "#F5F5F7",
-              borderRadius: "14px",
-              borderTopLeftRadius: "4px",
-              padding: "8px 12px",
-              border: isReply ? "1px solid rgba(255, 107, 53, 0.12)" : "none",
-            }}
-          >
+        <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "5px",
-                flexWrap: "wrap",
+                backgroundColor: isReply ? "#FFF7F2" : "#F5F5F7",
+                borderRadius: "14px",
+                borderTopLeftRadius: "4px",
+                padding: "8px 12px",
+                border: isReply ? "1px solid rgba(255, 107, 53, 0.12)" : "none",
+                width: "fit-content"
               }}
             >
-              <span
+              <div
                 style={{
-                  fontSize: "13.5px",
-                  fontWeight: 600,
-                  color: "#1d1d1f",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  flexWrap: "wrap",
                 }}
               >
-                {name}
-              </span>
-              {(comment.user?.level || comment.user?.title) && (
                 <span
                   style={{
-                    fontSize: "11px",
-                    fontWeight: 500,
-                    color: "#FF6B35",
-                    backgroundColor: "rgba(255, 107, 53, 0.08)",
-                    padding: "1px 6px",
-                    borderRadius: "10px",
-                  }}
-                >
-                  Lv.{comment.user?.level ?? 1} {comment.user?.title}
-                </span>
-              )}
-              {comment.user?.primary_badge && (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "3px",
-                    fontSize: "10px",
+                    fontSize: "13.5px",
                     fontWeight: 600,
-                    color: comment.user.primary_badge.accent_color,
-                    backgroundColor: `${comment.user.primary_badge.accent_color}12`,
-                    padding: "1px 6px",
-                    borderRadius: "10px",
-                    border: `1px solid ${comment.user.primary_badge.accent_color}33`,
+                    color: "#1d1d1f",
                   }}
-                  title={comment.user.primary_badge.name}
                 >
-                  <span style={{ fontSize: "12px" }}>󱐎</span>
-                  {comment.user.primary_badge.name}
-                </div>
-              )}
-            </div>
-            <div
-              style={{
-                fontSize: "13.5px",
-                lineHeight: "1.5",
-                color: "#333",
-                marginTop: "2px",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-              }}
-            >
-              {comment.content}
+                  {name}
+                </span>
+                {(comment.user?.level || comment.user?.title) && (
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 500,
+                      color: "#e76c3fff",
+                      backgroundColor: "rgba(254, 142, 72, 0.08)",
+                      padding: "1px 6px",
+                      borderRadius: "10px",
+                    }}
+                  >
+                    Lv.{comment.user?.level ?? 1} {comment.user?.title}
+                  </span>
+                )}
+                {comment.user?.primary_badge && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "3px",
+                      fontSize: "10px",
+                      fontWeight: 600,
+                      color: comment.user.primary_badge.accent_color,
+                      backgroundColor: `${comment.user.primary_badge.accent_color}12`,
+                      padding: "1px 6px",
+                      borderRadius: "10px",
+                      border: `1px solid ${comment.user.primary_badge.accent_color}33`,
+                    }}
+                    title={comment.user.primary_badge.name}
+                  >
+                    <FaMedal />
+                    {comment.user.primary_badge.name}
+                  </div>
+                )}
+              </div>
+              <div
+                style={{
+                  fontSize: "13.5px",
+                  lineHeight: "1.5",
+                  color: "#333",
+                  marginTop: "2px",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                }}
+              >
+                {comment.content}
+              </div>
             </div>
           </div>
+          <div style={{ display: "flex", gap: "12px", marginTop: "5px", paddingLeft: "4px" }}>
+            <span style={{ color: "#C0C0C0", fontSize: "0.68rem" }}>
+              {adaptTime(comment.created_at)}
+            </span>
+            <button
+              type="button"
+              onClick={() => onReply(comment)}
+              style={{
+                color: "#A3A3A3",
+                fontSize: "0.68rem",
+                fontWeight: 700,
+                cursor: "pointer",
+                background: "none",
+                border: "none",
+                padding: 0,
+              }}
+            >
+              Trả lời
+            </button>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: "12px", marginTop: "5px", paddingLeft: "4px" }}>
-          <span style={{ color: "#C0C0C0", fontSize: "0.68rem" }}>
-            {adaptTime(comment.created_at)}
-          </span>
-          <button
-            type="button"
-            onClick={() => onReply(comment)}
-            style={{
-              color: "#A3A3A3",
-              fontSize: "0.68rem",
-              fontWeight: 700,
-              cursor: "pointer",
-              background: "none",
-              border: "none",
-              padding: 0,
-            }}
-          >
-            Trả lời
-          </button>
-        </div>
+
       </motion.div>
 
       {comment.replies?.length ? (

@@ -161,8 +161,15 @@ const InlineNotice: React.FC<{
   );
 };
 
+import { PostData, ReelData } from "@/types/dashboard";
+
 // ─── Main component ──────────────────────────────────────────────
-export const TasteVault: React.FC = () => {
+interface TasteVaultProps {
+  onPostClick?: (post: PostData) => void;
+  onReelClick?: (reel: ReelData) => void;
+}
+
+export const TasteVault: React.FC<TasteVaultProps> = ({ onPostClick, onReelClick }) => {
   const vaultRef = useRef<HTMLDivElement>(null);
   const [bookmarks, setBookmarks] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -304,6 +311,41 @@ export const TasteVault: React.FC = () => {
               };
             }
 
+            const handleCardClick = () => {
+              if (bm.post && onPostClick) {
+                onPostClick({
+                  id: bm.post.id,
+                  name: bm.post.author_name || "User",
+                  avatar: bm.post.author_avatar || "",
+                  time: bm.post.created_at || "",
+                  location: bm.post.location_name || "",
+                  spotName: bm.post.spot_name || "Unknown Spot",
+                  rating: bm.post.rating || 0,
+                  review: bm.post.review || "",
+                  img: bm.post.image_url || cardData.img,
+                  tags: bm.post.tags || [],
+                  likes: bm.post.likes_count || 0,
+                  comments: bm.post.comments_count || 0,
+                  isLiked: bm.post.is_liked,
+                  isSaved: true,
+                });
+              } else if (bm.reel && onReelClick) {
+                onReelClick({
+                  id: bm.reel.id,
+                  title: bm.reel.title || "",
+                  user: bm.reel.author_name || "User",
+                  views: bm.reel.views_count?.toString() || "0",
+                  userAvatar: bm.reel.author_avatar || "",
+                  img: bm.reel.thumbnail_url || cardData.img,
+                  videoUrl: bm.reel.video_url,
+                  likes: bm.reel.likes_count,
+                  comments: bm.reel.comments_count,
+                  isLiked: bm.reel.is_liked,
+                  isSaved: true,
+                });
+              }
+            };
+
             return (
               <VaultCardV2
                 key={bm.id}
@@ -316,6 +358,7 @@ export const TasteVault: React.FC = () => {
                 authorName={cardData.authorName}
                 authorAvatar={cardData.authorAvatar}
                 authorSub={cardData.authorSub}
+                onClick={handleCardClick}
               />
             );
           })}

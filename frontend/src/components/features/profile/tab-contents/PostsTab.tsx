@@ -8,7 +8,19 @@ import { Text } from "@/components/OnceUI";
 export interface PostItem {
   id: number;
   user_id?: number;
-  user?: { id: number; display_name?: string; avatar_url?: string };
+  user?: { 
+    id: number; 
+    display_name?: string; 
+    avatar_url?: string;
+    title?: string;
+    level?: number;
+    primary_badge?: {
+      id: number;
+      name: string;
+      icon_name: string;
+      accent_color: string;
+    } | null;
+  };
   location_id?: number;
   location?: {
     id: number;

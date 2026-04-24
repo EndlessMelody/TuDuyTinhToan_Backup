@@ -52,6 +52,9 @@ export const ProfileTabs: React.FC<ProfileTabsProps> = ({
       likes: post.likes_count,
       comments: post.comments_count,
       isLiked: post.is_liked,
+      userTitle: post.user?.title,
+      userLevel: post.user?.level,
+      primaryBadge: post.user?.primary_badge,
     };
     setSelectedPost(mappedPost);
     setIsPostModalOpen(true);

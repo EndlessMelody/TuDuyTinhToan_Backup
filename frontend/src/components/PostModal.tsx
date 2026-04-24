@@ -113,54 +113,112 @@ export default function PostModal({
             >
               <div
                 style={{
-                  padding: "18px 20px 14px",
+                  padding: "20px",
                   borderBottom: "1px solid #F0F0F0",
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "12px",
+                  flexDirection: "column",
+                  gap: "16px",
                   flexShrink: 0,
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
-                  <Avatar src={data.avatar} size="m" />
-                  <div style={{ minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontSize: "0.88rem",
-                        fontWeight: 700,
-                        color: "#1C1C1E",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {data.name}
-                    </div>
-                    <div style={{ fontSize: "0.74rem", color: "#8E8E93" }}>
-                      {data.time} · {data.location}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
+                    <Avatar src={data.avatar} size="m" />
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: "1rem",
+                          fontWeight: 700,
+                          color: "#1C1C1E",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                        }}
+                      >
+                        {data.name}
+                        {data.primaryBadge && (
+                          <div
+                            style={{
+                              fontSize: "10px",
+                              fontWeight: 700,
+                              color: data.primaryBadge.accent_color,
+                              backgroundColor: "rgba(0,0,0,0.03)",
+                              padding: "2px 8px",
+                              borderRadius: "8px",
+                              border: `1px solid ${data.primaryBadge.accent_color}33`,
+                            }}
+                          >
+                            {data.primaryBadge.name}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ fontSize: "0.75rem", color: "#8E8E93", marginTop: "2px" }}>
+                        {data.time} — {data.location}
+                      </div>
                     </div>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    style={{
+                      width: "32px",
+                      height: "32px",
+                      borderRadius: "50%",
+                      border: "none",
+                      backgroundColor: "#F5F5F7",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                    }}
+                  >
+                    <X size={16} color="#1d1d1f" />
+                  </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={onClose}
-                  style={{
-                    width: "30px",
-                    height: "30px",
-                    borderRadius: "50%",
-                    border: "none",
-                    backgroundColor: "#F5F5F5",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    transition: "background 0.15s",
-                  }}
-                >
-                  <X size={15} color="#555" />
-                </button>
+                <div style={{ paddingLeft: "2px" }}>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: "0.9rem",
+                      lineHeight: 1.6,
+                      color: "#1C1C1E",
+                      whiteSpace: "pre-wrap",
+                    }}
+                  >
+                    {data.review}
+                  </p>
+
+                  {data.tags?.length ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: "8px",
+                        marginTop: "14px",
+                      }}
+                    >
+                      {data.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          style={{
+                            padding: "4px 12px",
+                            backgroundColor: "#FFF5F0",
+                            borderRadius: "10px",
+                            fontSize: "0.72rem",
+                            fontWeight: 600,
+                            color: "#ff6b35",
+                            border: "1px solid rgba(255,107,53,0.1)",
+                          }}
+                        >
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </div>
 
               <div
@@ -181,52 +239,7 @@ export default function PostModal({
                   }
                   rootStyle={{ flex: 1 }}
                   listStyle={{ padding: "16px 20px" }}
-                  fixedHeader={
-                    <div style={{ padding: "16px 20px", borderBottom: "1px solid #F0F0F0", backgroundColor: "#FFFFFF" }}>
-                      <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
-                        <Avatar src={data.avatar} size="s" />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "6px",
-                              marginBottom: "8px",
-                            }}
-                          >
-                            <MapPin size={13} color="#8E8E93" />
-                            <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#1C1C1E" }}>
-                              {data.spotName}
-                            </span>
-                          </div>
-                          <p style={{ margin: 0, fontSize: "0.83rem", lineHeight: 1.55, color: "#1C1C1E" }}>
-                            <span style={{ fontWeight: 700, marginRight: "5px" }}>{data.name}</span>
-                            {data.review}
-                          </p>
-                          {data.tags?.length ? (
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "10px" }}>
-                              {data.tags.map((tag) => (
-                                <span
-                                  key={tag}
-                                  style={{
-                                    padding: "3px 10px",
-                                    backgroundColor: "#FFF0EA",
-                                    borderRadius: "20px",
-                                    fontSize: "0.68rem",
-                                    fontWeight: 600,
-                                    color: "#ff6b35",
-                                    border: "1px solid rgba(255,107,53,0.15)",
-                                  }}
-                                >
-                                  #{tag}
-                                </span>
-                              ))}
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  }
+                  fixedHeader={null}
                   footer={
                     <div
                       style={{

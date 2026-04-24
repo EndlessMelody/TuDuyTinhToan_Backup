@@ -18,6 +18,19 @@ export interface PostData {
   id: number;
   name: string;
   avatar: string;
+  user?: { 
+    id: number; 
+    display_name?: string; 
+    avatar_url?: string;
+    title?: string;
+    level?: number;
+    primary_badge?: {
+      id: number;
+      name: string;
+      icon_name: string;
+      accent_color: string;
+    } | null;
+  };
   time: string;
   location: string;
   spotName: string;
@@ -29,6 +42,14 @@ export interface PostData {
   comments: number;
   isLiked?: boolean;
   isSaved?: boolean;
+  userTitle?: string;
+  userLevel?: number;
+  primaryBadge?: {
+    id: number;
+    name: string;
+    icon_name: string;
+    accent_color: string;
+  } | null;
 }
 
 export interface AIPickData {
