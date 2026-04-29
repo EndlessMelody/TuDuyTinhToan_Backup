@@ -2172,7 +2172,7 @@ export default function GroupRoomPage() {
         {/* ── LEFT PANEL ── */}
         <div
           className="flex-1 flex flex-col overflow-hidden border-r border-[#E5E5EA]"
-          style={{ backgroundColor: "#fff" }}
+          style={{ backgroundColor: "#fff", minWidth: 0 }}
         >
           {/* Room info bar */}
           <div
@@ -2230,7 +2230,8 @@ export default function GroupRoomPage() {
             )}
           </div>
 
-          {/* ── READY BAR + LAUNCH ── */}
+          {/* ── READY BAR + LAUNCH (only during "active" / waiting phase) ── */}
+          {room.status === "active" && (
           <div className="px-5 py-4 border-b border-[#F2F2F7] flex flex-col gap-3.5">
             <ReadyBar members={members} />
 
@@ -2317,6 +2318,7 @@ export default function GroupRoomPage() {
               </motion.button>
             )}
           </div>
+          )}
 
           {/* ── MAIN CONTENT AREA: conditional on room.status ── */}
           {room.status === "in_progress" || room.status === "completed" ? (
@@ -2373,7 +2375,7 @@ export default function GroupRoomPage() {
         {/* ── RIGHT SIDEBAR ── */}
         <div
           className="flex flex-col shrink-0 overflow-hidden"
-          style={{ width: 520, backgroundColor: "#FAFAFA" }}
+          style={{ width: 360, backgroundColor: "#FAFAFA" }}
         >
           {/* Tab switcher */}
           <div className="p-2 border-b border-[#E5E5EA] shrink-0">

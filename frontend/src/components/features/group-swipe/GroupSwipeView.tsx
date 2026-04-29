@@ -21,8 +21,8 @@ import {
 import { toast } from "sonner";
 import { useGroupSwipe, type GroupCard } from "@/hooks/useGroupSwipe";
 import { TourDNABar } from "./TourDNABar";
-import { GroupVaultSheet } from "./GroupVaultSheet";
-import { GroupResultsView } from "./GroupResultsView";
+import { GroupVaultSheet } from "@/components/features/group-swipe/GroupVaultSheet";
+import { GroupResultsView } from "@/components/features/group-swipe/GroupResultsView";
 
 // ─── Swipe Card ───────────────────────────────────────────────────────────────
 
