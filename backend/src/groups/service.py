@@ -231,10 +231,10 @@ async def group_recommend(db: AsyncSession, group_id: int, body, user_id: int) -
     3. Prioritizes starred cards from teammates
     4. Groups vectors with weighting based on compromise_score (loser boost)
     """
-    # Validate group is active
+    # Validate group is active or in_progress
     group_q = await db.execute(select(Group).where(Group.id == group_id))
     group = group_q.scalars().first()
-    if not group or group.status != "active":
+    if not group or group.status not in ("active", "in_progress"):
         raise HTTPException(status_code=400, detail="Lobby không hoạt động")
 
     # Get all members + their SESSION vectors
@@ -315,6 +315,10 @@ async def group_recommend(db: AsyncSession, group_id: int, body, user_id: int) -
 
         entry = {
             "place_id": loc.id, "name": loc.name, "group_score": round(group_score, 3),
+            "image_url": loc.image_url,
+            "price_range": loc.price_range,
+            "rating": loc.rating,
+            "address": loc.address,
             "member_scores": member_scores,
             "most_compromised_member": most_compromised["display_name"],
             "compensation_note": f"{most_compromised['display_name']} sẽ được ưu tiên ở lượt sau",
@@ -604,6 +608,7 @@ async def group_finish(db: AsyncSession, group_id: int, user_id: int, top_n: int
             "place_id": loc.id,
             "name": loc.name,
             "group_score": group_score,
+            "image_url": loc.image_url,
             "member_scores": member_scores,
             "in_vault": loc.id in vault_ids,
             "_max_compromise": max_compromise,
@@ -639,7 +644,7 @@ async def group_undo(db: AsyncSession, group_id: int, user_id: int) -> dict:
     # Validate group is active
     group_q = await db.execute(select(Group).where(Group.id == group_id))
     group = group_q.scalars().first()
-    if not group or group.status != "active":
+    if not group or group.status not in ("active", "in_progress"):
         raise HTTPException(status_code=400, detail="Lobby không hoạt động hoặc đã kết thúc")
 
     # Find latest interaction of this user in this group
@@ -697,6 +702,158 @@ async def group_undo(db: AsyncSession, group_id: int, user_id: int) -> dict:
         "status": "undone",
         "undone_interaction_id": undone_id,
         "reverted_vector": list(member.session_vector or []),
+    }
+
+
+# ─── Group Swipe (Session Vector Update) ────────────────────────────
+
+ALPHA = 0.1  # Learning rate for session vector updates
+
+
+async def group_swipe(
+    db: AsyncSession,
+    group_id: int,
+    user_id: int,
+    location_id: int,
+    action: str,
+) -> dict:
+    """
+    Process a swipe action within a group lobby.
+
+    1. Validate group is in_progress and user is member
+    2. Create Interaction record with group_id
+    3. Update GroupMember.session_vector:
+       - LIKED:   U_new = U_old + α·P
+       - SKIPPED: U_new = U_old - α·P
+       - STARRED: U_new = U_old + 2α·P (boost)
+    4. Clip vector to [0, 1]
+    """
+    # Validate action
+    valid_actions = ("LIKED", "SKIPPED", "DISLIKED", "STARRED")
+    action = action.upper()
+    if action not in valid_actions:
+        raise HTTPException(status_code=400, detail=f"Invalid action: {action}")
+
+    # Validate group is in_progress
+    group_q = await db.execute(select(Group).where(Group.id == group_id))
+    group = group_q.scalars().first()
+    if not group or group.status not in ("active", "in_progress"):
+        raise HTTPException(status_code=400, detail="Lobby không hoạt động")
+
+    # Validate membership
+    member_q = await db.execute(
+        select(GroupMember).where(
+            GroupMember.group_id == group_id,
+            GroupMember.user_id == user_id,
+        )
+    )
+    member = member_q.scalars().first()
+    if not member:
+        raise HTTPException(status_code=404, detail="Bạn không phải thành viên lobby này")
+
+    # Check for duplicate swipe on same location in this group
+    dup_q = await db.execute(
+        select(Interaction).where(
+            Interaction.group_id == group_id,
+            Interaction.user_id == user_id,
+            Interaction.location_id == location_id,
+        )
+    )
+    if dup_q.scalars().first():
+        raise HTTPException(status_code=400, detail="Bạn đã quẹt thẻ này rồi")
+
+    # Get location vector
+    loc_q = await db.execute(select(Location).where(Location.id == location_id))
+    loc = loc_q.scalars().first()
+    if not loc:
+        raise HTTPException(status_code=404, detail="Location không tồn tại")
+
+    # Create Interaction record
+    interaction = Interaction(
+        user_id=user_id,
+        location_id=location_id,
+        group_id=group_id,
+        action=action,
+    )
+    db.add(interaction)
+    await db.flush()  # Get interaction.id
+
+    # Update session_vector
+    if loc.vector is not None and member.session_vector is not None:
+        U = np.array(member.session_vector, dtype=float)
+        P = np.array(loc.vector, dtype=float)
+
+        if action == "STARRED":
+            U = U + 2 * ALPHA * P  # Boost mạnh hơn
+        elif action in ("LIKED",):
+            U = U + ALPHA * P
+        elif action in ("SKIPPED", "DISLIKED"):
+            U = U - ALPHA * P
+
+        U = np.clip(U, 0.0, 1.0)
+        member.session_vector = [round(float(x), 4) for x in U]
+
+    await db.commit()
+
+    return {
+        "status": "swiped",
+        "interaction_id": interaction.id,
+        "updated_session_vector": list(member.session_vector or []),
+        "is_starred": action == "STARRED",
+    }
+
+
+# ─── Group Launch (Host starts swipe session) ───────────────────────
+
+async def group_launch(db: AsyncSession, group_id: int, user_id: int) -> dict:
+    """
+    Host launches the swipe session.
+    1. Validate caller is host
+    2. Validate all members are ready
+    3. Set group.status = 'in_progress'
+    """
+    # Check host permission
+    member_q = await db.execute(
+        select(GroupMember).where(
+            GroupMember.group_id == group_id,
+            GroupMember.user_id == user_id,
+        )
+    )
+    host_member = member_q.scalars().first()
+    if not host_member or not host_member.is_host:
+        raise HTTPException(status_code=403, detail="Chỉ Host mới có quyền launch")
+
+    # Get group
+    group_q = await db.execute(select(Group).where(Group.id == group_id))
+    group = group_q.scalars().first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Lobby không tìm thấy")
+    if group.status != "active":
+        raise HTTPException(status_code=400, detail="Lobby không ở trạng thái active")
+
+    # Check all members ready
+    members_q = await db.execute(
+        select(GroupMember).where(GroupMember.group_id == group_id)
+    )
+    members = members_q.scalars().all()
+    if not members:
+        raise HTTPException(status_code=400, detail="Lobby trống")
+
+    not_ready = [m for m in members if not m.is_ready]
+    if not_ready:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Còn {len(not_ready)} thành viên chưa sẵn sàng"
+        )
+
+    # Transition to in_progress
+    group.status = "in_progress"
+    await db.commit()
+
+    return {
+        "status": "in_progress",
+        "group_id": group.id,
+        "message": "Phiên khám phá đã bắt đầu! Mọi người hãy bắt đầu lướt thẻ.",
     }
 
 
