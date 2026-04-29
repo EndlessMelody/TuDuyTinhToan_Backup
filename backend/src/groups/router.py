@@ -8,6 +8,7 @@ from src.groups.schemas import (
     FinishRequest,
     JoinByCodeRequest,
     ChatMessageCreate,
+    GroupSwipeRequest,
 )
 from src.core.dependencies import get_current_user_id
 from src.groups.websocket import voice_manager, validate_ws_token
@@ -154,6 +155,35 @@ async def group_undo(
     db: AsyncSession = Depends(get_db)
 ):
     return await service.group_undo(db, group_id, user_id)
+
+
+@router.post(
+    "/{group_id}/swipe",
+    summary="Swipe thẻ trong group lobby",
+    description="Ghi nhận hành động swipe (LIKED/SKIPPED/STARRED) và cập nhật session_vector.",
+)
+async def group_swipe(
+    group_id: int,
+    body: GroupSwipeRequest,
+    user_id: int = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    return await service.group_swipe(
+        db, group_id, user_id, body.location_id, body.action
+    )
+
+
+@router.post(
+    "/{group_id}/launch",
+    summary="Launch phiên khám phá",
+    description="Chỉ Host gọi được. Chuyển group sang trạng thái in_progress để bắt đầu lướt thẻ.",
+)
+async def group_launch(
+    group_id: int,
+    user_id: int = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    return await service.group_launch(db, group_id, user_id)
 
 
 @router.get("/{group_id}/messages", summary="Lấy tin nhắn chat", description="Lấy lịch sử tin nhắn trong phòng lobby")

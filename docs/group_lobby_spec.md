@@ -24,7 +24,14 @@ Tính năng Group Lobby (Phòng chờ nhóm) cho phép một người dùng (Hos
 - Mọi thao tác Quẹt Trái (Bỏ qua) / Quẹt Phải (Thích) trong phòng này sẽ chỉ làm thay đổi Session Vector, hoàn toàn không tác động đến Vector gốc của user. (Giúp user thoải mái "chiều" theo bạn bè trong buổi đi chơi đó mà không sợ AI sau này gợi ý sai cho cá nhân mình).
 
 ## 3. Lõi Toán học: Thuật toán Trọng tài (AI Thought Engine)
+5.1. Đồng bộ Dữ liệu & Giao tiếp Mạng (Real-time WebSocket)
+Hạ tầng lõi: Tính năng vuốt thẻ nhóm bắt buộc phải có độ trễ cực thấp (Zero-latency) để tạo cảm giác đồng bộ. Do đó, hệ thống sẽ sử dụng hoàn toàn WebSocket, tận dụng lại cơ sở hạ tầng đã được xây dựng cho tính năng Voice Chat (VoiceConnectionManager).  
 
+Cơ chế Event-driven: Thay vì Frontend phải liên tục "hỏi thăm" Server (Polling), Frontend chỉ gửi tín hiệu (Emit) khi user có hành động cụ thể (vd: swipe_right, star_location).
+
+Xử lý Siêu thích (Star): Khi user A bấm Star một quán, Frontend bắn event qua WebSocket. Backend nhận được sẽ lập tức broadcast (phát sóng) event force_insert_card tới 5 người còn lại. Frontend của 5 người này sẽ tự động bắt event và chèn thẻ đó lên đầu mảng Queue cục bộ ngay lập tức.  
+
+Fallback & Sync: HTTP GET request truyền thống chỉ được dùng duy nhất vào lúc user mới bước vào phòng hoặc bị rớt mạng cần kết nối lại (Reconnect) để tải toàn bộ trạng thái phòng (Room State) hiện tại.
 Để sinh ra các thẻ món ăn tiếp theo cho nhóm, Backend không random bừa, mà sử dụng thuật toán Minimax để làm "Trọng tài" phân xử sở thích.
 
 ### 3.1. Tìm điểm dung hòa tối ưu
@@ -55,10 +62,16 @@ Nếu AI phát hiện sở thích của nhóm đang bị "phân cực" quá mứ
 
 ## 5. UI Elements & Giao tiếp Mạng (Networking)
 
-### 5.1. Đồng bộ Dữ liệu (Short Polling)
+### 5.1. Đồng bộ Dữ liệu & Giao tiếp Mạng (Real-time WebSocket)
 
-- Để giảm tải cho server và dễ code, hệ thống KHÔNG DÙNG WebSocket.
-- Thay vào đó, Frontend sẽ dùng HTTP POST / GET Polling: Cứ mỗi vài giây, giao diện sẽ ngầm gọi API lên Backend để lấy trạng thái mới nhất của phòng (Ví dụ: Xem có ai vừa quăng nút Star để mình load thẻ đó về không, hoặc cập nhật thanh tiến trình DNA của cả nhóm).
+- Hạ tầng lõi: Tính năng vuốt thẻ nhóm bắt buộc phải có độ trễ cực thấp (Zero-latency) để tạo cảm giác đồng bộ. Do đó, hệ thống sẽ sử dụng hoàn toàn WebSocket, tận dụng lại cơ sở hạ tầng đã được xây dựng cho tính năng Voice Chat (VoiceConnectionManager).  
+
+- Cơ chế Event-driven: Thay vì Frontend phải liên tục "hỏi thăm" Server (Polling), Frontend chỉ gửi tín hiệu (Emit) khi user có hành động cụ thể (vd: swipe_right, star_location).
+
+- Xử lý Siêu thích (Star): Khi user A bấm Star một quán, Frontend bắn event qua WebSocket. Backend nhận được sẽ lập tức broadcast (phát sóng) event force_insert_card tới 5 người còn lại. Frontend của 5 người này sẽ tự động bắt event và chèn thẻ đó lên đầu mảng Queue cục bộ ngay lập tức.  
+
+Fallback & Sync: HTTP GET request truyền thống chỉ được dùng duy nhất vào lúc user mới bước vào phòng hoặc bị rớt mạng cần kết nối lại (Reconnect) để tải toàn bộ trạng thái phòng (Room State) hiện tại.
+
 
 ### 5.2. Hiển thị Linh động (Dynamic UI)
 
