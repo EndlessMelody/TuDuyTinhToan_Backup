@@ -45,6 +45,7 @@ import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { GroupSwipeView } from "@/components/features/group-swipe";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1970,7 +1971,7 @@ export default function GroupRoomPage() {
     }
   }, [meReady, roomId, user?.id]);
 
-  const handleLaunch = useCallback(() => {
+  const handleLaunch = useCallback(async () => {
     if (!allReady) {
       toast.error("Wait for everyone to be ready!");
       return;
@@ -1980,13 +1981,27 @@ export default function GroupRoomPage() {
       setCountdown((c) => {
         if (c === null || c <= 1) {
           clearInterval(countdownRef.current!);
-          toast.success("Launching Tour Builder! 🚀");
+          // Call backend to transition status to in_progress
+          apiPost(`/api/v1/groups/${roomId}/launch`)
+            .then(() => {
+              setRoom((prev) =>
+                prev ? { ...prev, status: "in_progress" } : prev,
+              );
+              toast.success("Phiên khám phá bắt đầu! 🚀");
+            })
+            .catch((err: unknown) => {
+              toast.error(
+                err instanceof Error
+                  ? err.message
+                  : "Failed to launch session.",
+              );
+            });
           return null;
         }
         return c - 1;
       });
     }, 1000);
-  }, [allReady]);
+  }, [allReady, roomId]);
 
   const handleDeleteRoom = useCallback(async () => {
     if (!isHost) {
@@ -2157,7 +2172,7 @@ export default function GroupRoomPage() {
         {/* ── LEFT PANEL ── */}
         <div
           className="flex-1 flex flex-col overflow-hidden border-r border-[#E5E5EA]"
-          style={{ backgroundColor: "#fff" }}
+          style={{ backgroundColor: "#fff", minWidth: 0 }}
         >
           {/* Room info bar */}
           <div
@@ -2215,7 +2230,8 @@ export default function GroupRoomPage() {
             )}
           </div>
 
-          {/* ── READY BAR + LAUNCH ── */}
+          {/* ── READY BAR + LAUNCH (only during "active" / waiting phase) ── */}
+          {room.status === "active" && (
           <div className="px-5 py-4 border-b border-[#F2F2F7] flex flex-col gap-3.5">
             <ReadyBar members={members} />
 
@@ -2302,48 +2318,64 @@ export default function GroupRoomPage() {
               </motion.button>
             )}
           </div>
+          )}
 
-          {/* ── WAITING PLACEHOLDER ── */}
-          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-            <motion.div
-              animate={{ scale: [1, 1.04, 1] }}
-              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              className="w-24 h-24 rounded-[28px] flex items-center justify-center mb-5"
-              style={{
-                background: `linear-gradient(135deg, ${accentColor}22, ${accentColor}44)`,
-              }}
-            >
-              <Zap size={36} style={{ color: accentColor }} />
-            </motion.div>
-            <h3 className="text-[20px] font-extrabold text-[#1C1C1E] tracking-tight mb-2">
-              Waiting to Launch
-            </h3>
-            <p className="text-[14px] text-[#8E8E93] max-full leading-relaxed">
-              Once everyone marks ready and the host launches, you&apos;ll all
-              enter the Tour Builder together to swipe and vote on spots.
-            </p>
+          {/* ── MAIN CONTENT AREA: conditional on room.status ── */}
+          {room.status === "in_progress" || room.status === "completed" ? (
+            <div className="flex-1 overflow-hidden">
+              <GroupSwipeView
+                groupId={roomId}
+                isHost={isHost}
+                onStatusChange={(newStatus) => {
+                  setRoom((prev) =>
+                    prev ? { ...prev, status: newStatus } : prev,
+                  );
+                }}
+              />
+            </div>
+          ) : (
+            /* ── WAITING PLACEHOLDER (status === "active") ── */
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+              <motion.div
+                animate={{ scale: [1, 1.04, 1] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                className="w-24 h-24 rounded-[28px] flex items-center justify-center mb-5"
+                style={{
+                  background: `linear-gradient(135deg, ${accentColor}22, ${accentColor}44)`,
+                }}
+              >
+                <Zap size={36} style={{ color: accentColor }} />
+              </motion.div>
+              <h3 className="text-[20px] font-extrabold text-[#1C1C1E] tracking-tight mb-2">
+                Waiting to Launch
+              </h3>
+              <p className="text-[14px] text-[#8E8E93] max-full leading-relaxed">
+                Once everyone marks ready and the host launches, you&apos;ll all
+                enter the Tour Builder together to swipe and vote on spots.
+              </p>
 
-            <div className="flex gap-3 mt-6">
-              <div
-                className="flex items-center gap-2 px-4 py-2.5 rounded-[12px] text-[13px] font-semibold"
-                style={{ backgroundColor: "#F2F2F7", color: "#3C3C43" }}
-              >
-                <Users size={14} /> {members.length} / {room.max_spots} joined
-              </div>
-              <div
-                className="flex items-center gap-2 px-4 py-2.5 rounded-[12px] text-[13px] font-semibold"
-                style={{ backgroundColor: "#F2F2F7", color: "#3C3C43" }}
-              >
-                <Check size={14} /> {readyCount} ready
+              <div className="flex gap-3 mt-6">
+                <div
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-[12px] text-[13px] font-semibold"
+                  style={{ backgroundColor: "#F2F2F7", color: "#3C3C43" }}
+                >
+                  <Users size={14} /> {members.length} / {room.max_spots} joined
+                </div>
+                <div
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-[12px] text-[13px] font-semibold"
+                  style={{ backgroundColor: "#F2F2F7", color: "#3C3C43" }}
+                >
+                  <Check size={14} /> {readyCount} ready
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* ── RIGHT SIDEBAR ── */}
         <div
           className="flex flex-col shrink-0 overflow-hidden"
-          style={{ width: 520, backgroundColor: "#FAFAFA" }}
+          style={{ width: 360, backgroundColor: "#FAFAFA" }}
         >
           {/* Tab switcher */}
           <div className="p-2 border-b border-[#E5E5EA] shrink-0">

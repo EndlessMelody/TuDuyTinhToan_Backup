@@ -167,6 +167,28 @@ class UndoResponse(BaseModel):
     reverted_vector: List[float] = []
 
 
+# ─── Swipe (Group-context swiping) ────────────────────────────────────────
+
+class GroupSwipeRequest(BaseModel):
+    location_id: int
+    action: str  # "LIKED" | "SKIPPED" | "STARRED"
+
+
+class GroupSwipeResponse(BaseModel):
+    status: str
+    interaction_id: int
+    updated_session_vector: List[float] = []
+    is_starred: bool = False
+
+
+# ─── Launch (Host starts swipe session) ───────────────────────────────────
+
+class GroupLaunchResponse(BaseModel):
+    status: str
+    group_id: int
+    message: str
+
+
 # ─── Chat ─────────────────────────────────────────────────────────────────
 
 class ChatMessageBase(BaseModel):
