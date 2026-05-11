@@ -13,7 +13,7 @@ import math
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, or_
+from sqlalchemy import case, func, or_
 from typing import Optional, List
 
 from src.locations.models import Location
@@ -139,7 +139,7 @@ async def find_locations_by_food_name(
     
     # Prefer food category, then by rating
     query = query.order_by(
-        func.case((Location.category == "food", 1), else_=0).desc(),
+        case((Location.category == "food", 1), else_=0).desc(),
         Location.rating.desc().nullslast(),
         Location.base_score.desc().nullslast(),
     )

@@ -351,6 +351,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         if (isOpen) onToggle(false);
       }}
       style={{
+        width: isFullScreen ? 0 : isOpen ? 240 : 72,
+        minWidth: isFullScreen ? 0 : isOpen ? 240 : 72,
         height: "100%",
         flexShrink: 0,
         overflowX: "hidden",

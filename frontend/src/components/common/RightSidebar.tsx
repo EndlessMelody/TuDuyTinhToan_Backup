@@ -180,18 +180,18 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
             overflow: "hidden",
           }}
         >
-          <ResponsiveContainer width="100%" height="100%">
-            <RadarChart
-              data={radarData}
-              cx="50%"
-              cy="50%"
-              outerRadius={isExpanded ? "72%" : "80%"}
-            >
-              <PolarGrid
-                stroke="rgba(0,0,0,0.06)"
-                strokeDasharray="3 3"
-              />
-              {isExpanded && (
+          {isExpanded ? (
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+              <RadarChart
+                data={radarData}
+                cx="50%"
+                cy="50%"
+                outerRadius="72%"
+              >
+                <PolarGrid
+                  stroke="rgba(0,0,0,0.06)"
+                  strokeDasharray="3 3"
+                />
                 <PolarAngleAxis
                   dataKey="subject"
                   tick={{
@@ -200,16 +200,36 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     fill: "rgba(0,0,0,0.4)",
                   }}
                 />
-              )}
-              <Radar
-                dataKey="A"
-                stroke="#ff6b35"
-                fill="rgba(255, 107, 53, 0.15)"
-                strokeWidth={2}
-                dot={isExpanded}
-              />
-            </RadarChart>
-          </ResponsiveContainer>
+                <Radar
+                  dataKey="A"
+                  stroke="#ff6b35"
+                  fill="rgba(255, 107, 53, 0.15)"
+                  strokeWidth={2}
+                  dot
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+              <RadarChart
+                data={radarData}
+                cx="50%"
+                cy="50%"
+                outerRadius="80%"
+              >
+                <PolarGrid
+                  stroke="rgba(0,0,0,0.06)"
+                  strokeDasharray="3 3"
+                />
+                <Radar
+                  dataKey="A"
+                  stroke="#ff6b35"
+                  fill="rgba(255, 107, 53, 0.15)"
+                  strokeWidth={2}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
         {isExpanded && topTrait && (
